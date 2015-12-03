@@ -1,0 +1,300 @@
+/*
+ * module to transform Go! programs to be more indexable
+ * The idea is to transform:
+ * p(f(A,B),C) :- G1
+ * p(f(E,F),D) :- G2
+ *
+ * into 
+ * p(f(U,V),W) :- p1(U,V,W).
+ * p1(A,B,C) :- G1.
+ * p1(E,F,D) :- G2.
+ * 
+ * This transformation helps when there are many similar patterns in the program
+ */
+#include "go.ah";			-- standard header for the compiler
+#include "xtree.ah";
+
+module
+import {
+  interface "misc.af" and
+  interface "canon.af" and
+  interface "dirtree.af" and
+  interface <stdio.af>
+} in
+{
+					-- And/Or tree
+  flattenBar(Nd) => let{
+    Count : 0;
+    fB(N) => case N in {
+      seqn(L,R) => fB(L)<>fB(R)
+    | clse(_,H,_,_) => valof{
+	Count +:=1;
+	valis [(Count,cons("",H),N)]              -- Special sentinel for args
+      }
+    }
+  } in fB(Nd);
+
+  reChoice(List) => case List in {
+    [Cl] => Cl
+  | [Cl,..L] => seqn(Cl,reChoice(L))
+  };
+
+  reShape(Tree,Clauses,Opts) => let {
+
+    skipArg(tX(El,_,_,R)) => case El in {
+      leaf(N) => R
+    | sy(Sy) => R
+    | nm(Nm) => R
+    | c(Ch) => R
+    | ls => skipArg(skipArg(R))
+    | fn(C,Ar) => valof{
+        xR : R;
+        for i in 1..Ar do
+          xR := skipArg(xR);
+        valis xR
+      }
+    | oth(vList) => R
+    };
+
+    -- Construct a new head from the tree.
+    -- We continue constructing a pattern while there is no choice
+    -- and then we construct variables for the remainder of the pattern
+
+    commonFront(tX(Nd,Mt,Ch,Rs),unFold,inMatch,Ld,Q,xTr,soFar) => valof {
+      if unFold && Ch==empty then {
+	case Nd in {
+	  leaf(N) ->
+	    valis (rev(soFar),true,tX(Nd,Mt,Ch,Rs),Ld,Q,xTr)
+	| sy(Sy)::(Mt && !inMatch) ->
+	    valis ([mtch(symb(Sy)),..soFar],true,Rs,Ld,Q,xTr)
+	| sy(Sy) ->
+	    valis ([symb(Sy),..soFar],true,Rs,Ld,Q,xTr)
+	| nm(Nm)::(Mt && !inMatch) ->
+	    valis ([mtch(numb(Nm)),..soFar],true,Rs,Ld,Q,xTr)
+	| nm(Nm) ->
+	    valis ([numb(Nm),..soFar],true,Rs,Ld,Q,xTr)
+
+	| c(Ch)::(Mt && !inMatch) ->
+	    valis ([mtch(ch(Ch)),..soFar],true,Rs,Ld,Q,xTr)
+	| c(Ch) ->
+	    valis ([ch(Ch),..soFar],true,Rs,Ld,Q,xTr)
+
+	| ls::(Mt && !inMatch) -> {
+	    ([H,..XX],U1,R1,L1,Q1,xTr1) = commonFront(Rs,true,true,Ld,Q,xTr,soFar);
+	    ([T,..YY],U2,R2,L2,Q2,xTr2) = commonFront(R1,U1,true,L1,Q1,xTr1,XX);
+	    valis ([mtch(list(H,T)),..soFar],U2,R2,L2,Q2,xTr2)
+	  }
+	| ls -> {
+	    ([H,.._],U1,R1,L1,Q1,xTr1) = commonFront(Rs,true,inMatch,Ld,Q,xTr,[]);
+	    ([T,.._],U2,R2,L2,Q2,xTr2) = commonFront(R1,U1,inMatch,L1,Q1,xTr1,[]);
+	    valis ([list(H,T),..soFar],U2,R2,L2,Q2,xTr2)
+	  }
+	| fn(C,Ar) -> {
+            U : true;
+            L : Ld;
+	    AA : [];
+	    xxTr : xTr;
+	    xQ : Q;
+	    RR : Rs;
+	    for I in 1..Ar do
+	      (AA,U,RR,L,xQ,xxTr) := commonFront(RR,U,(inMatch||Mt),L,xQ,xxTr,AA);
+
+            if (Mt && !inMatch) then
+              valis ([mtch(cons(C,rev(AA))),..soFar],U,RR,L,xQ,xxTr)
+            else
+              valis ([cons(C,rev(AA)),..soFar],U,RR,L,xQ,xxTr)
+	  }
+	| oth(vList) -> {
+	    nVar = idnt(genNew("$V"));
+	    valis ([nVar,..soFar],true,Rs,[(nVar,vList),..Ld],[nVar,..Q],xTr)
+	  }
+	}
+      }
+      else{
+        nVar = idnt(genNew("$V"));
+        if unFold then
+          valis ([nVar,..soFar],false,skipArg(tX(Nd,Mt,Ch,Rs)),Ld,
+                 [nVar,..Q],tX(Nd,Mt,Ch,Rs))
+        else
+          valis ([nVar,..soFar],false,skipArg(tX(Nd,Mt,Ch,Rs)),[(nVar,[]),..Ld],
+                 [nVar,..Q],xTr)
+      }
+    };
+
+    generateClauses(tX(El,Mt,Ch,Rs),leadArgs,Q) => valof{
+      if Ch==empty then{
+        Nos = leafNumbers(tX(El,Mt,Ch,Rs));
+        HedArgs = frontArgs(leadArgs);
+
+        if dbgOpt in Opts then{
+          "Generating from tree\n">>stdout;
+          showTr(tX(El,Mt,Ch,Rs))++"\n">>stdout;
+          "Clause numbers: "<>Nos^0<>"\n">>stdout;
+        };
+
+        if listlen(Nos)>1 then{
+          (TlArgs,xTr,Ld,Q1) : HeadArgs(tX(El,Mt,empty,Rs));
+
+          if [cons("",A)].=TlArgs then             -- strip off the sentinel
+            TlArgs := A;
+
+          nArgs : HedArgs<>TlArgs;
+
+          subProg = generateClauses(xTr,leadArgs<>Ld,Q<>Q1);
+
+          if dbgOpt in Opts then{
+            "Sub-program corresponding to tree\n">>stdout;
+            showTr(tX(El,Mt,Ch,Rs))++"\n">>stdout;
+            "is "<>showC(reChoice(subProg))<>"\n">>stdout;
+          };
+
+          if isSignificant(nArgs) then            -- Did we make progress?
+            valis [clse(Q<>Q1,nArgs,[call(reChoice(subProg),Q1,noLoc)],noLoc)]
+
+          else
+            valis subProg
+        }
+        else{
+          [clNo]=Nos;
+
+          if (clNo,_,Cl) in Clauses then{
+            clse(cQ,cHead,cBody,Lc) .= Cl;
+
+            (TlArgs,_,subEnv,_) = leafHeadArgs(tX(El,Mt,empty,Rs),leadArgs);
+
+            leafArgs = collect{
+              for (Trm,[_,.._]) in leadArgs do
+                elemis subInVars(Trm,clNo,leadArgs)
+            }<>subInArgs(TlArgs,clNo,subEnv);
+
+            nCl = clse(cQ,leafArgs,cBody,Lc);
+            valis [nCl]
+          }
+          else
+            exception error("We lost clause number "<>clNo^0,'fail)
+        }
+      }
+      else
+        valis generateClauses(tX(El,Mt,empty,Rs),leadArgs,Q)<>generateClauses(Ch,leadArgs,Q)
+    };
+
+    isSignificant(L) => valof{
+      for E in L do{
+        if !idnt(_).=E then
+          valis true
+      };
+      valis false
+    };
+
+    leafHeadArgs(Tree,Env) => valof{
+      Tr : Tree;
+      Args : [];
+      Q : [];
+      subEnv : Env;
+      xTr : empty;
+      while !tX(leaf(_),_,_,_).=Tr do{
+        (Args,_,Tr,subEnv,Q,xTr) := commonFront(Tr,true,false,subEnv,Q,xTr,Args);
+      };
+      if xTr==empty then
+        valis (rev(Args),Tr,subEnv,Q)
+      else
+        valis (rev(Args),xTr,subEnv,Q);
+    };
+
+    HeadArgs(Tree) => valof{
+      Tr : Tree;
+      Args : [];
+      subEnv : [];
+      xTr : empty;
+      Q : [];
+      unFold : true;
+      while !tX(leaf(_),_,_,_).=Tr do{
+        (Args,unFold,Tr,subEnv,Q,xTr) := commonFront(Tr,unFold,false,subEnv,Q,xTr,Args);
+      };
+      if xTr==empty then
+        valis (rev(Args),Tr,rev(subEnv),rev(Q))
+      else
+        valis (rev(Args),xTr,rev(subEnv),rev(Q));
+    };
+
+    subInArgs(Args,clNo,Env) => collect{
+      for A in Args do
+        elemis subInVars(A,clNo,Env)
+    };
+
+    subInVars(Trm,clNo,Env) => case Trm in {
+      idnt(V) => valof{
+        if (idnt(V),vList) in Env && (Vr,!clNo) in vList then
+          valis Vr
+        else
+          valis Trm
+      }
+    | cons(Fn,Args) => cons(Fn,subInArgs(Args,clNo,Env))
+    | mtch(T) => mtch(subInVars(T,clNo,Env))
+    | list(H,T) => list(subInVars(H,clNo,Env),subInVars(T,clNo,Env))
+    | _ => Trm
+    };
+
+    showArgs(L) => valof{
+      S : "{";
+      Sep : "";
+      for (Trm,vL) in L do{
+        S := S++Sep++showC(Trm)++"/[";
+        Sep := "";
+        
+        for (T,cL) in vL do{
+          S := S++Sep++showC(T)++"@"++cL^0;
+          Sep := ",";
+        };
+        Sep := ", ";
+        S := S++"]";
+      };
+      valis S++"}"
+    };
+
+  } in generateClauses(Tree,[],[]);
+
+  leafNumbers(Tr) => case Tr in {
+    empty => []
+  | tX(El,_,Ch,Rs) => valof{
+      if leaf(N).=El then
+        valis [N,..leafNumbers(Ch)]
+      else
+        valis leafNumbers(Ch)<>leafNumbers(Rs)
+    }
+  };
+
+  frontArgs(Args) => collect{
+    for (Var,[_,.._]) in Args do{
+      elemis Var;
+    }
+  };
+
+  snipOffTopTree(tX(fn("",_),_,_,Rs))=>Rs;
+
+  decTree(mdle(Name,Imp,Ar,Clauses),Opts) => valof{
+    if PAr>0 then{
+      if dbgOpt in Opts then
+        "Generating decision tree of:\n"++showCP(mdle(Name,Imp,Ar,Clauses))++"\n">>stdout;
+
+      tree = genMergedTree(Clauses);
+
+      if dbgOpt in Opts then{
+        "decision tree is:\n">>stdout;
+        showTr(tree)++"\n">>stdout;
+      };
+
+      dProg = mdle(Name,Imp,Ar,reShape(snipOffTopTree(tree),FlatClauseList,Opts));
+
+      if dbgOpt in Opts then{
+        "Decision tree version is\n">>stdout;
+        showC(dProg)<>"\n">>stdout;
+      };
+
+      valis dProg;
+    }
+    else
+      valis mdle(Name,Imp,Ar,Clauses) -- not possible to restructure
+  };
+
+} export decTree;

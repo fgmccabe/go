@@ -1,0 +1,59 @@
+\chapter{Introduction}
+The requirements for secure computing in a public arena (such as the Internet) are significantly different to those in the typical laboratory workbench. Applications that routinely interface with other systems via the Internet need to adopt a much more defensive approach to inter-working. This is particularly true in the case of systems where agents may be making real committments on behalf of their owners.  \go is a logic programming language, designed from scratch to be functional in such an environment.
+
+At the level of programming language design, security is less a matter of encryption and public key infrastructure than a matter of transparency and integrity: the program will do what it transparently says it will, and only that. Such transparency comes from a well designed language with clear semantics. 
+
+\paragraph{Software engineering}
+All significant programs evolve over time -- even \go programs. Supporting this evolution in the context of large scale systems is a primary reason for addressing software engineering. Having a language that is oriented towards intelligent systems does not eliminate or replace the requirements for managing complex systems. The reason is simple: a large program is a large program no matter what the underlying technical aspects are. In fact, a knowledge engineering system are often inherently complex and matters of scale can be exposed quite quickly.
+
+The design of \go is guided by a strong desire to gain the benefits of modern software engineering best practice as well as that of knowledge engineering. 
+
+\go is a multi-paradigm language -- there are specialized notations for  functions, action rules and grammar rules, as well as predicates. In many cases a programmer knows full well whether their program is intended to be fully relational or is actually a function. By giving different notations for these cases it allows programmers to signal their intentions more clearly than if all kinds of program have to be expressed in the single formalism of a logic clause.
+
+\paragraph{Object orientation}
+\go's \emph{object orderness} is fundamental to \go's approach to  software engineering.  To support the evolution of programs it is important to be able to modify a large program in a way that has manageable and predictable consequences. This is aided by having a clean separation between interfaces and implementations. For example, to be able to change the implementation of an aspect of a program without changing all the \emph{references} to the program is a basic benefit of object ordered programming. Similarly, any change to a program system (whether code or data) should not require changes to unaffected parts of the system. For example, merely \emph{adding} a new function to a module should not require modifying programs that use existing features of the module -- again, we use module here loosely to include data structures and program code. Both of these are important benefits of object ordered programming
+
+\begin{aside}
+We use the term \emph{object ordered programming} to avoid some of the specifics of common object oriented languages -- the key feature of object ordered programming is the encapsulation of code and data that permits the \emph{hiding} of the implementation of a concept from the parts of the application that wish to merely \emph{use} the concept. Features such as inheritance are important but secondary compared to the core concepts of encapsulation and hiding.
+
+As an example of the importance of interfaces, consider the \prolog term\footnote{Really the \prolog term is a first order logic term of course.} -- which is \prolog's basic means for structuring dynamic data. The term is very flexible and simple; however, viewed as a data structuring technique, it mixes implementation of data structures with access to data in an unfortunate way. For example, the \q{tree} term:
+\begin{alltt}
+tree(\emph{left},\emph{label},\emph{right})
+\end{alltt}
+may be used to denote a binary tree structure. Should it become necessary to adjust this term -- perhaps to include a weight element -- then \emph{all} references to the \q{tree} term will need to change, including existing uses which have no interest in the new weight feature. On average there will an order of magnitude more references that \emph{use} the concept of \q{tree} than references which \emph{define} the essence of \q{tree}.
+
+If we encapsulate the \q{tree} concept in an object, and use an interface contract to access the tree, then we should be able to add weights to our tree without upsetting existing uses of the tree.
+
+It is, of course, possible, in principle, to write \prolog programs in a way that mitigates this problem. However, it is difficult and the \prolog language does not make it easy.
+\end{aside}
+
+\go has some features that distinguish it from some OO languages such as Java\tm. \go's object notation is based on Logic and Objects (\cite{fgm:92}) with some significant simplifications and modifications to incorporate types. 
+
+\paragraph{Strong types}
+\go\ is a strongly typed programming language. The purpose of using a strong type system is to enhance programmers' confidence in the correctness of the program -- it cannot replace a formal proof of correctness.
+
+Having a strongly typed language can be quite constrictive compared to the untyped freedom one gets in languages such as \prolog.  However, for applications requiring a strong sense of reliability, having a strongly typed language provides a better base than an untyped language.
+
+Types are modeled as type terms. A type term is introduced using a type definition. Types may be defined in terms of other types -- leading to a lattice of sub-type relationships between types. 
+
+Functions, relations and action procedures, class definitions and other top-level variables are \emph{declared}, but type inference is used to check that the definitions are consistent with the declared types. We use a modified Hindley/Milner style type inference technique \cite{hindley:69}, \cite{milner:78} to conform that the types of identifiers is consistent and to infer the types of local variables used in definitions.
+
+This type checking and type inference takes into account sub-type relationships.  For example, a call to a unary function is type correct providing its argument expression  is inferred to be of the declared argument  type, or any sub-type of this  declared type.
+
+\paragraph{Meta-order and object order}
+Unlike \prolog, \go\ does not permit data to be directly interpreted as code. The standard \prolog approach of using the same language for meta-level names of programs and programs themselves -- which in turn allows program text to be manipulated like other data -- has a number of technical problems; especially when considering distributed and secure applications. Many of the applications of meta-level reasoning in \prolog can be more directly -- and safely -- be affected using \go's object oriented features.
+
+\paragraph{Threads and distribution}
+\go\ is a multi-tasking programming language. It is possible to spawn off computations as separate threads or tasks. These tasks can communicate with each other using shared global objects and by message passing.  
+
+In a multi-threaded environment there are two overlapping concerns -- sharing of resources and coordination of activities. In the cases of shared resources the primary requirement is that the different users of a resource see consistent views of the resource. In the case of coordination the primary requirement is a means of controlling the flow of execution in the different threads of activity.
+
+\go threads may share access to objects, and to their state in the case of stateful objects -- within a single invocation of the system. \go supports synchronized access to such shared objects to permit contention issues to be addressed.
+
+Coordination is achieved through \emph{mesage communication}. The communications model is very simple: a communication channel is established by a pair of entities: a \q{mailbox} and one or more associated \q{dropbox}es. When one process wishes to send a message to another process, it does so by using an appropriate \q{dropbox}. A process wishing to read a message does so by picking up messages from its \q{mailbox}.
+
+\paragraph{This reference manual}
+Overall, the intention behind the design of \go\ is to make programs more transparent: what you see in a \go\ program is what you mean -- there can be no hidden semantics. This property is what makes \go\ a reasonable language to use for high integrity applications -- such as agents that will be performing tasks that may involve real resources, or in safety critical areas.
+
+This manual is intended to represent both a reference to a particular \go\ implementation and as a specification of the language itself. In the future, these functions may be separated into distinct documents.
+

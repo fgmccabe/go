@@ -1,0 +1,17 @@
+# 
+# Rules for compiling go programs within the build tree
+#
+.SUFFIXES: .go .goc .gof .glx .gpg
+
+GO_DIR = file:///${top_builddir}/
+GOC = @aprildir@/bin/april -h30000 file:///${top_builddir}/BootCompiler/goc.aam
+GO = ${top_builddir}/Engine/go
+
+%.goc: ${srcdir}/%.go
+	@echo Compiling go! program $<
+	GO_DIR=$(GO_DIR) $(GOC) $(GOFLAGS) $<
+
+%.go: ${srcdir}/%.glx
+	@echo generating tokeniser from $<
+	GO_DIR=${top_builddir} $(GO) -h3000 -P ${top_builddir}/golex golex $(GOLEX_OPTS) $<
+

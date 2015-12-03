@@ -1,0 +1,445 @@
+/*
+ * Manage the set of labels associated with a context
+ */
+#include "go.ah";
+
+module
+import
+{ interface "misc.af" and
+  interface "errors.af" and
+  interface "display.af" and
+  interface "canon.af" and
+  interface "refactor.af" and
+  interface "dynamic.af" and
+  interface "types.af" and
+  interface <stdio.af>
+} in
+{
+
+  /*
+   * Each element in Layers defines a scope. It is a tuple of the form:
+   * lyr(Prefix,Defs:(Name,Class)[],Loc,Label,clvr,thvr)
+   * Where Prefix is the current prefix
+   * Defs is the set of local programs and other names defined in this scope
+   * Loc is the file location of the defining label
+   * Label is the full form of the label term.
+   * clvr is the variable holding the label
+   * thvr is the variable holding this
+   *
+   * E.g., in
+   * pk{
+   *  foo(A)..{
+   *   ...
+   *    bar(B)..{
+   *      X = $anon..{}
+   *   ...
+   *    }
+   *  }
+   * }
+   *
+   * The inner-most layer will look like:
+   *    lyr(pk#foo#bar#anon23,Defs,Lc,anon23(Free,bar(B,foo(A))),clVar,thVar)
+   * the outermost class layer will look like
+   *    lyr(pk#foo,Defs,Lc,foo(A),clVar,thVar)
+   * the package layer will look like
+   *    lyr(pk,[],Defs,Lc,vdel,vdel,vdel)
+   */
+
+  lookup(Layers,N,Tst,Opts) => valof{
+    if noAssert(N) in Opts || noAssert("*") in Opts then{
+      for lyr(Prefix,Defns,Lc,Lbl,lVr,tVr) in Layers do{ -- each layer ...
+	if (N,Defn::Tst(Defn)) in Defns then	  -- has its own definitions
+	  valis Defn
+      }
+    }
+    else{
+      AssName = N<>"@assert";
+      for lyr(Prefix,Defns,Lc,Lbl,lVr,tVr) in Layers do{ -- each layer ...
+	if (N,Defn::Tst(Defn)) in Defns then{	  -- has its own definitions
+	  if (AssName,aDefn::Tst(aDefn)) in Defns then 
+	    valis aDefn				  -- use version with assert
+	  else
+	    valis Defn
+	}
+      }
+    };
+    valis notInMap;
+  };
+
+  lookupVarName(m(Layers,_),N) => 
+    lookup(Layers,N,
+	   ((Def)=>(moduleVar(_,_).=Def
+		  ||localVar(_,_,_).=Def
+		  ||localAsgn(_,_,_).=Def
+		  ||moduleAsgn(_,_,_).=Def
+		  ||labelArg(_,_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),[]);
+
+  lookupRelName(m(Layers,_),N,Opts) => 
+    lookup(Layers,N,
+	   ((Def)=>(localRel(_,_,_).=Def
+		  ||moduleRel(_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),Opts);
+
+  lookupFunName(m(Layers,_),N,Opts) => 
+    lookup(Layers,N,
+	   ((Def)=>(localFun(_,_,_).=Def
+		  ||moduleFun(_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),Opts);
+
+  lookupGrmName(m(Layers,_),N,Opts) => 
+    lookup(Layers,N,
+	   ((Def)=>(localGrm(_,_,_).=Def
+		  ||moduleGrm(_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),Opts);
+
+  lookupPrcName(m(Layers,_),N,Opts) => 
+    lookup(Layers,N,
+	   ((Def)=>(localPrc(_,_,_).=Def
+		  ||modulePrc(_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),Opts);
+  
+  lookupClassName(m(Layers,_),N) => 
+    lookup(Layers,N,
+	   ((Def)=>(localClass(_,_,_,_).=Def
+		  ||moduleClass(_,_,_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||inheritField(_,_,_).=Def)),[]);
+
+  lookupTypeName(m(Layers,_),N) => 
+    lookup(Layers,N,
+	   ((Def)=>(localType(_).=Def
+		  ||inherit(_,_,_,_).=Def
+		  ||moduleType(_,_).=Def)),[]);
+
+  lookupDefn(m(Layers,_),N) => 
+    lookup(Layers,N,
+	   ((Def)=> !moduleType(_,_).=Def && !localType(_).=Def),[]);
+
+  lookupPackageRef(m(Layers,_),Pkg,Nm,Opts) => 
+    lookup(Layers,Nm,
+	   ((Defn)=>(moduleFun(!Pkg,_).=Defn ||
+		     moduleRel(!Pkg,_).=Defn ||
+		     moduleGrm(!Pkg,_).=Defn ||
+		     modulePrc(!Pkg,_).=Defn ||
+		     moduleVar(!Pkg,_).=Defn ||
+		     moduleAsgn(!Pkg,_,_).=Defn ||
+		     moduleClass(!Pkg,_,_).=Defn ||
+		     moduleType(!Pkg,_).=Defn)),Opts);
+
+  defineProg(Map,Nm,Prog){
+    if m(_,dyn(_,D,_,_)).=Map then
+      D(Nm,reFactor(Prog))
+    else
+      "Funny map: "<>Map^0<>"\n">>stdout;
+  };
+
+  definedProgs(m(_,dyn(_,_,_,F))) => F();
+
+  mungePrefix(m([lyr(P,_,_,_,_,_),.._],_)) => P;
+
+  mungeName(Map,Suffix) => mungePrefix(Map)<>"#"<>Suffix;
+
+  extraVars(m([lyr(_,_,_,_,lVr,tVr),.._],_)) => if lVr!=vdel then
+    [lVr,tVr]
+  else
+    [];
+
+  lbVr(m(Layers,_)) => if [lyr(_,_,_,_,lVr,tVr),.._].=Layers && lVr!=vdel then
+    lVr
+  else
+    vdel;
+
+  thVr(m(Layers,_)) => if [lyr(_,_,_,_,lVr,tVr),.._].=Layers && lVr!=vdel then
+    tVr
+  else
+    vdel;
+
+  defined(m(_,dyn(_,_,_,df))) => df();
+
+  -- Define the map for a package
+  packageMap(mName,pLc,Imps,Els) => valof{
+    L0 = collect{
+      for node(Defn,mTp,_) in Els do{
+	case Defn in {
+	  fun(Nm,_,Arity,_) -> elemis (Nm,moduleFun(mName,prg(mName++"@"++Nm,Arity+1)))
+	| rel(Nm,_,Arity,_) -> elemis (Nm,moduleRel(mName,prg(mName++"@"++Nm,Arity)))
+	| srel(Nm,_,Arity,_) -> elemis (Nm,moduleRel(mName,prg(mName++"@"++Nm,Arity)))
+	| grm(Nm,_,Arity,_) -> elemis (Nm,moduleGrm(mName,prg(mName++"@"++Nm,Arity+2)))
+	| prc(Nm,_,Arity,_) -> elemis (Nm,modulePrc(mName,prg(mName++"@"++Nm,Arity)))
+	| class(Nm,_,Arity,_) -> elemis (Nm,moduleClass(mName,strct(mName++"#"++Nm,Arity),prg(mName++"#"++Nm,3)))
+	| tpe(Nm,_,_) -> elemis (Nm,moduleType(mName,prg(mName++"*"++Nm,0)))
+	| def(Nm,_,_) -> elemis (Nm,moduleVar(mName,prg(mName++"@"++Nm,1)))
+	| asg(Nm,_,_) -> elemis (Nm,moduleAsgn(mName,prg(mName++"@"++Nm,1),prg(mName++"@:="++Nm,1)))
+	| vlof(_,_) -> {}
+	| _ -> exception error("problem in mapModule",'fail)
+	}
+      };
+      for (PkgName,Defs,Ver) in Imps do{
+	Pkg = trPackageName(PkgName);
+	for (Fld,Mode,Tp) in Defs do{
+	  case Mode in {
+	    varBind -> case stripForAlls(Tp) in {
+	      enuType(_) ->
+		elemis (Fld,moduleClass(Pkg,strct(Pkg++"#"++Fld,0),prg(Pkg++"#"++Fld,3)))
+	    | conType(A,_) ->
+		elemis (Fld,moduleClass(Pkg,strct(Pkg++"#"++Fld,listlen(A)),prg(Pkg++"#"++Fld,3)))
+	    | sconType(A,_) ->
+		elemis (Fld,moduleClass(Pkg,strct(Pkg++"#"++Fld,listlen(A)),prg(Pkg++"#"++Fld,3)))
+	    | funType(A,_) ->
+		elemis (Fld,moduleFun(Pkg,prg(Pkg++"@"++Fld,listlen(A)+1)))
+	    | predType(A) ->
+		elemis (Fld,moduleRel(Pkg,prg(Pkg++"@"++Fld,listlen(A))))
+	    | actType(A) ->
+		elemis (Fld,modulePrc(Pkg,prg(Pkg++"@"++Fld,listlen(A))))
+	    | grType(A,_) ->
+		elemis (Fld,moduleGrm(Pkg,prg(Pkg++"@"++Fld,listlen(A)+2)))
+	    | _ -> 
+		elemis (Fld,moduleVar(Pkg,prg(Pkg++"@"++Fld,1)))
+	    }
+	  | typeBind -> {}
+	  }
+	};
+      }
+    };
+    valis m([lyr(mName,L0,pLc,vdel,vdel,vdel)],dynQ([]))
+  };
+
+  -- Build a class map, always on top of at least one other layer
+  classMap(oMap::m(Layers,Progs).=oMap,
+	   node(class(Name,Viz,clAr,Els),_,cLc)) => valof{ 
+    mName = mungePrefix(oMap)++"#"++Name;	-- What is the new munge prefix?
+
+    thisVar = idnt(genNew("$th"));
+    lbVar = idnt(genNew("$lb"));
+
+    Lbl: vdel;
+    clDefs : [];
+
+    -- Special function to create actual label
+    oLabel = { if [lV,tV].=extraVars(oMap) then -- inner class case
+	((Nm,A)=>cons(strct(Nm,listlen(A)+2),A<>[lV,tV]))
+      else
+	((Nm,A)=>{if A==[] then symb(Nm) else cons(strct(Nm,listlen(A)),A)})
+    };
+
+    if node(clss(Q,_,H,Body),_,Lc) in Els then{
+      clDefs := collect{
+	if Viz==anonymous then{			  -- special case because
+	  if [cV,tV].=extraVars(oMap) then	  -- other class defns are caught
+	    elemis (Name,localClass(strct(mName,clAr+2),prg(mName,3),cV,tV)) -- earlier
+	  else{
+	    lyr(Pkg,_,_,_,_,_).=head(Layers);
+	    elemis (Name,moduleClass(Pkg,strct(mName,clAr),prg(mName,3)))
+	  }
+	};
+
+	for node(Defn,mTp,_) in Body do {
+	  case Defn in {
+	    fun(Nm,_,Arity,_) -> 
+	      elemis (Nm,localFun(prg(mName++"@"++Nm,Arity+3),lbVar,thisVar))
+	  | rel(Nm,_,Arity,_) -> 
+	      elemis (Nm,localRel(prg(mName++"@"++Nm,Arity+2),lbVar,thisVar))
+	  | srel(Nm,_,Arity,_) -> 
+	      elemis (Nm,localRel(prg(mName++"@"++Nm,Arity+2),lbVar,thisVar))
+	  | grm(Nm,_,Arity,_) -> 
+	      elemis (Nm,localGrm(prg(mName++"@"++Nm,Arity+4),lbVar,thisVar))
+	  | prc(Nm,_,Arity,_) -> 
+	      elemis (Nm,localPrc(prg(mName++"@"++Nm,Arity+2),lbVar,thisVar))
+	  | class(Nm,_,Arity,_) -> {
+	      lname = mName++"#"++Nm;
+	      elemis (Nm,localClass(strct(lname,Arity+2),prg(lname,3),lbVar,thisVar))
+	    }
+	  | tpe(Nm,_,_) -> 
+	      elemis (Nm,localType(prg(mName++"*"++Nm,0)))
+	  | def(Nm,_,_) -> 
+	      elemis (Nm,localVar(prg(mName++"@"++Nm,3),lbVar,thisVar))
+	  | asg(Nm,_,_) -> 
+	      elemis (Nm,localAsgn(prg(mName++"@"++Nm,3),lbVar,thisVar))
+	  | vlof(_,_) -> {}
+	  | _ -> exception error("problem in mapClass",'fail)
+	  }
+	};
+      };
+
+      if [lV,tV].=extraVars(oMap) then{
+	clDefs := [(iName(lV),labelArg(iName(lV),lbVar,thisVar)),..clDefs]
+      };
+
+      case H in {
+	node(enu(Lb),_,_) ->
+	  Lbl := oLabel(mungePrefix(oMap)++"#"++Lb,[])
+      | node(con(node(C,_,_),A),_,_) -> {
+	  Args = collect{
+	    for (Arg::node(El,eTp,eLc).=Arg) in A do{
+	      if iden(V).=El then{
+		elemis idnt(V);
+		clDefs := [(V,labelArg(V,lbVar,thisVar)),..clDefs]
+	      }
+	      else if flow(node(iden(V),_,_),_).=El then{
+		elemis idnt(V);
+		clDefs := [(V,labelArg(V,lbVar,thisVar)),..clDefs]
+	      }
+	      else
+		reportError("arguments to labels must be variables, not: "<>
+			    showTerm(Arg),eLc)
+	    }
+	  };
+	  Name = {if iden(Lb).=C then mungePrefix(oMap)++"#"++Lb else "###" };
+	  Lbl := oLabel(Name,Args);
+	}
+      | _ -> 
+	  reportError("cannot handle class label: "<>showTerm(H),Lc)
+      };
+    }
+    else if node(crle(Q,H,_),_,Lc) in Els then{
+      case H in {
+	node(enu(Lb),_,_) ->
+	  Lbl := oLabel(mungePrefix(oMap)++"#"++Lb,[])
+      | node(con(node(C,_,_),A),_,_) -> {
+	  Args = collect{
+	    for (Arg::node(El,eTp,eLc).=Arg) in A do{
+	      if iden(V).=El then{
+		elemis idnt(V);
+		clDefs := [(V,labelArg(V,lbVar,thisVar)),..clDefs]
+	      }
+	      else if flow(node(iden(V),_,_),_).=El then{
+		elemis idnt(V);
+		clDefs := [(V,labelArg(V,lbVar,thisVar)),..clDefs]
+	      }
+	      else
+		reportError("arguments to labels must be variables, not: "<>
+			    showTerm(Arg),eLc)
+	    }
+	  };
+	  Name = {if iden(Lb).=C then mungePrefix(oMap)++"#"++Lb else "###" };
+	  Lbl := oLabel(Name,Args);
+	}
+      | _ -> 
+	  reportError("cannot handle class label: "<>showTerm(H),Lc)
+      };
+    }
+    else
+      exception error("empty class",'internal);
+
+    -- Now that local definitions are in place we handle inheritance
+    for node(El,Tp,Lc) in Els do{
+      case El in {
+        crle(_,_,node(con(node(iden(Spr),_,_),_),uType(SprPkg,_,_),_)) -> {
+          Mthds = fieldsOf(Tp);
+	  sName = SprPkg<>"#"<>Spr;
+          for (fld,_,_) in Mthds do{
+            if !(fld,_) in clDefs then
+              clDefs := [(fld,inheritField(prg(mName<>"."<>Spr,3),lbVar,thisVar)),..clDefs]
+          };
+          clDefs := [(Spr,inherit(prg(sName,3),prg(mName<>"."<>Spr,3),lbVar,thisVar)),..clDefs]
+        }
+      | crle(_,_,node(enu(Spr),uType(SprPkg,_,_),_)) -> {
+	  sName = SprPkg<>"#"<>Spr;
+          Mthds = fieldsOf(Tp);
+          for (fld,_,_) in Mthds do{
+            if !(fld,_) in clDefs then
+              clDefs := [(fld,inheritField(prg(mName<>"."<>Spr,3),lbVar,thisVar)),..clDefs]
+          };
+          clDefs := [(Spr,inherit(prg(sName,3),prg(mName<>"."<>Spr,3),lbVar,thisVar)),..clDefs]
+        }
+      | _ -> {}
+      }
+    };
+
+    valis m([lyr(mName,clDefs,cLc,Lbl,lbVar,thisVar),..Layers],Progs)
+  };
+
+  accessLabel(Map::m(Layers,_).=Map,Q) => valof{
+    QQ : Q\extraVars(Map);
+    Qout : [];
+    Gls : [];
+
+    while QQ != [] do{
+      iQQ = collect{
+	for idnt(Nm) in QQ do{
+	  if !idnt(Nm) in Qout then{
+	    case lookup(Layers,Nm,
+			((Def)=>labelArg(_,_,_).=Def),[]) in {
+	      labelArg(_,lbV,thV) -> {
+		if lyr(_,_,iLc,iLb,lbV,itV) in Layers then{
+		  Gls := Gls<>[defn(lbV,iLb,iLc)];
+
+		  elemis lbV;			 -- We have another var to check
+		  Qout := merge(argsOf(iLb),Qout);
+		}
+	      }
+	    | _ -> {}
+	    }
+	  }
+	}
+      };
+      QQ := iQQ;
+    };
+    valis (merge(Qout,merge(Q,extraVars(Map))),Gls)
+  };
+
+  argsOf(T) => case T in {
+    cons(_,A) => A
+  | _ => []
+  };
+
+  unpackName(Defn) => valof{
+    case Defn in {
+      localVar(N,_,_) -> valis N
+    | localFun(N,_,_) -> valis N
+    | localRel(N,_,_) -> valis N
+    | localGrm(N,_,_) -> valis N
+    | localPrc(N,_,_) -> valis N
+    | localClass(N,_,_,_) -> valis N
+    | localType(N) -> valis N
+    | localAsgn(N,_,_) -> valis N
+    | moduleFun(_,N) -> valis N
+    | moduleRel(_,N) -> valis N
+    | moduleGrm(_,N) -> valis N
+    | modulePrc(_,N) -> valis N
+    | moduleClass(_,N,_) -> valis N
+    | moduleType(_,N) -> valis N
+    | moduleVar(_,N) -> valis N
+    | moduleAsgn(_,N,_) -> valis N
+    | inherit(N,_,_,_) -> valis N
+    | inheritField(N,_,_) -> valis N
+    }
+  };
+
+  showMap(m(Layers,Progs)) => valof{
+    O : [];
+    for lyr(Prefix,Defs,Lc,Lbl,lVr,tVr) in Layers do{
+      O := O<>["prefix = ",Prefix,
+	       "\nLabel: ",showCT(Lbl)," defined @",showLocation(Lc),
+	       "\nlbVar= ",showCT(lVr)," thVar= ",showCT(tVr),"\n"];
+      for (N,Defn) in Defs do
+	O := O<>[N," = ",Defn^0,"\n"];
+      O:=O<>["=====\n"];
+    };
+
+    valis flatten(O);
+  };
+
+  showProgs(dyn(_,_,_,dQ))=>flatten(collect{
+				      elemis "Defined programs:\n";
+				      for (Key,Val) in dQ() do{
+					elemis Key++":\n    "++showCP(Val)++"\n";
+				      }});
+
+  flatten(LL) => case LL in {
+    [] => []
+  | [L,..R] => L<>flatten(R)
+  };
+  
+} export(lookupRelName,lookupFunName,lookupGrmName,lookupPrcName,
+	 lookupClassName,lookupTypeName,lookupDefn,lookupVarName,
+	 lookupPackageRef,
+	 accessLabel,packageMap,classMap,
+	 defineProg,definedProgs,showMap,extraVars,lbVr,thVr,
+	 unpackName,mungeName,mungePrefix,defined)

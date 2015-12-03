@@ -1,0 +1,178 @@
+/*
+ * Test a term to see if it is ground, similarly for a type expression
+ */
+
+#include "go.ah";
+
+module
+import{
+  interface "types.af" and
+  interface "misc.af" and
+  interface <stdio.af>
+} in {
+
+  isGroundC(N) => case N in {
+    idnt(_) => false
+  | intgr(_) => true
+  | float(_) => true
+  | symb(_) => true
+  | ch(_) => true
+  | strg(_) => true
+  | cons(_,A) => valof{
+      for X in A do{
+	if !isGroundC(X) then
+	  valis false;
+      };
+      valis true;
+    }
+  | mtch(T) => isGroundC(T)
+  | bild(T) => isGroundC(T)
+  | strct(_,_) => true
+  | prg(_,_) => true
+  | vdel => true
+  };
+
+  isGroundType(T,E) => case deRef(T) in {
+    bound(N) => N in E 
+  | varType(_,_,_,_,Abv,_,Nm,_) => isGroundType(Abv(),E)
+  | topType => true
+  | voidType => true
+  | tplType(L) => isGroundTypeList(L,E)
+  | faceType(S) => isGroundTypeMethodList(S,E)
+  | enuType(R) => isGroundType(R,E)
+  | conType(A,R) => isGroundTypeList(A,E) && isGroundType(R,E)
+  | sconType(A,R) => isGroundArgList(A,E) && isGroundType(R,E)
+  | funType(A,R) => isGroundArgList(A,E) && isGroundType(R,E)
+  | predType(A) => isGroundArgList(A,E)
+  | grType(A,R) => isGroundArgList(A,E) && isGroundType(R,E)
+  | actType(A) => isGroundArgList(A,E)
+  | allType(N,G,A) => valof{
+      nE = collectVars(T,E);
+      valis isGroundType(A,nE) && isGroundType(G,nE)
+    }
+  | uType(_,_,A) => isGroundTypeList(A,E)
+  | typeDef(uType(_,_,A),T) => valof{		  -- would not normally happen
+      sE = (A//(bound(Nm)=>Nm))<>E;
+
+      valis isGroundTypeList(T,sE)
+    }
+  | _ => exception error("invalid type in isGroundType: "++showType(T),'fail)
+  };
+
+  collectVars(T,E) => case T in {
+    allType(N,_,A) => collectVars(A,[N,..E])
+  | _ => E
+  };
+
+  isGroundTypeList(L,E) => valof{
+    for Tx in L do{
+      if !isGroundType(Tx,E) then
+	valis false
+    };
+    valis true
+  };
+
+  isGroundArgList(L,E) => valof{
+    for (Tx,_) in L do{
+      if !isGroundType(Tx,E) then
+	valis false
+    };
+    valis true
+  };
+
+  isGroundTypeMethodList(L,E) => valof{
+    for (Fld,_,Tx) in L do{
+      if !isGroundType(Tx,E) then
+	valis false
+    };
+    valis true
+  };
+
+  sameLit(A,B) => case A in {
+    idnt(Nm) => idnt(Nm).=B
+  | intgr(N) => intgr(N).=B
+  | float(N) => float(N).=B
+  | symb(Nm) => symb(Nm).=B
+  | strg(S) => strg(S).=B
+  | ch(S) => ch(S).=B
+  | strct(F,A) => strct(F,A).=B
+  | prg(F,A) => prg(F,A).=B
+  | cons(CF,AL) => cons(CF,BL).=B && listlen(AL)==listlen(BL) && sameLitList(AL,BL)
+  | X => exception error("not permitted in ground: "<>A^0,'eFAIL)
+  };
+
+  sameLitList = {
+    ([],[]) => true
+  | ([A,..AL],[B,..BL]) => sameLit(A,B) && sameLitList(AL,BL)
+  | ([_,.._],[]) => false
+  | ([],[_,.._]) => false
+  };
+  
+  sameTypeLit(AA,BB) => valof{
+    A = deRef(AA); B = deRef(BB);
+
+    if varType(_,_,_,_,Abv,_,_,Kb).=B then{
+      if varType(_,_,_,_,_,_,_,Kb).=A then
+        valis true
+      else
+        valis sameTypeLit(A,Abv())
+    }
+    else{
+      case A in {
+        bound(N) -> valis bound(N).=B
+      | varType(_,_,_,_,Abv,_,_,N) -> valis sameTypeLit(Abv(),B)
+      | topType -> valis topType.=B
+      | typeType -> valis typeType.=B
+      | tplType(AL) -> valis tplType(BL).=B && sameTypeLitList(AL,BL)
+      | faceType(AM) -> valis faceType(BM).=B && sameTypeMethods(AM,BM)
+      | enuType(AR) -> valis enuType(BR).=B && sameTypeLit(AR,BR) 
+      | conType(AA,AR) -> valis conType(BA,BR).=B && 
+	sameTypeLitList(AA,BA) && sameTypeLit(AR,BR) 
+      | sconType(AA,AR) -> valis sconType(BA,BR).=B && 
+	sameTypeArgList(AA,BA) && sameTypeLit(AR,BR) 
+      | funType(AA,AR) -> valis funType(BA,BR).=B && 
+	sameTypeArgList(AA,BA) && sameTypeLit(AR,BR) 
+      | predType(AA) -> valis predType(BA).=B &&  sameTypeArgList(AA,BA)
+      | grType(AA,AR) -> valis grType(BA,BR).=B && 
+        sameTypeArgList(AA,BA) && sameTypeLit(AR,BR) 
+      | actType(AA) -> valis actType(BA).=B && sameTypeArgList(AA,BA)
+      | uType(Pkg,Nm,AT) -> valis uType(Pkg,Nm,BT).=B && sameTypeLitList(AT,BT)
+      | allType(V1,G1,T1) -> valis allType(V1,G2,T2).=B && 
+        sameTypeLit(T1,T2)&&sameTypeLit(G1,G2)
+      | voidType -> valis voidType.=B
+      }
+    }
+  };
+
+  sameTypeLitList  = {
+    ([],[]) => true
+  | ([A,..AL],[B,..BL]) => sameTypeLit(A,B) && sameTypeLitList(AL,BL)
+  | (_,_) => false
+  };
+
+  sameTypeArgList  = {
+    ([],[]) => true
+  | ([(A,M),..AL],[(B,M),..BL]) => sameTypeLit(A,B) && sameTypeArgList(AL,BL)
+  | (_,_) => false
+  };
+
+  sameTypeMethods(A,B) => valof{
+    if listlen(A)==listlen(B) then{
+      BB = sort(B,(((N1,_,_),(N2,_,_)) => N1<N2));
+      for (Fld,Mode,tA) in sort(A,(((N1,_,_),(N2,_,_)) => N1<N2)) do{
+        if (Fld,Mode,tB) in BB then{
+          if !sameTypeLit(tA,tB) then
+            valis false
+        }
+        else
+          valis false;
+      };
+    }
+    else
+      valis false;
+  };
+  
+  -- __debug_display__(X) => X^0;
+
+} export (isGroundType,isGroundC,sameLit,sameTypeLit);
+  

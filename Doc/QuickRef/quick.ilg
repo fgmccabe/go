@@ -1,0 +1,12 @@
+This is makeindex, version 2.14 [02-Oct-2002] (kpathsea + Thai support).
+Scanning input file ./quick.idx....
+!! Input index error (file = ./quick.idx, line = 20):
+   -- Illegal null field.
+
+!! Input index error (file = ./quick.idx, line = 52):
+   -- Illegal null field.
+done (428 entries accepted, 2 rejected).
+Sorting entries......done (4178 comparisons).
+Generating output file ./quick.ind....done (527 lines written, 0 warnings).
+Output written in ./quick.ind.
+Transcript written in ./quick.ilg.

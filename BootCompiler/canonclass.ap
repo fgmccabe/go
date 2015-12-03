@@ -1,0 +1,3692 @@
+/*
+ * Main part of the canonicalizer -- transform a class
+ */
+#include "go.ah";
+
+module
+  import
+{
+  interface "misc.af" and
+  interface "errors.af" and
+  interface "findvars.af" and
+  interface "canon.af" and
+  interface "canonlabel.af" and
+  interface "canonmeta.af" and
+  interface "display.af" and
+  interface "types.af" and
+  interface "ground.af" and
+  interface "debug.af" and
+  interface "st-types.af" and
+  interface <stdio.af>
+} in
+{
+  /*
+   * A class of the form:
+   * 
+   * module pkg{
+   *   cl(L1,..,Lk) <= cm(M1,..,Mn).
+   *   cl(L1,..,Lk):clTp..{
+   *     foo(X) => bar(X*X) :- p(X).
+   *     p(U) :- cm.bar(Li,U).
+   *     q(A) :- A.q(A).
+   *   }
+   * }
+   *
+   * is mapped to:
+   *
+   * pkg#cl@(foo(X,$v),$c,$t) :- pkg#cl@foo(X,$v,$c,$t).        -- class directory program
+   * pkg#cl@(p(X),$c,$t) :- pkg#cl@p(X,$c,$t).
+   * pkg#cl@(a(A),$c,$t) :- #(A,q(A)).                          -- when we cant figure out the label
+   * pkg#cl@(Gl,cl(L1,..,Lk),$t) :- pkg#cm(Gl,cm(M1,..,Mn),$t). -- implement general inheritance
+   * 
+   * pkg#cl@foo(X,V,C,this) :- pkg#cl@p(X,C,this),pkg#cl(bar(X*X,V),C,this). -- inheriting definition of bar
+   * pkg#cl@p(U,cl(L1,..,Lk),this) :- pkg#cm(bar(Li,U),cm(M1,..,Mn),this)    -- directly get bar from cm
+   *
+   * #(cl(X1,..,Xk),Gl) :- pkg#cl(Gl,cl(X1,..,Xk),cl(X1,..,Xk)). -- package directory program
+   * ...
+   * #(Obj,Gl) :- __dynObj(Obj,$cl,$cp), $cp(Gl,$cl,Obj)    -- where Obj=$cl, created instance invocation
+   *
+   */
+  trClass(Nd::(node(class(clName,_,clArity,Progs),_,Lc).=Nd),Opts,Map) => valof{
+    clMap = classMap(Map,Nd);		    -- define the new munged identifiers
+
+    if dbgCanon in Opts then{
+      "Class map of "<>clName<>" is "<>showMap(clMap)++"\n">>stdout;
+    };
+
+    entryClses : [];                               -- the entry point clauses
+    superClses : [];
+    superClasses: [];                             -- What super classes do we have access to?
+    varInits : [];                                -- Which variables to initialize
+    inheritId = prg(mungeName(Map,clName++"."),3);	-- program that does inheritance
+
+    -- In the first pass we deal with the class body
+    if node(clss(Q,_,Lb,Body),_,cLc) in Progs then{
+      /* A class body of the form
+      lbl(A1,..,Ak):Tp..{
+	prog1 :- ...
+      }
+      is mapped to 
+      
+      pkg#lbl(prog1(X1,..,Xm),Lb,Th) :- pkg#lbl@prog(X1,..,Xm,Lb,Th)
+      
+      together with the specific translations of prog1
+      */
+      if dbgCanon in Opts then
+	"Class label : "<>show(Lb)<>"\n">>stdout;
+      
+      for (eNd::node(El,_,eLc).=eNd) in Body do{
+	case El in {
+	  asg(Name,Viz,Val) ->{
+	    (initPrg,vName) = trVariable(eNd,Opts,clMap);
+
+	    if Viz==public then{
+	      vQ = idnt(genNew("$"));
+	      entryClses := [generateEntryCl(Name,vName,[vQ],eLc,clMap),..entryClses]
+	    };
+	    
+	    varInits := [(Name,initPrg),..varInits];
+	  }
+
+	| def(Name,Viz,Val) ->{
+	    (initPrg,vName) = trConstant(eNd,Opts,clMap);
+
+	    if Viz==public then{
+	      vQ = idnt(genNew("$"));
+	      entryClses := [generateEntryCl(Name,vName,[vQ],eLc,clMap),..entryClses]
+	    };
+	    
+	    varInits := [(Name,initPrg),..varInits];
+	  }
+	| rel(Name,Viz,Arity,Clses) ->{
+	    vName = { case lookupRelName(clMap,Name,Opts) in {
+		localRel(vName,_,_) => vName
+	      | moduleRel(_,vName) => vName
+	      | M => exception error("invalid map entry for predicate ["<>Name<>"]: "<>M^0,'internal)
+	      }
+	    };
+	    
+	    defineProg(Map,vName,trPredicate(eNd,Opts,clMap));
+	    if Viz==public then
+	      entryClses := [generateEntryCl(Name,vName,vIota(Arity),eLc,clMap),..entryClses];
+	  }
+	| srel(Name,Viz,Arity,Clses) ->{
+	    vName = { case lookupRelName(clMap,Name,Opts) in {
+		localRel(vName,_,_) => vName
+	      | moduleRel(_,vName) => vName
+	      | M => exception error("invalid map entry for predicate ["<>Name<>"]: "<>M^0,'internal)
+	      }
+	    };
+	    
+	    defineProg(Map,vName,trStrongPredicate(eNd,Opts,clMap));
+	    if Viz==public then
+	      entryClses := [generateEntryCl(Name,vName,vIota(Arity),eLc,clMap),..entryClses];
+	  }
+	| fun(Name,Vis,Arity,Clses) -> {
+	    vName = { case lookupFunName(clMap,Name,Opts) in {
+		localFun(vName,_,_) => vName
+	      | moduleFun(_,vName) => vName
+	      | M => exception error("invalid map entry for function ["<>Name<>"]: "<>M^0,'internal)
+	      }
+	    };
+
+	    defineProg(Map,vName,trFunction(eNd,Opts,clMap));
+	    if Vis==public then
+	      entryClses := [generateEntryCl(Name,vName,vIota(Arity+1),eLc,clMap),..entryClses];
+	  }
+	| grm(Name,Viz,Arity,Clses) ->{
+	    vName = { case lookupGrmName(clMap,Name,Opts) in {
+		localGrm(vName,_,_) => vName
+	      | moduleGrm(_,vName) => vName
+	      | M => exception error("invalid map entry for grammar ["<>Name<>"]: "<>M^0,'internal)
+	      }
+	    };
+
+	    defineProg(Map,vName,trGrammar(eNd,Opts,clMap));
+	    if Viz==public then
+	      entryClses := [generateEntryCl(Name,vName,vIota(Arity+2),eLc,clMap),..entryClses];
+	  }
+	| prc(Name,Viz,Arity,Clses) ->{
+	    vName = { case lookupPrcName(clMap,Name,Opts) in {
+		localPrc(vName,_,_) => vName
+	      | modulePrc(_,vName) => vName
+	      | M => exception error("invalid map entry for procedure ["<>Name<>"]: "<>M^0,'internal)
+	      }
+	    };
+
+	    defineProg(Map,vName,trProcedure(eNd,Opts,clMap));
+	    if Viz==public then
+	      entryClses := [generateEntryCl(Name,vName,vIota(Arity),eLc,clMap),..entryClses];
+	  }
+	| vlof(Q,Init) -> {
+	    CQV = Q//((.(Nm,_).)=>idnt(Nm));
+	    
+	    (xOpts,dbgPreamble,dV) = debugPreamble("$",[inProg("$"),..Opts],Lc,CQV);
+	    (_,GG,_,Q1)  = trValof(eNd,dV,xOpts,clMap);
+	    (Q2,Pre) = accessLabel(clMap,Q1);
+	    
+	    vName = prg(mungePrefix(clMap)<>"$__init",listlen(extraVars(clMap)));
+
+	    defineProg(Map,vName,seqn([clse(merge(Q2,extraVars(clMap)),
+					    extraVars(clMap),Pre<>dbgPreamble<>GG,eLc)]));
+	    
+	    varInits := [("$",vName),..varInits]
+	  }
+	| class(Name,Viz,Arity,Entries) -> {
+	    vName = unpackName(lookupClassName(clMap,Name));
+	    _ = trClass(eNd,Opts,clMap);
+	    if Viz==public then{
+	      thisVar = idnt(genNew("$t"));
+	      glVar = idnt(genNew("$g"));
+	      rVar = idnt(genNew("$r"));
+	      Args = vIota(Arity);
+	      Q = [glVar,thisVar,rVar,..Args];
+	      
+	      entryClses := [
+		clse(Q,[cons(trCons(Name,Arity+1),[rVar,..Args]),glVar,thisVar],
+		     [neck(eLc),
+		      defn(rVar,cons(vName,Args<>[glVar,thisVar]),eLc)],
+		     eLc),..entryClses];
+	    }
+	  }
+	| tpe(Name,_,_) -> {}
+	| _ ->
+	    exception error("cannot handle class element: "<>show(eNd),'internal)
+	}
+      }
+    };
+
+    -- In the second pass we deal with the inheritance rules
+    for (node(crle(Q,A,B),_,cLc)) in Progs do{
+      /* A class rule of the form
+        lbl(A1,..,Ak) <= mbl(E1,..,En)
+      is mapped to
+        pkg#lbl(Gl,lbl(A1,..,Ak),This) :- pkg#mbl(Gl,mbl(E1,..,En),This)
+      or, in the case of a nested class
+        pkg#lbl(Gl,lbl(A1,..,Ak)#O1#...#Om,This) :-
+          <access>
+        pkg#mbl(Gl,mbl(E1,..,En)#Oi#...#Om,This)
+      where Oj are variables representing the nesting of the label
+      and <access> is a series of goals of the form:
+        Lb(X1,..,Xj).=Oj
+      which are generated as necessary depending on the patterns Ai and 
+      expressions Ei
+      */
+
+      thVar = thVr(clMap);
+      glVar = idnt(genNew("$g"));
+      CQV = Q//((.(Nm,_).)=>idnt(Nm));
+      
+      (lbArg,preA,postA,Q1) = trPtn(A,[thVar,glVar,..CQV],Opts,clMap);
+
+      (sCl,Spr) = valof{
+	case B in {
+	  node(enu(Spr),_,bLc) -> {
+	    case lookupClassName(Map,Spr) in {
+	      moduleClass(_,MSpr,MPrg) ->{
+		valis (clse(Q1,[glVar,lbArg,thVar],preA<>postA<>
+			    [neck(cLc),
+			     call(MPrg,[glVar,cons(MSpr,[]),thVar],cLc)],cLc),Spr)
+	      }
+	    | localClass(MSpr,MPrg,lbV,thV) -> {
+		valis (clse(merge(Q1,[lbV,thV]),
+			    [glVar,lbArg,thVar],preA<>postA<>
+			    [neck(cLc),
+			     call(MPrg,[glVar,cons(MSpr,[lbV,thV]),thVar],cLc)],cLc),Spr)
+	      }
+	      
+	    | inherit(Super::(prg(SName,_).=Super),_,lbV,_) -> {
+		valis (clse(merge(Q1,[lbV]),[glVar,lbArg,thVar],preA<>postA<>
+			    [neck(cLc),call(Super,[glVar,lbV,thVar],cLc)],cLc),Spr)
+	      }
+	    | Rf -> {
+		reportError("problem in "<>show(B)<>":"<>Rf^0,bLc);
+		exception error("problem in compiling super@"<>showLocation(bLc),'internal)
+	      }
+	    }
+	  }
+	| node(con(SS,sA),_,bLc) -> {
+	    (nsA,preS,pstS,Q1b) = trExpArgs(sA,Q1,Opts,clMap);
+	    (QQ,preL) = accessLabel(clMap,Q1b);
+	    
+	    case SS in {
+	      node(iden(Spr),_,_) -> {
+		case lookupClassName(Map,Spr) in {
+		  moduleClass(_,MSpr,MPrg) -> {
+		    valis (clse(QQ,[glVar,lbArg,thVar],preL<>preA<>postA<>
+				[neck(cLc)]<>
+				 preS<>pstS<>
+				[call(MPrg,[glVar,cons(MSpr,nsA),thVar],
+				      cLc)],cLc),Spr)
+		  }
+		| localClass(MSpr,MPrg,lbV,thV) -> {
+		    valis (clse(merge([lbV,thV],QQ),
+				[glVar,lbArg,thVar],
+				preL<>preA<>postA<> [neck(cLc)]<> preS<>pstS<>
+				[call(MPrg,[glVar,cons(MSpr,nsA<>[lbV,thV]),thVar],
+				      cLc)],cLc),Spr)
+		  }
+		  
+		| inherit(Super::prg(SpNam,_).=Super,_,lbV,_) -> {
+		    valis (clse(merge([glVar,lbArg,thVar],QQ),
+				[glVar,lbArg,thVar],preL<>preA<>postA<>
+				[neck(cLc)]<>preS<>pstS<>
+				[call(Super,[glVar,
+					     cons(strct(SpNam,listlen(sA)),nsA),
+					     thVar],cLc)],cLc),Spr)
+		  }
+		| _ -> exception error("problem in compiling super@ "<>
+				       showLocation(bLc),'internal)
+		}
+	      }
+	    | node(pkrf(Pkg,node(iden(Nm),_,_)),_,_) -> {
+		(mNm,mPrg) = { case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+		    moduleClass(_,mNm,mPrg) => (mNm,mPrg)
+		  | Mode => valof{
+		      reportError("illegal access: "<>Mode^0<>" to constructor: "<>Nm<>
+				  " from package "<>Pkg,Lc);
+		      valis (strct(Nm,3),prg(Nm,3))
+		    }
+		  }
+		};
+		
+		valis (clse(QQ,[glVar,lbArg,thVar],
+			    preL<>preA<>postA<>[neck(cLc)]<>
+			    preS<>pstS<>[call(mPrg,
+					      [glVar,cons(mNm,nsA),thVar],
+					      cLc)],cLc),Nm)
+	      }
+	    | _ ->
+		exception error("problem in trClass",'fail)
+	    }
+	  }
+	| _ -> {
+	    (nS,preS,pstS,sQ) = trExp(B,Q1,Opts,clMap);
+	    (QQ,preL) = accessLabel(clMap,sQ);
+	    
+	    valis (clse(QQ,[glVar,lbArg,thVar],preL<>preA<>postA<>[neck(cLc)]<>
+			preS<>pstS<>
+			[generateCall("",nS,ocall(glVar,nS,thVar,cLc),cLc,Opts,clMap)],cLc),"#")
+	  }
+	}
+      };
+      
+      superClses := [sCl,..superClses];
+      if Spr!="#" then{
+	sName = prg(mungePrefix(clMap)<>"."<>Spr,3);
+	superClasses := [(Spr,sName),..superClasses];
+	defineProg(clMap,sName,seqn([sCl]));
+      }
+    };
+    
+    entryClses := entryClses<>[generateVarInits(rev(varInits),superClasses,Lc,clMap)];
+    entryClses := entryClses<>[labelEntry(Lc,inheritId,superClasses,Opts,clMap)];
+--    entryClses := entryClses<>genMeta(Nd,Opts,clMap);
+
+    if superClses==[] then{
+      entryClses := entryClses<> [
+        valof{
+          glVar = idnt(genNew("$G"));
+          clVar = idnt(genNew("$C"));
+          thVar = idnt(genNew("$T"));
+          V1 = idnt(genNew("V1"));
+          V2 = idnt(genNew("V2"));
+          V3 = idnt(genNew("V3"));
+          Vx = idnt(genNew("Vx"));
+
+          valis clse([glVar,clVar,thVar,V1,V2,V3,Vx],[glVar,clVar,thVar],
+                     [ecall("__stringOf",[thVar,intgr(0),intgr(0),V1],Lc),
+                      ecall("__stringOf",[glVar,intgr(0),intgr(0),V2],Lc),
+                      call(prg("go.stdlib@append",3),
+			   [V1,cons(strct("go.stdlib#,..",2),[ch(''.),V2]),V3],Lc),
+                      call(prg("go.stdlib@append",3),
+			   [V3,strg(" not implemented"),Vx],Lc),
+                      rais(cons(strct("go.stdlib#error",2),[Vx,symb("eCODE")]),Lc)],Lc)
+        }]
+    }
+    else{
+      glVar = idnt(genNew("$G"));
+      clVar = idnt(genNew("$C"));
+      thVar = idnt(genNew("$T"));
+      entryClses := entryClses<>
+      [clse([glVar,clVar,thVar],[glVar,clVar,thVar],
+	    [call(inheritId,[glVar,clVar,thVar],Lc)],Lc)];
+      defineProg(Map,inheritId,seqn(superClses));
+    };
+
+    defineProg(Map,prg(mungeName(Map,clName),3),seqn(entryClses));
+
+    valis clMap
+  };
+
+  labelEntry(Lc,inheritId,Supers,Opts,Map) => valof{
+    LbV = idnt(genNew("$LbV"));
+    clV = idnt("cl");
+    thV = idnt("this");
+
+    if Supers!=[] then{
+      lblP = prg(genNew("$<="),3);			  -- define a label accessing program
+
+      -- set up a recursive test program
+      lB = collect{
+	elemis clse([clV,thV],[clV,clV,thV],[],Lc);
+
+	for (Spr,Sname) in Supers do{
+	  elemis clse([LbV,clV,thV],
+		      [LbV,clV,thV],
+		      [call(inheritId,[cons(strct("$label",1),[LbV]),clV,thV],Lc)],Lc)
+	};
+      };
+
+      defineProg(Map,lblP,seqn(lB));
+      
+      valis clse([clV,thV,LbV],[mtch(cons(strct("$label",1),[LbV])),clV,thV],
+		 [neck(Lc),call(lblP,[LbV,clV,thV],Lc)],Lc)
+    }
+    else
+      valis clse([clV,thV,LbV],[mtch(cons(strct("$label",1),[LbV])),clV,thV],
+		 [neck(Lc),defn(LbV,clV,Lc)],Lc)
+  };
+
+
+  /* Handle the arguments to a call, constructor */
+  trExpArgs(L,Q,Opts,Map) => valof{
+    preGG : [];
+    postGG : [];
+    QQ : Q;
+    NL = collect{
+      for E in L do{
+        (NE,preNG,postNG,NQ)=trExp(E,QQ,Opts,Map);
+        preGG := preGG<>preNG;
+        postGG := postNG<>postGG;
+        QQ := NQ;
+        elemis NE;
+      }
+    };
+                
+    valis (NL,preGG,postGG,QQ)
+  };
+
+  trExp(Nd::node(N,_,Lc).=Nd,Q,Opts,Map) => {
+    case N in {
+      iden("this") => (thVr(Map),[],[],merge([thVr(Map)],Q))
+
+    | iden(Nm) => valof{
+	xI = idnt(genNew("$v"));
+	case lookupVarName(Map,Nm) in {
+	  localVar(Vn,clVr,thVr) -> {                        -- an instance variable
+	    valis (xI,[],[call(Vn,[xI,clVr,thVr],Lc)],
+		   merge(Q,[xI,thVr,clVr]))
+	  }
+	| localAsgn(Vn,clVr,thVr) -> {                        -- an instance variable
+	    valis (xI,[],[ecall("__getProp",[thVr,symb(Nm),xI],Lc)],
+		   merge(Q,[xI,clVr,thVr]))
+	  }
+	  
+	| moduleVar(_,Vn) -> {                    -- a package-level variable
+	    valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+	  }
+	  
+	| moduleAsgn(_,Vn,_) -> {                   -- a package-level variable
+	    valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+	  }
+	  
+	| labelArg(N,clVr,thVr) -> 
+	    valis (idnt(N),[],[],merge(Q,[clVr,thVr,idnt(Nm)]))	-- label handled later
+	  
+	| inheritField(Super,clVr,thVr) -> {
+	    nO = idnt(genNew(Nm));
+	    
+	    valis (nO,[call(Super,[cons(strct(Nm,1),[nO]),clVr,thVr],Lc)],[],
+		   merge([nO,..Q],[clVr,thVr]))
+	  }
+	  
+	| notInMap ->{
+	    if dbgCanon in Opts then
+	      Nm<>" not in map\n">>stdout;
+
+	    valis (idnt(Nm),[],[],Q)
+	  }
+
+	| Rf -> {
+	    if dbgCanon in Opts then
+	      showMap(Map)>>stdout;
+	    
+	    reportError("illegal access:(E) "<>Rf^0<>" to non-local variable: "<>Nm,Lc);
+	    valis (vdel,[],[],Q)
+	  }
+	}
+      }
+
+    | pkrf(Pkg,node(iden(Nm),_,_)) => valof{
+	xI = idnt(genNew("$v"));
+        case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+          moduleVar(_,Vn) -> 
+            valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+        | moduleAsgn(_,Vn,_) ->			  -- a package-level variable
+            valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+        | Mode -> {
+            reportError("illegal access: "<>Mode^0<>" to unknown package variable: "<>Pkg<>"#"<>Nm,Lc);
+            valis (vdel,[],[],Q)
+          }
+        }
+      }
+
+    | pkrf(Pkg,node(enu(Nm),_,_)) => valof{
+        case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+          moduleClass(_,mNm,_) -> 
+            valis (cons(mNm,[]),[],[],Q)
+        | Mode -> {
+            reportError("illegal access: "<>Mode^0<>" to unknown package variable: "<>Pkg<>"#"<>Nm,Lc);
+            valis (vdel,[],[],Q)
+          }
+        }
+      }
+
+    | enu(Nm) => valof{
+        case lookupClassName(Map,Nm) in {
+          moduleClass(_,mNm,_) -> 
+            valis (cons(mNm,[]),[],[],Q)
+        | localClass(mNm,mSn,lbV,thV) -> {
+            valis (cons(mNm,[lbV,thV]),[],[],merge(Q,[lbV,thV]))
+	  }
+        | inherit(prg(mNm,_),_,_,_) ->
+            valis (cons(strct(mNm,0),[]),[],[],Q)
+	| notInMap -> {
+	    if (Nm,_,_) in standardTypes then
+	      valis (cons(strct(Nm,0),[]),[],[],Q) -- treated specially
+	    else
+	      exception error("Problem: enumerated symbol "<>Nm<>" not in map",'failed)
+	  }
+        | X ->
+            exception error("Problem: cannot deal with enumerated symbol "<>Nm,'failed)
+        }
+      }
+
+    | int(N) => (intgr(N),[],[],Q)
+    | flt(N) => (float(N),[],[],Q)
+    | sym(S) => (symb(S),[],[],Q)
+    | chr(S) => (ch(S),[],[],Q)
+    | str(S) => (strg(S),[],[],Q)
+
+    | app(node(F,fTp,fLc),A) => valof{            -- Function call
+        (NA,preA,postA,QQ) = trExpArgs(A,Q,Opts,Map);
+        XV = idnt(genNew("$@"));       -- generate a new variable for the result
+
+        case F in {
+          iden(Fun) -> {
+            if isEscape(Fun) then
+              valis (XV,preA,postA<>[ecall(Fun,NA<>[XV],Lc)],[XV,..QQ])
+            else{
+              case lookupFunName(Map,Fun,Opts) in {
+                localFun(Fn,clVr,thVr) -> {
+                  valis (XV,preA,postA<>
+			 evalDebug(Fun,NA,XV,call(Fn,NA<>[XV,clVr,thVr],Lc),
+				   Opts,Map,Lc),
+                         merge(QQ,[XV,clVr,thVr]))
+                }
+              | moduleFun(_,Fn) -> {
+                  valis (XV,preA,postA<>
+                         evalDebug(Fun,NA,XV,call(Fn,NA<>[XV],Lc),Opts,Map,Lc),
+                         [XV,..QQ])
+                }
+              | inheritField(Super,clVr,thVr) -> {
+                  valis (XV,preA,postA<>
+                         evalDebug(Fun,NA,XV,
+				   call(Super,[cons(trCons(Fun,listlen(NA)+1),
+						    NA<>[XV]),clVr,thVr],
+					Lc),Opts,Map,Lc),
+                         merge([clVr,thVr,XV],QQ))
+                }
+
+              | notInMap -> {
+                  reportError("function: "<>Fun<>" not defined",Lc);
+                  valis (XV,[],[],[XV,..QQ])
+                }
+              | _ -> exception error("cannot handle source: "<>Fun,'fail)
+              }
+            }
+          }
+
+        | dot(node(Rc,rFtp,rLc),Fld) -> { -- We had a function call of the form L.f(A)
+	    mArity = listlen(NA)+1;
+            C = cons(trCons(Fld,mArity),NA<>[XV]); -- Whatever, the function call is morphed to a term f(A,X)
+            case Rc in {
+              iden(Lbl) -> {
+                case lookupFunName(Map,Lbl,Opts) in {
+                  inherit(_,Super,clVr,thVr) -> {             -- This is a super call
+                    valis (XV,preA,postA<>
+			   evalDebug(Fld,NA,XV,
+				     call(Super,[C,clVr,thVr],Lc),
+				     Opts,Map,Lc),
+                           [XV,..QQ])
+                  }
+                | _ ->{
+                    (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                    
+                    valis (XV,preR<>preA<>pstR,postA<>
+			   evalDebug(Fld,NA,XV,
+				     generateCall(Fld,nR,ocall(C,nR,nR,Lc),
+						  Lc,Opts,Map),
+				     Opts,Map,Lc),
+                           [XV,..Qx])
+                  }
+                }
+              }
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                valis (XV,preR<>pstR<>preA,postA<>
+		       evalDebug(Fld,NA,XV,ocall(C,nR,nR,Lc),Opts,Map,Lc),
+                       [XV,..Qx])
+              }
+            }
+          }
+	| pkrf(Pkg,node(iden(Fn),_,_)) -> {
+            case lookupPackageRef(Map,Pkg,Fn,Opts) in {
+              moduleFun(_,Fun) -> {
+		valis (XV,preA,postA<>
+		       evalDebug(Pkg<>"#"<>Fn,NA,XV,call(Fun,NA<>[XV],Lc),Opts,Map,Lc),
+		       [XV,..QQ])
+              }
+            | _ -> exception error("cannot handle source: "<>Fn,'fail)
+            }
+          }
+
+        | _ -> {
+            reportError("invalid function: "<>show(node(F,fTp,fLc)),fLc);
+            valis (vdel,[],[],Q)
+          }
+        }
+      }
+
+    | dot(node(Rc,rFtp,rLc),Fld) => valof{ -- We have a variable access, treat it like a function call
+        XV = idnt(genNew("$@"));         -- generate a new variable for the result
+
+	C = cons(strct(Fld++"%1",1),[XV]); -- Whatever, the function call is morphed to a term f(A,X)
+
+        case Rc in {                              -- is the label a literal label? We can shortcut in that case
+          iden(Lbl) -> {
+            case lookupVarName(Map,Lbl) in {
+              inherit(_,Super,clVr,thVr) -> {             -- This is a super call
+                valis (XV,[],evalDebug(Fld,[],XV,
+				       call(Super,[C,clVr,thVr],Lc),
+				       Opts,Map,Lc),
+                       [XV,..Q])
+              }
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q,Opts,Map);
+                valis (XV,preR,pstR<>
+		       evalDebug(Fld,[],XV,ocall(C,nR,nR,Lc),Opts,Map,Lc),
+                       [XV,..Qx])
+              }
+            }
+          }
+        | _ -> {
+            (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q,Opts,Map);
+            valis (XV,preR,pstR<>
+		   evalDebug(Fld,[],XV,ocall(C,nR,nR,Lc),Opts,Map,Lc),
+                   [XV,..Qx])
+          }
+        }
+      }
+
+    | onew(A) => valof{
+        (NA,preNG,postNG,Q1) = trExp(A,Q,Opts,Map);
+        XV = idnt(genNew("$v"));         -- generate a new variable
+
+        QQ = [XV,..Q1];
+
+        valis (XV,preNG<>postNG<>[ecall("__newObject",[NA,XV],Lc),
+                                  ocall(cons(strct("$init",0),[]),XV,XV,Lc)],[],[XV,..Q1])
+      }
+
+    | class(Id,mode,clArity,Cls) => valof{
+        if dbgCanon in Opts then{
+          "current quantifiers are "<>showCQuants(Q)<>"\n">>stdout;
+        };
+
+        Nvars = merge(findFreeVars(Nd,[],Q,[]),debugVars(Opts));
+
+        xVars = Nvars//(idnt(V)=>(V,voidType));
+        Nlabel = node(con(node(iden(Id),voidType,Lc),
+			  Nvars//(idnt(V)=>node(iden(V),voidType,Lc))),ndType(Nd),Lc);
+        if dbgCanon in Opts then{
+	  "anonymous class at "<>showLocation(Lc)<>"\n">>stdout;
+	  showTerm(Nd)<>"\n">>stdout;
+          "Free vars of anonymous class are "<>Nvars^0<>"\n">>stdout;
+        };
+
+	-- We refactor the class to insert the free variables into the label
+        nCls = collect{
+          for node(cNd,cTp,cLc) in Cls do{
+            case cNd in {
+              crle(rQ,_,Sp) ->
+                elemis node(crle(xVars<>rQ,Nlabel,Sp),cTp,cLc)
+            | clss(rQ,cT,_,Dfs) ->
+                elemis node(clss(xVars<>rQ,cT,Nlabel,Dfs),cTp,cLc)
+            }
+          };
+        };
+
+        nAnon = node(class(Id,mode,listlen(Nvars),nCls),ndType(Nd),Lc);
+
+        if dbgCanon in Opts then{
+          "Reworked anonymous class is "<>show(nAnon)<>"\n">>stdout;
+	};
+
+	lName = mungeName(Map,Id);
+	clMap = trClass(nAnon,Opts,Map);
+        if dbgCanon in Opts then{
+          "New label is "<>show(Nlabel)<>"\n">>stdout;
+	};
+
+	(aLabel,Pr,Ps,Q1) = trExp(Nlabel,Q,Opts,clMap);
+
+        if dbgCanon in Opts then{
+	  "Transformed label is "<>showCT(aLabel)<>"\n">>stdout;
+	};
+
+	valis (aLabel,Pr,Ps,varsInCanon(aLabel,Q1))
+      }
+
+    | con(C,L) => valof{
+	(NL,preA,pstA,Q1) = trExpArgs(L,Q,Opts,Map);
+
+	case C in {
+	  node(iden(Nm),_,_) -> {
+	    case lookupClassName(Map,Nm) in {
+	      moduleClass(_,mNm,_) -> {
+		valis (cons(mNm,NL),preA,pstA,Q1)
+	      }
+	    | localClass(mNm,_,lbV,thV) -> {
+		valis (cons(mNm,NL<>[lbV,thV]),preA,pstA,merge([lbV,thV],Q1))
+	      }
+	    | inherit(prg(mNm,_),_,lbV,thV) -> {                  -- cope with special case 
+		valis (cons(strct(mNm,listlen(NL)),NL),preA,pstA,merge([lbV],Q1))
+	      }
+	    | C -> exception error("Problem: "<>Nm<>" expression constructor not in map, class="<>C^0,
+				   'internal)
+	    }
+	  }
+	| node(pkrf(Pkg,node(iden(Nm),_,_)),_,_) -> {
+	    case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+	      moduleClass(_,mNm,_) -> 
+		valis (cons(mNm,NL),preA,pstA,Q1)
+	    | localClass(mNm,_,lbV,thV) -> 
+		valis (cons(mNm,NL<>[lbV,thV]),preA,pstA,merge([lbV,thV],Q1))
+	    | Mode -> {
+		reportError("illegal access: "<>Mode^0<>" to constructor: "<>Nm<>
+			    " from package "<>Pkg,Lc);
+		valis (vdel,[],[],Q1)
+	      }
+	    }
+	  }
+
+          -- We have a constructor of the form L.c(A)
+	| node(dot(node(Rc,rFtp,rLc),Fld),_,_) -> { 
+	    XV = idnt(genNew("$rL"));
+
+	    mArity = listlen(NL)+1;
+            C = cons(strct(Fld++"%"++mArity^0,mArity),[XV,..NL]);  -- set up a call to fetch the constructor
+
+            case Rc in {
+              iden(Lbl) -> {
+                case lookupVarName(Map,Lbl) in {
+                  inherit(_,Super,clVr,thVr) -> {             -- This is a super call
+                    valis (XV,preA,pstA<>
+                           [call(Super,[C,clVr,thVr],Lc)],
+                           [XV,..Q1])
+                  }
+                | _ ->{
+                    (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q1,Opts,Map);
+                    
+                    valis (XV,preR<>preA<>pstR,pstA<>
+                           [ocall(C,nR,nR,Lc)],[XV,..Qx])
+                  }
+                }
+              }
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q1,Opts,Map);
+                valis (XV,preR<>pstR<>preA,pstA<>
+                       [ocall(C,nR,nR,Lc)],[XV,..Qx])
+              }
+            }
+          }
+
+	| _ -> {
+	    reportError("illegal constructor: "<>showTerm(C),Lc);
+	    valis (vdel,[],[],Q)
+	  }
+	}
+      }
+
+    | cse(_,_) => trCaseExp(Nd,Q,Opts,Map)
+
+    | grd(E,G) => valof{
+        if G==[] then
+          valis trExp(E,Q,Opts,Map)
+        else{
+	  Q0 = freeVars(Nd,Q,Opts,Map);
+          XV = idnt(genNew("$::"));        -- generate a new variable
+          
+          (GB,Q1) = trGoalList(G,Q0,Opts,Map);
+          (NE,preNG,postNG,Q2) = trExp(E,Q1,Opts,Map);
+
+	  (QQ,preL) = accessLabel(Map,Q2);
+
+          Nargs = Q0<>extraVars(Map);
+
+          grdError = cons(strct("go.stdlib#error",2),[strg("unexpected failure: "<>showLocation(Lc)),symb("eFAIL")]);
+
+          XPr = seqn([clse(QQ,Nargs<>[NE], 
+                           preL<>GB<>[neck(Lc)]<>preNG<>postNG,Lc),
+                      clse([XV,..Nargs], Nargs<>[XV],[rais(grdError,Lc)],Lc)]);
+
+          XP = prg(genNew(mungePrefix(Map)<>"$::"),listlen(Nargs)+1);
+          defineProg(Map,XP,XPr);
+
+          valis (XV,[],[call(XP,Nargs<>[XV],Lc)],[XV,..Q])
+        }
+      }
+
+    | lzy(E,G) => valof{
+        if G==[] then
+          valis trExp(E,Q,Opts,Map)
+        else{
+          Q0 = freeVars(Nd,Q,Opts,Map);
+	  if dbgCanon in Opts then{
+	    "Free vars of suspend are: "<>showCQuants(Q0)<>"\n">>stdout;
+	  };
+
+          XV = idnt(genNew("$::"));		  -- generate a new variable
+
+          (NE,preNG,postNG,QQ) = trExp(E,Q,Opts,Map);
+
+          (GB,Q1) = trGoalList(G,Q0,Opts,Map);
+	  (Q2,preL) = accessLabel(Map,Q1);
+          
+          Nargs = Q0<>extraVars(Map);
+
+	  /*
+	   * We have to define the equivalent of:
+ 	   * lbl(X)..{
+	   *   trigger() :: var(X) :-- __suspend(X,this).
+	   *   trigger() :-- <Goal>.
+           * }
+	   */
+	  thVar = idnt(genNew("$th"));
+          XP = genNew(mungePrefix(Map)<>"$::");
+	  XPfun = strct(XP,listlen(Nargs));
+	  XPprog = prg(XP,listlen(Nargs));
+
+          XPr = seqn([clse([thVar,..Q2], 
+			   [mtch(cons(trCons("trigger",0),[])),mtch(cons(XPfun,Nargs)),thVar],
+			   preL<>triggerDebug(iName(NE),NE,Opts,Map,Lc)<>GB,Lc)]);
+
+          defineProg(Map,XPprog,XPr);
+	   
+	  valis (NE,preNG,postNG<>[ecall("__suspend",[NE,cons(XPfun,Nargs)],Lc)],QQ)
+        }
+      }
+
+    | nt(Gr,[Str]) => valof{                  -- handle a call to a grammar rule
+        (nS,preSG,postSG,QQ) = trExp(Str,Q,Opts,Map);
+        
+        XV = genNew("$V");
+        S0 = idnt(genNew("$S"));
+
+        Q0 = freeVars(Gr,Q,Opts,Map);
+
+        (NB,Q1,Sx) = dcgBody(node(nt(Gr,[node(iden(XV),ndType(Str),Lc)]),ndType(Str),Lc),
+                             node(enu("[]"),ndType(Str),Lc),S0,
+			     [idnt(XV),S0,..Q0],Opts,Map);
+
+        Args = Q0<>[S0,idnt(XV),..extraVars(Map)];
+	(Q2,preL) = accessLabel(Map,Q1);
+
+        P = seqn([clse(Q2,Args,preL<>NB<>
+                       [ocall(cons(trCons("eof",0),[]),Sx,Sx,Lc),neck(Lc)],Lc),
+                  clse(Args,Args,[rais(cons(strct("go.stdlib#error",2),
+					    [strg(showLocation(Lc)),
+					     symb("eFAIL")]),Lc)],Lc)]);
+                   
+        xArgs = Q0<>[nS,idnt(XV),..extraVars(Map)];
+	XN = prg(genNew(mungePrefix(Map)<>"$!"),listlen(xArgs));
+        defineProg(Map,XN,P);
+
+        valis (idnt(XV),preSG<>postSG<>
+               [call(XN,xArgs,Lc)],[],[idnt(XV),..QQ])
+      }
+      
+    | nt(Gr,[Str,Rst]) => valof{                  -- handle a call to a grammar rule
+        (nS,preSG,postSG,Qa) = trExp(Str,Q,Opts,Map);
+        (nR,preRG,postRG,QQ) = trExp(Rst,Qa,Opts,Map);
+        
+        XV = genNew("$V");
+        S0 = idnt(genNew("$S"));
+        Sr = idnt(genNew("$E"));
+
+        Q0 = freeVars(Gr,Q,Opts,Map);
+
+        (NB,Q1,Sx) = dcgBody(node(nt(Gr,[node(iden(XV),ndType(Str),Lc)]),
+				  ndType(Str),Lc),
+                             node(enu("[]"),ndType(Str),Lc),S0,[idnt(XV),S0,..Q0],
+			     Opts,Map);
+
+        Args = Q0<>[S0,Sr,idnt(XV),..extraVars(Map)];
+	
+        P = seqn([clse([Sr,..QQ],Args,NB<>
+                       [ocall(cons(trCons("eq",1),[Sr]),Sx,Sx,Lc),neck(Lc)],Lc),
+                  clse(Args,Args,[rais(cons(strct("go.stdlib#error",2),
+					    [strg(showLocation(Lc)),
+					     symb("eFAIL")]),Lc)],Lc)]);
+	xArgs = Q0<>[nS,nR,idnt(XV),..extraVars(Map)];
+	XN = prg(genNew(mungePrefix(Map)<>"$!"),listlen(xArgs));
+        
+        defineProg(Map,XN,P);
+
+        valis (idnt(XV),preSG<>postSG<>preRG<>postRG<>
+               [call(XN,xArgs,Lc)],[],[idnt(XV),..QQ])
+      }
+      
+    | nt(Gr,[Str,Rst]) => valof{            -- handle a call to a grammar rule
+        (nS,preSG,postSG,Q1) = trExp(Str,Q,Opts,Map);
+        (nR,preRG,postRG,Q2) = trExp(Rst,Q1,Opts,Map);
+        
+        XV = genNew("$V");
+
+        (NB,QQ,Sx) = dcgBody(node(nt(Gr,[node(iden(XV),ndType(Str),Lc)]),
+				  ndType(Str),Lc),
+                             node(enu("[]"),ndType(Str),Lc),nS,Q2,Opts,Map);
+
+        valis (idnt(XV),preSG<>postSG<>preRG<>postRG<>NB<>
+               [ocall(cons(trCons("eq",1),[nR]),Sx,Sx,Lc)],[],[idnt(XV),..QQ])
+      }
+      
+    | vlof(_,_) => valof{
+	(nEx,PP,AA,QQ)  = trValof(Nd,Q,Opts,Map);
+	if nEx==vdel then
+	  reportError("valis action missing in "<>show(Nd),Lc);
+
+	valis (nEx,PP,AA,QQ)
+      }
+
+    | bag(_,_,_) => trBag(Nd,Q,Opts,Map)
+
+    | bnd(_,_,_) => trBnd(Nd,Q,Opts,Map)
+
+      -- E onerror ( error(E,C) => V | ... error(E,C) => V )
+      -- is mapped to
+      -- $Er(_,V,F1,...,Fn) where Fi are the free variables
+      --  and V is the value of the expression
+      -- Where $Er is a new program defined as:
+      -- $Er(._,F1,...,Fn) :- trpBegin,E,trEnd. Mark the current cp as a trap point
+      -- $Er(.error(Ei,Ci),F1,..,Fn) :- !, Vi for each error handling clause
+      -- $Er(.fail,_,...,_) :- raise unexpected failure
+      -- $Er(F,_,...,_) :- raise(F) -- propogate the error
+      
+    | err(Ex,Er) => valof{
+	nFree = freeVars(Nd,Q,Opts,Map);
+
+	XV = idnt(genNew("$v"));	 -- result returned by the error handler
+	XC = idnt(genNew("$t"));		  -- the error trap value
+
+	trpProg = collect{
+	  (NE,pre,pst,NQ) = trExp(Ex,nFree,Opts,Map);
+	  elemis clse([XC,XV,..NQ],
+		      [XC,XV,..nFree],
+		      [trpBegin]<>pre<>pst<>[defn(XV,NE,Lc),trpEnd],Lc);
+
+	  ErClNo : 0;
+
+	  for node(eqn(_,eQ,[ePtn],eRp,eGd),_,eLc) in Er do{
+	    eQV = (eQ//((.(Nm,_).)=>idnt(Nm)))<>nFree;
+
+	    (xOpts,dbgPreamble,dV) = 
+	    debugPreamble("onerror",Opts,Lc,eQV);
+
+	    (NH,preHG,postHG,Q1) = trPtn(ePtn,merge(dV,nFree),xOpts,Map);
+	    (RX,preBG,postBG,Q2) = trExp(eRp,Q1,Opts,Map);
+	    (NC,Q3) = trGoalList(eGd,Q2,xOpts,Map);
+	    (QQ,preL) = accessLabel(Map,Q3);
+
+	    elemis clse([XV,..QQ],
+			[mtch(NH),XV,..nFree],
+			preL<>dbgPreamble<>
+			preHG<>postHG<>
+			NC<>[neck(eLc)]<>preBG<>postBG<>[defn(XV,RX,eLc)],eLc)
+	  };
+	  elemis clse([XV,..nFree],
+		      [symb("#false"),XV,..nFree],
+		      [rais(cons(strct("go.stdlib#error",2),
+				 [strg("unexpected failure: "<>
+				       showLocation(Lc)),
+				  symb("eFAIL")]),Lc)],Lc);
+	  elemis clse([XV,XC,..nFree],[XC,XV,..nFree],[rais(XC,Lc)],Lc)
+	};
+
+	XP = prg(genNew(mungePrefix(Map)<>"$Er"),listlen(nFree)+2);
+	defineProg(Map,XP,seqn(trpProg));
+
+	valis (XV,[call(XP,[symb("#false"),XV,..nFree],Lc)],[],[XV,..Q])
+      }
+
+    | exc(G) => valof{
+        (EB,preEG,postEG,QQ) = trExp(G,Q,Opts,Map); -- The error exception
+
+        valis (idnt("_"),preEG<>postEG<>[rais(EB,Lc)],[],QQ)
+      }
+
+    | frk(_,_) => trSpawn(Nd,Q,Opts,Map)
+
+    | iff(_,_,_) => valof{
+	FQ = freeVars(Nd,Q,Opts,Map);
+	XV = idnt(genNew("$?"));                  -- generate a new variable
+	XPr = trCondX(Nd,FQ,Opts,Map);
+	
+	xArgs = FQ<>extraVars(Map)<>[XV];
+	XP = prg(genNew(mungePrefix(Map)<>"$?"),listlen(xArgs)); -- a sub-program 
+	defineProg(Map,XP,seqn(XPr));
+	
+	valis (XV,[call(XP,xArgs,ndContext(Nd))],[],[XV,..Q])
+      }
+
+    | _ => exception error("unexpected expression "++show(Nd)++" @ "++showLocation(ndContext(Nd)),'fail)
+    }
+  };
+
+  trCondX(Nd::(node(El,_,Lc).=Nd),FQ,Opts,Map) => case El in {
+    iff(T,H,E) => valof{
+      (tst,tQ) = trGoal(T,FQ,Opts,Map);
+      (thV,thPre,thPst,thQ) = trExp(H,tQ,Opts,Map);
+      (QQ,preLt) = accessLabel(Map,thQ);
+      valis [clse(QQ,FQ<>extraVars(Map)<>[thV],preLt<>tst<>[neck(Lc)]<>thPre<>thPst,Lc)]<>trCondX(E,FQ,Opts,Map)
+    }
+  | _ => valof{
+      (nE,preE,pstE,eQ) = trExp(Nd,FQ,Opts,Map);
+      (QQ,preLe) = accessLabel(Map,eQ);
+      valis [clse(QQ,FQ<>extraVars(Map)<>[nE],preLe<>preE<>pstE,Lc)]
+    }
+  };
+
+  freeVars(Nd,Q,Opts,Map) => merge(merge(findFreeVars(Nd,[],Q,[]),extraVars(Map)),
+				   debugVars(Opts));
+
+  /* spawn A is mapped to
+     __fork($(lbl$(Free)),true,handle)
+
+     where Free are the Free variables in A, and lbl$ is defined as:
+
+     lbl$(Free):thread[]..{
+       start() -> A
+     }
+
+     */
+
+  trSpawn(Nd::node(frk(QV,A),_,Lc).=Nd,Q,Opts,Map) => valof{
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    nFree = freeVars(Nd,Q,Opts,Map);
+    
+    if dbgCanon in Opts then{
+      "Free variables in spawned action are: "<>showCQuants(nFree)<>"\n">>stdout;
+    };
+
+    XT = idnt(genNew("$thr"));
+
+    if dbgCanon in Opts then{
+      "Outer variables in spawned action are: "<>showCQuants(Q)<>"\n">>stdout;
+      "Free variables in spawned action are: "<>showCQuants(nFree)<>"\n">>stdout;
+    };
+
+    (V,NC,Q1) = trActionList(A,Lc,merge(CQV,nFree),Opts,Map);
+
+    if dbgCanon in Opts then{
+      "spawned code is "<>showCCalls(NC,"",";","",[],[])<>"\n">>stdout;
+      _break("spawn");
+    };
+
+    if V!=vdel then
+      reportError("unexpected valis in spawned action",Lc);
+
+    XH = idnt(genNew("$H"));
+    XG = idnt(genNew("$Gl"));
+    TV = idnt(genNew("$this"));
+
+    Xf = genNew(mungePrefix(Map)<>"$F");
+    Label = cons(strct(Xf,listlen(nFree)),nFree);
+
+    (Q2,preL) = accessLabel(Map,Q1);
+
+    case lookupClassName(Map,"thread") in {
+      moduleClass(_,MSpr,Mprg) -> {
+        defineProg(Map,prg(Xf,listlen(nFree)),
+                   seqn([clse(merge(Q2,[TV]),
+                              [cons(trCons("start",0),[]),Label,TV],
+                              [neck(Lc),..preL<>NC],Lc),
+                         clse([XG,TV,..nFree],[XG,Label,TV],
+                              [call(Mprg,[XG,cons(MSpr,[]),TV],Lc)],Lc)]));
+
+        XO = idnt(genNew("$O"));
+
+        valis (XO,[],[ecall("__newObject",[Label,XO],Lc), -- new thread
+		      ocall(cons(strct("$init",0),[]),XO,XO,Lc) -- initialize and fork
+		      ],[XO,..Q])
+      }
+    | _ -> reportError("cannot find definition of thread",Lc)
+    }
+  };
+
+  trBag(Nd::node(bag(QV,E,G),_,Lc).=Nd,Q,Opts,Map) => valof{
+    if dbgCanon in Opts then
+      "Transforming bag of :"++show(Nd)++"\n">>stdout;
+
+    /* { E || G } is mapped to the equivalent of:
+
+    go.stdlib@bagOf(:bagTest[tE]..{
+		      check(E) :- G
+		    })
+    where bagOf is a privately defined function in stdlib and tE is the type of E
+
+    */
+
+    xBagTest = genNew(mungePrefix(Map)<>"$BagTest"); -- The name of our new anonymous class
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+    Nvars = freeVars(Nd,Q,Opts,Map);
+
+    nLabel = cons(strct(xBagTest,listlen(Nvars)),Nvars); -- our anonymous label
+
+    -- Build the check program
+
+    xCheck = prg(xBagTest<>"#check",3); -- The local name of our check program
+
+    (GB,Q1) = trGoal(G,Nvars<>CQV,Opts,Map);
+    (nE,preE,pstE,Q2) = trExp(E,Q1,Opts,Map);
+
+    thVr = idnt(genNew("$this"));
+    clVr = idnt(genNew("$cll"));
+    lbVr = idnt(genNew("$lbl"));
+    xlVr = idnt(genNew("$xl"));
+    eVr = idnt(genNew("$e"));
+
+    (QQ,preL) = accessLabel(Map,Q2);
+
+    -- check(T,C,E) :- G
+    chkCls = clse([thVr,..QQ],[nE,nLabel,thVr],preL<>GB<>preE<>pstE,Lc); 
+
+    defineProg(Map,xCheck,seqn([chkCls]));
+
+    anonCls = clse([thVr,lbVr,eVr],[cons(trCons("check",1),[eVr]),lbVr,thVr],[call(xCheck,[eVr,lbVr,thVr],Lc)],Lc);
+
+    defineProg(Map,prg(xBagTest,3),seqn([anonCls]));
+      
+    valis (xlVr,[call(prg("go.stdlib@bagOf",2),[nLabel,xlVr],Lc)],[],[xlVr,..Q])
+  };
+
+  /*  {E .. V1 in S1,V2 in S2, ..., Vn in Sn} is mapped to Bag1(S*,F*)
+
+  Bag1([V1,..L1],L2,..,Ln,F*)::G1 => Bag2(L2,...,Ln,V1,F*,Bag1(L1,..,Ln,F*))
+  Bag1([_,..L1],L2,..,Ln,F*)::G1 => Bag1(L1,..,Ln,F*)
+  Bag1([],_,...,_) => [].
+
+  Bag2([],...,Tl) => Tl.
+  Bag2([V2,..L2],L3,..,Ln,F*,Tl)::G2 => Bag3(L3,..,Ln,V1,V2,F*,Bag2(L2,..,Ln,V1,F*,Tl))
+  Bag2([_,..L2],L3,..,Ln,F*,Tl) => Bag2(L2,..,Ln,V1,F*,Tl)
+
+  Bagn([],V1,..,Vn-1,F*,Tl) => Tl
+  Bagn([Vn,..Ln],V1,..,Vn-1,F*,Tl)::Gn => [E,..Bagn(Ln,V1,..,Vn-1,F*,Tl)]
+  Bagn([_,..Ln],V1,..,Vn-1,F*,Tl) => Bagn(Ln,V1,..,Vn-1,F*,Tl)
+
+    */
+
+  genBg(Bags,Ci,X,oQ,iQ,F,Lc,Opts,Map) => case Bags in {
+    [(P,S)] => valof{				  -- last (or only) set to deal with
+      Q0 = merge(iQ,F);
+
+      Lu = idnt(genNew("_"));
+      Ln = idnt(genNew("Ln"));
+      Tl = idnt(genNew("Tl"));
+      Lx = idnt(genNew("Lx"));
+      xBagOf = prg(genNew(mungePrefix(Map)<>"Bg"),listlen(F)+3);
+
+      -- C1 = bag([],Free,in,in) :- !.
+      C1 = clse([Lx,..F],[cons(strct("go.stdlib#[]",0),[])]<>F<>[Lx,Lx],[neck(Lc)],Lc);
+
+      -- C2 = bag([P,..S],Free,in,[X,..out]) :- !,
+      --        bag(S,Free,in,out).
+      (Ptn,preP,pstP,Q1) = trPtn(P,Q0,Opts,Map);
+      (Exp,preE,pstE,Q2) = trExp(X,Q1,Opts,Map);  -- The element expression 
+      (Q3,prL) = accessLabel(Map,Q2);
+      C2 = clse([Tl,Lx,Ln,..Q3],
+                [cons(strct("go.stdlib#,..",2),[Ptn,Ln])]<>F<>
+		[cons(strct("go.stdlib#,..",2),[Exp,Tl]),Lx],
+                prL<>preP<>pstP<>[neck(Lc)]<>preE<>pstE<>
+                [call(xBagOf,[Ln,..F]<>[Tl,Lx],Lc)],Lc);
+      
+      -- C3 = bag([_,..S],Free,in,out) :- bag(S,Free,in,out).
+
+      C3 = clse(merge(F,[Tl,Lx,Lu,Ln]),
+                [cons(strct("go.stdlib#,..",2),[Lu,Ln])]<>F<>[Tl,Lx],
+                [call(xBagOf,[Ln]<>F<>[Tl,Lx],Lc)],Lc);
+
+      defineProg(Map,xBagOf,seqn([C1,C2,C3]));
+
+      (nS,preS,pstS,qS).=trExp(S,oQ,Opts,Map);  -- compute the set
+
+      valis (Lx,preS<>pstS<>[call(xBagOf,[nS]<>F<>[Lx,Ci],Lc)],[],[Lx,..qS])
+    }
+  | [(P,S),..Bgs] => valof{                       -- intermediate case,
+      nC = idnt(genNew("$L"));                    -- A new carry in variable
+      Q0 = merge(iQ,F);					  -- need to fix this later
+
+      Lu = idnt(genNew("_"));
+      Ln = idnt(genNew("Ln"));
+      Lx = idnt(genNew("Lx"));
+      Ti = idnt(genNew("Ti"));
+      To = idnt(genNew("To"));
+      Tx = idnt(genNew("Tx"));
+
+      xBagOf = prg(genNew(mungePrefix(Map)<>"$Bag"),listlen(F)+3);
+
+      -- C1 = bag([],F,in,in) :- !.
+      C1 = clse([Ti,..F],[cons(strct("go.stdlib#[]",0),[])]<>F<>[Ti,Ti],[neck(Lc)],Lc);
+
+      -- C2 = bag([P,..S],F,in,out) :-
+      --        nextBag(nextS,F*,in,int),
+      --        bag(S,F,int,out)
+
+      -- Increment the list of free variables
+      Fx = merge(freeVars(S,iQ,Opts,Map),merge(freeVars(P,iQ,Opts,Map),F));
+
+      (Ptn,preP,pstP,Q1) = trPtn(P,[Tx,Ln,Lx,..Fx],Opts,Map);
+
+      (Cx,bgG,_,bgQ) = genBg(Bgs,Tx,X,Q1,iQ,Fx,Lc,Opts,Map);
+
+      C2 = clse(bgQ,
+                [cons(strct("go.stdlib#,..",2),[Ptn,Ln])]<>F<>[Cx,Lx],
+                preP<>pstP<>[neck(Lc)]<>bgG<>[call(xBagOf,[Ln]<>F<>[Tx,Lx],Lc)],Lc);
+      -- C3 = bag([_,..S],F,in,out) :- bag(S,F,in,out)
+      C3 = clse(merge(F,[Ti,To,Lu,Ln]),
+                [cons(strct("go.stdlib#,..",2),[Lu,Ln])]<>F<>[Ti,To],
+                [call(xBagOf,[Ln]<>F<>[Ti,To],Lc)],Lc);
+      defineProg(Map,xBagOf,seqn([C1,C2,C3]));
+
+      (nS,preS,pstS,Q2).=trExp(S,oQ,Opts,Map);	  -- compute this set
+      
+      valis (Lx,preS<>pstS<>[call(xBagOf,[nS]<>F<>[Lx,Ci],Lc)],[],[Lx,..Q2])
+    }
+  };
+
+  trBnd(Nd::node(bnd(QV,E,VS),_,Lc).=Nd,Q,Opts,Map) => valof{
+    if dbgCanon in Opts then{
+      "Transforming bound set exp of :"++show(Nd)++"\n">>stdout;
+      "Current quantifiers are "<>showCQuants(Q)<>"\n">>stdout;
+    };
+
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    nFree = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then{
+      "Free variables in bnd exp "++show(Nd)++" = "++showCQuants(nFree)++"\n">>stdout;
+    };
+
+    valis genBg(VS,cons(strct("go.stdlib#[]",0),[]),E,Q,CQV,nFree,Lc,Opts,Map);
+  };
+  
+  trPredicate(node(rel(Name,_,Arity,Clses),_,Lc),Opts,Map) => valof{
+    if dbgCanon in Opts then
+      "Transforming predicate "++Name++"\n">>stdout;
+
+    pr = collect{
+      clNo : 0;
+
+      for Cl in Clses do{
+        clNo := clNo+1;
+        elemis trClause(Name,clNo,Cl,Opts,Map)
+      }
+    };
+
+    if dbgCanon in Opts then
+      "Transformed predicate "++Name++showCP(seqn(pr))++"\n">>stdout;
+
+    if decOpt in Opts then
+      valis decTree(seqn(pr),Opts)
+    else
+      valis seqn(pr)
+  };
+
+  genLazyVersion(Tps,eVars,Opts,Map,prg(Name,Ar),prog,Lc){
+    Arity = listlen(Tps);
+    Lzy : [];
+
+    Args = collect{
+      i : 1;
+      for (_,Mode) in Tps do{
+	if Mode==superMode then{
+	  Vr = idnt(genNew("_A"));
+	  Lzy := [(Vr,Name<>"_"<>i^0),..Lzy];
+	  elemis Vr
+	}
+	else
+	  elemis idnt(genNew("_$"));
+      }
+    }<>eVars;
+
+    -- We map foo(X,Y) :- ...
+    -- to
+    -- foo(X,Y) :- X@@(Y@@fooHidden(X,Y)).
+    -- fooHidden(X,Y) :- ...
+
+    if Lzy!=[] then {
+      Hdn : prg(genNew(Name),Ar);		  -- Hide original program
+      RealName = Hdn;
+      callHdn : [call(Hdn,Args,Lc)];		  -- This calls it
+
+      thVar = idnt(genNew("$th"));
+
+      for (XV,Vn) in Lzy do{
+	XP = genNew(mungePrefix(Map)<>"$::");
+
+	XPfun = strct(XP,3);
+	XPprg = prg(XP,3);
+
+	XPr = seqn([clse([thVar,..Args], 
+			 [mtch(cons(trCons("trigger",0),[])),
+			  mtch(cons(XPfun,Args)),thVar],
+			 triggerDebug(Vn,XV,Opts,Map,Lc)<>callHdn,Lc)]);
+
+	defineProg(Map,XPprg,XPr);
+
+	callHdn := [ecall("__suspend",[XV,cons(XPfun,Args)],Lc)];
+		    
+	Hdn := XPprg;
+      };
+
+      defineProg(Map,prg(Name,listlen(Args)),seqn([clse(Args,Args,callHdn,Lc)]));
+      defineProg(Map,RealName,prog);
+    }
+    else
+      defineProg(Map,prg(Name,Ar),prog);
+  };
+
+  trClause(Name,clNo,node(cls(_,QV,Head,Body),Tp,Lc),Opts,Map) => valof {
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    (xOpts,dbgPreamble,dV) = debugPreamble(Name,[inProg(Name),..Opts],Lc,CQV);
+      
+    (Args,preHG,postHG,Q1) = trPtnArgs(Head,merge(dV,CQV),xOpts,Map);
+
+    (NB,Q2) = trGoalList(Body,Q1,xOpts,Map);
+    (QQ,preL) = accessLabel(Map,merge(extraVars(Map),Q2));
+
+    valis clse(QQ,Args<>extraVars(Map),
+               preL<>dbgPreamble<>frameDebug(xOpts,Name,clNo,Lc)<>preHG<>
+	       breakDebug(xOpts,Name,Lc)<>
+               NB<>postHG<>deFrameDebug(xOpts,Name,clNo,Lc),Lc)
+  };
+
+  trStrongPredicate(node(srel(Name,_,Arity,Clses),Tp,Lc),Opts,Map) => valof{
+    if dbgCanon in Opts then
+      "Transforming strong predicate "++Name++"\n">>stdout;
+
+    pr = collect{
+      clNo : 0;
+      for Cl in Clses do{
+        clNo := clNo+1;
+        elemis trStrongClause(Name,clNo,Cl,Opts,Map);
+      }
+    };
+
+    if dbgCanon in Opts then
+      "Transformed predicate "++Name++showCP(seqn(pr))++"\n">>stdout;
+
+    if decOpt in Opts then
+      valis decTree(seqn(pr),Opts)
+    else
+      valis seqn(pr)
+  };
+
+  trStrongClause(Name,clNo,node(scls(_,QV,Head,Grd,Body),Tp,Lc),Opts,Map) => valof {
+    CQV = QV//((.(Nm,VT).)=>idnt(Nm));
+
+    (nOpts,dbgPreamble,dV) = debugPreamble(Name,[inProg(Name),..Opts],Lc,CQV);
+    
+    (Args,preHG,postHG,Q1) = trPtnArgs(Head,merge(dV,CQV),nOpts,Map);
+    (NB,Q2) = trGoalList(Body,Q1,nOpts,Map);
+    (NG,Q3) = trGoalList(Grd,Q2,nOpts,Map);
+    (QQ,preL) = accessLabel(Map,merge(extraVars(Map),Q3));
+
+    valis clse(QQ,Args<>extraVars(Map),
+               preL<>dbgPreamble<>frameDebug(nOpts,Name,clNo,Lc)<>preHG<>
+	       breakDebug(nOpts,Name,Lc)<>
+               NG<>[neck(Lc)]<>NB<>postHG<>deFrameDebug(nOpts,Name,clNo,Lc),Lc)
+  };
+  
+  trFunction(node(fun(Name,_,Arity,Eqns),Tp,Lc),Opts,Map) => valof{
+    if dbgCanon in Opts then{
+      "Transforming function "++Name++"\n">>stdout;
+    };
+
+    pr = collect{
+      clNo : 0;
+      for E in Eqns do{
+        clNo := clNo+1;
+        elemis trEquation(Name,clNo,E,Opts,Map);
+      };
+      elemis failClause(Arity+listlen(extraVars(Map))+1,Name,Lc);
+    };
+
+    if dbgCanon in Opts then{
+      "Transformed function "++Name++showCP(seqn(pr))++"\n">>stdout;
+    };
+
+    if decOpt in Opts then
+      valis decTree(seqn(pr),Opts)
+    else
+      valis seqn(pr)
+  };
+
+  /* Construct the fail error exception clause at the end of a function or procedure */
+  failClause(Ar,Msg,Lc) => valof{
+    Args = vIota(Ar);
+
+    valis clse(Args,Args,[rais(cons(strct("go.stdlib#error",2),
+				    [strg(Msg<>" failed to match at "<>
+					  showLocation(Lc)),
+				     symb("eFAIL")]),Lc)],Lc)
+  };
+
+  trEquation(Name,clNo,node(eqn(_,QV,Head,Rep,Guard),Tp,Lc),Opts,Map) => valof {
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    (nOpts,dbgPreamble,dV) = debugPreamble(Name,[inProg(Name),..Opts],Lc,CQV);
+
+    (Args,preHG,postHG,Q1) = trPtnArgs(Head,merge(dV,CQV),nOpts,Map);
+    (Gd,Q2) = trGoalList(Guard,Q1,nOpts,Map);
+
+    (Rp,preR,pstR,Q3) = trExp(Rep,Q2,nOpts,Map);
+    (QQ,preL) = accessLabel(Map,merge(extraVars(Map),Q3));
+
+    valis clse(QQ,Args<>[Rp,..extraVars(Map)],
+               preL<>dbgPreamble<>frameDebug(nOpts,Name,clNo,Lc)<>
+	       preHG<>Gd<>[neck(Lc)]<>
+	       breakDebug(nOpts,Name,Lc)<>
+               preR<>pstR<>postHG<>deFrameDebug(nOpts,Name,clNo,Lc),Lc)
+  };
+
+  trProcedure(node(prc(Name,_,Arity,Rls),Tp,Lc),Opts,Map) => valof{
+    if dbgCanon in Opts then{
+      "Transforming procedure "++Name++"\n">>stdout;
+    };
+
+    pr = collect{
+      clNo : 0;
+      for E in Rls do{
+        clNo := clNo+1;
+        elemis trActionRule(Name,clNo,E,Opts,Map);
+      };
+      elemis failClause(Arity+listlen(extraVars(Map)),Name,Lc);
+    };
+
+    if dbgCanon in Opts then{
+      "Transformed procedure "++Name^0++showCP(seqn(pr))++"\n">>stdout;
+    };
+
+    if decOpt in Opts then
+      valis decTree(seqn(pr),Opts)
+    else
+      valis seqn(pr)
+  };
+
+  /* 
+    A rule of the form:
+     head(X) -> P1(),{P2}
+   is transformed to:
+     head(X,$self,clVar,thVar) :- 
+      P1($self,clVar,thVar),P2
+  */
+
+  trActionRule(Name,clNo,Nd::(node(prl(QV,Head,Guard,Body),Tp,Lc).=Nd),Opts,Map) => valof {
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    (nOpts,dbgPreamble,dV) = debugPreamble(Name,[inProg(Name),..Opts],Lc,CQV);
+
+    (Args,preHG,postHG,Q1) = trPtnArgs(Head,merge(dV,CQV),nOpts,Map);
+    (Gd,Q2) = trGoalList(Guard,Q1,nOpts,Map);
+    (VV,NC,Q3) = trActionList(Body,Lc,Q2,nOpts,Map);
+
+    (QQ,preL) = accessLabel(Map,merge(extraVars(Map),Q3));
+
+    if VV!=vdel then
+      reportError("unexpected valis in action rule body: "<>show(Nd),Lc);
+
+    valis clse(QQ,Args<>extraVars(Map),
+               preL<>dbgPreamble<>frameDebug(nOpts,Name,clNo,Lc)<>
+	       preHG<>postHG<>
+	       Gd<>[neck(Lc)]<>
+	       breakDebug(nOpts,Name,Lc)<>
+               NC<>deFrameDebug(nOpts,Name,clNo,Lc),Lc)
+  };
+
+  trGrammar(node(grm(Name,_,Arity,Rls),Tp,Lc),Opts,Map) => valof{
+    if dbgCanon in Opts then{
+      "Transforming grammar "++Name++"\n">>stdout;
+    };
+
+    pr = collect{
+      clNo : 0;
+      for E in Rls do{
+        clNo := clNo+1;
+        elemis trGrammarRule(Name,clNo,E,Opts,Map)
+      }
+    };
+
+    if dbgCanon in Opts then{
+      "Transformed grammar "++Name++":"++showCP(seqn(pr))++"\n">>stdout;
+    };
+
+    if decOpt in Opts then
+      valis decTree(seqn(pr),Opts)
+    else
+      valis seqn(pr)
+  };
+
+  trGrammarRule(Name,clNo,node(grl(QV,Head,PB,Body),Tp,Lc),Opts,Map) => valof {
+    S = idnt(genNew("$S"));
+    Q0 = QV//((.(Nm,_).)=>idnt(Nm));
+
+    (nOpts,dbgPreamble,dV) = debugPreamble(Name,[inProg(Name),..Opts],Lc,Q0);
+
+    (Args,preHG,postHG,Q1) = trPtnArgs(Head,merge(dV,Q0),nOpts,Map);
+
+    (NB,Q2,Sx) = dcgBody(Body,PB,S,merge([S],Q1),nOpts,Map);
+    (QQ,preL) = accessLabel(Map,merge(extraVars(Map),Q2));
+
+    if [defn(S,Ft,_),..RB].=NB then
+      valis clse(QQ,Args<>{if Sx==S then [Ft,Ft] else [Ft,Sx]}<>extraVars(Map),
+                 preL<>dbgPreamble<>frameDebug(nOpts,Name,clNo,Lc)<>preHG<>
+		 breakDebug(nOpts,Name,Lc)<>
+                 RB<>postHG<>deFrameDebug(nOpts,Name,clNo,Lc),Lc)
+    else
+      valis clse([S,..QQ],Args<>[S,Sx,..extraVars(Map)],preL<>
+		 dbgPreamble<>frameDebug(nOpts,Name,clNo,Lc)<>preHG<>
+		 breakDebug(nOpts,Name,Lc)<>
+                 NB<>postHG<>deFrameDebug(nOpts,Name,clNo,Lc),Lc)
+  };
+
+  -- A constant denotes a zero-argument function that is evaluated once -- and may not access
+  -- any label variable
+
+  trConstant(node(def(Nm,_,Val),Tp,Lc),Opts,Map)=> valof{
+    Vl = idnt(genNew("$"++Nm));
+    Vs = idnt(genNew("$"++Nm));
+    Ve = idnt(genNew("$E"++Nm));
+
+    (nV,preV,pstV,Q1) = trExp(Val,extraVars(Map),[inProg(Nm),..Opts],Map);
+    (QQ,preL) = accessLabel(Map,Q1);
+
+    case lookupVarName(Map,Nm) in {
+      localVar(prg(vName,_),lbVr,thVr) -> { 		  -- A variable in a class body
+	vrProg = [
+	  -- for $-objects use named property value associated with the object
+	  clse([Vl,Ve,lbVr,thVr],[Vl,lbVr,thVr],
+	       [ecall("__getProp",[thVr,symb(Nm),Ve],Lc),neck(Lc),
+		defn(Vl,Ve,Lc)],Lc),
+	  clse(merge(extraVars(Map),[Vl,Vs,Ve]),[Vl]<>extraVars(Map),
+	       [rais(cons(strct("go.stdlib#error",2),
+			  [strg(Nm<>" not initialized at "<>
+				showLocation(Lc)),symb("eFAIL")]),Lc)],Lc)
+	  ];
+
+	dfProg = [clse(QQ,
+		       extraVars(Map),
+		       preL<>preV<>pstV<>[ecall("__setProp",[thVr,symb(Nm),nV],Lc),
+					  neck(Lc)],Lc),
+		  clse(extraVars(Map),extraVars(Map),
+		       [rais(cons(strct("go.stdlib#error",2),
+				  [strg("failed to initialize "<>Nm<>" at "<>
+					showLocation(Lc)), symb("eFAIL")]),Lc)],Lc)];
+	
+
+	iName = prg(vName<>"$init",listlen(extraVars(Map)));
+	defineProg(Map,iName,seqn(dfProg));
+	defineProg(Map,prg(vName,3),seqn(vrProg));
+
+	valis (iName,prg(vName,3))
+      }
+    | moduleVar(_,prg(vName,_)) -> {		  -- A package variable
+	dfProg = [clse(QQ,
+		       extraVars(Map),
+		       preL<>preV<>pstV<>[ecall("__assert",[symb(vName),nV],Lc),
+					  neck(Lc)],Lc),
+		  clse(extraVars(Map),extraVars(Map),
+		       [rais(cons(strct("go.stdlib#error",2),
+				  [strg("failed to initialize "<>Nm<>" at "<>
+					showLocation(Lc)), symb("eFAIL")]),Lc)],Lc)];
+
+	iName = prg(vName<>"$init",listlen(extraVars(Map)));
+	defineProg(Map,iName,seqn(dfProg));
+
+	valis (iName,prg(vName,1))
+      }
+    | M -> exception error("invalid map entry for constant ["<>Nm<>"]: "<>M^0,'internal)
+    };
+  };
+  
+  
+  -- A variable denotes a mutable resource.
+  trVariable(node(asg(Nm,_,Val),Tp,Lc),Opts,Map)=> valof{
+    Vl = idnt(genNew("$"++Nm));
+    Vs = idnt(genNew("$"++Nm));
+    Ve = idnt(genNew("$E"++Nm));
+
+    (nV,preV,pstV,Q1) = trExp(Val,extraVars(Map),[inProg(Nm),..Opts],Map);
+    (QQ,preL) = accessLabel(Map,Q1);
+
+    case lookupVarName(Map,Nm) in {
+      localAsgn(prg(vName,_),lbVr,thVr) -> { 		  -- A variable in a class body
+	vrProg = [
+	  -- for $-objects use named property value associated with the object
+	  clse([Vl,Ve,lbVr,thVr],[Vl,lbVr,thVr],
+	       [ecall("__getProp",[thVr,symb(Nm),Ve],Lc),neck(Lc),
+		defn(Vl,Ve,Lc)],Lc),
+	  clse(merge(extraVars(Map),[Vl,Vs,Ve]),[Vl]<>extraVars(Map),
+	       [rais(cons(strct("go.stdlib#error",2),
+			  [strg(Nm<>" not initialized at "<>
+				showLocation(Lc)),symb("eFAIL")]),Lc)],Lc)
+	  ];
+
+	dfProg = [clse(QQ,
+		       extraVars(Map),
+		       preL<>preV<>pstV<>[ecall("__setProp",[thVr,symb(Nm),nV],Lc),
+					  neck(Lc)],Lc),
+		  clse(extraVars(Map),extraVars(Map),
+		       [rais(cons(strct("go.stdlib#error",2),
+				  [strg("failed to initialize "<>Nm<>" at "<>
+					showLocation(Lc)), symb("eFAIL")]),Lc)],Lc)];
+	
+
+	iName = prg(vName<>"$init",listlen(extraVars(Map)));
+	defineProg(Map,iName,seqn(dfProg));
+	defineProg(Map,prg(vName,3),seqn(vrProg));
+
+	valis (iName,prg(vName,3))
+      }
+    | moduleAsgn(_,prg(vName,_),aName) -> {		  -- A package variable
+	dfProg = [clse(QQ,
+		       extraVars(Map),
+		       preL<>preV<>pstV<>[ecall("__assert",[symb(vName),nV],Lc),
+					  neck(Lc)],Lc),
+		  clse(extraVars(Map),extraVars(Map),
+		       [rais(cons(strct("go.stdlib#error",2),
+				  [strg("failed to initialize "<>Nm<>" at "<>
+					showLocation(Lc)), symb("eFAIL")]),Lc)],Lc)];
+
+	iName = prg(vName<>"$init",listlen(extraVars(Map)));
+	defineProg(Map,iName,seqn(dfProg));
+
+	asrtProg = [clse([Vl],[Vl],[ecall("__assert",[symb(vName),Vl],Lc)],Lc)];
+	defineProg(Map,aName,seqn(asrtProg));
+
+	valis (iName,prg(vName,1))
+      }
+    | M -> exception error("invalid map entry for variable ["<>Nm<>"]: "<>M^0,'internal)
+    };
+  };
+
+  generateVarInits(varInits,superClasses,Lc,Map) => valof{
+    clVar = idnt("cl");
+    thVar = idnt("this");
+
+    Calls = collect{
+      elemis neck(Lc);
+      for (spr,sprName) in superClasses do{
+        elemis call(sprName,[cons(strct("$init",0),[]),clVar,thVar],Lc);
+      };
+
+      for (vN::(vN!="$"),lVn) in varInits do{
+        elemis call(lVn,[clVar,thVar],Lc)
+      };
+      for ("$",lVn) in varInits do{
+        elemis call(lVn,[clVar,thVar],Lc)
+      };
+    };
+
+    valis clse([clVar,thVar],[mtch(cons(strct("$init",0),[])),clVar,thVar],Calls,Lc)
+  };
+
+
+/* Handle head arguments, doesnt completly unfold so as to gain benefit
+  of decision tree construction
+*/
+
+  trPtnArgs(L,Q,Opts,Map) => valof{
+    preGG : [];
+    postGG : [];
+    QQ : Q;
+    NL = collect{
+      for E in L do{
+        (NE,preNG,postNG,NQ)=trPtn(E,QQ,Opts,Map);
+        preGG := preGG<>preNG;
+        postGG := postNG<>postGG;
+        QQ := NQ;
+        elemis NE;
+      }
+    };
+    valis (NL,preGG,postGG,QQ)
+  };
+
+  trArgs(L,Q,Opts,Map) => trPtnArgs(L,Q,Opts,Map);
+
+/* Handle term matching, doesnt completly unfold so as to gain benefit
+  of decision tree construction
+*/
+
+  trPtn(Nd::node(N,Tp,Lc).=Nd,Q,Opts,Map) => {
+    case N in {
+      iden("this") => (thVr(Map),[],[],merge([thVr(Map)],Q))
+    | iden(Nm) => valof{
+	xI = idnt(genNew("$v"));
+        case lookupVarName(Map,Nm) in {
+          localVar(Vn,clVr,tVr) ->		  -- an instance variable
+            valis (xI,[call(Vn,[xI,clVr,tVr],Lc)],[],merge([xI,clVr,tVr],Q))
+        | localAsgn(Vn,clVr,tVr) ->		  -- an instance variable
+            valis (xI,[ecall("__getProp",[tVr,symb(Nm),xI],Lc)],[],merge([xI,clVr,tVr],Q))
+        | moduleVar(_,Vn) ->			  -- a package-level variable
+            valis (xI,[call(Vn,[xI],Lc)],[],[xI,..Q])
+        | moduleAsgn(_,Vn,_) ->			  -- a package-level variable
+            valis (xI,[call(Vn,[xI],Lc)],[],[xI,..Q])
+	| labelArg(N,clVr,tVr) -> 
+	    valis (idnt(N),[],[],merge(Q,[idnt(Nm),clVr,tVr])) -- label handled later
+	  
+        | notInMap ->
+            valis (idnt(Nm),[],[],Q)
+        | Rf -> {
+            reportError("illegal access: "<>Rf^0<>" to non-local variable: "<>Nm,Lc);
+            valis (vdel,[],[],Q)
+          }
+        }
+      }
+
+    | pkrf(Pkg,node(iden(Nm),_,_)) => valof{
+	xI = idnt(genNew("$v"));
+        case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+          moduleVar(_,Vn) -> 
+            valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+        | moduleAsgn(_,Vn,_) ->			  -- a package-level variable
+            valis (xI,[],[call(Vn,[xI],Lc)],[xI,..Q])
+        | Mode -> {
+            reportError("illegal access: "<>Mode^0<>" to unknown package variable: "<>Pkg<>"#"<>Nm,Lc);
+            valis (vdel,[],[],Q)
+          }
+        }
+      }
+
+    | enu(Nm) => valof{
+        case lookupClassName(Map,Nm) in {
+          moduleClass(_,mNm,_) -> 
+            valis (cons(mNm,[]),[],[],Q)
+
+        | localClass(mNm,_,lbV,thV) -> {
+            valis (cons(mNm,[lbV,thV]),[],[],merge([lbV,thV],Q))
+	  }
+        | inherit(prg(mNm,_),_,lbV,thV) ->
+            valis (cons(strct(mNm,2),[lbV,thV]),[],[],merge([lbV,thV],Q))
+	| notInMap -> {
+	    if (Nm,_,_) in standardTypes then
+	      valis (cons(strct(Nm,0),[]),[],[],Q) -- treated specially
+	    else
+	      exception error("Problem: enumerated symbol "<>Nm<>" not in map",'failed)
+	  }
+
+        | _ -> exception error("Problem: cannot deal with enumerated "<>Nm,'failed)
+        }
+      }
+
+    | pkrf(Pkg,node(enu(Nm),_,_)) => valof{
+	case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+	  moduleClass(_,mNm,_) -> 
+	    valis (cons(mNm,[]),[],[],Q)
+	| Mode -> {
+	    reportError("illegal access: "<>Mode^0<>" to constructor: "<>Nm<>" from package "<>Pkg,Lc);
+	    valis (vdel,[],[],Q)
+	  }
+	}
+      }
+
+    | int(N) => (intgr(N),[],[],Q)
+    | flt(N) => (float(N),[],[],Q)
+    | chr(S) => (ch(S),[],[],Q)
+    | str(S) => (strg(S),[],[],Q)
+    | sym(S) => (symb(S),[],[],Q)
+
+    | con(C,L) => valof{
+	case C in {
+	  node(iden(Nm),_,_) -> {
+	    (NL,preA,pstA,Q1) = trPtnArgs(L,Q,Opts,Map);
+
+	    case lookupClassName(Map,Nm) in {
+	      moduleClass(_,mNm,_) -> {
+		valis (cons(mNm,NL),preA,pstA,Q1)
+	      }
+	    | localClass(mNm,_,lbV,thV) -> {
+		valis (cons(mNm,NL<>[lbV,thV]),preA,pstA,merge([lbV,thV],Q1))
+	      }
+	    | inherit(prg(mNm,_),_,lbV,thV) -> {                  -- cope with special case 
+		valis (cons(strct(mNm,listlen(NL)),NL),preA,pstA,merge([lbV,thV],Q1))
+	      }
+	    | C -> exception error("Problem: "<>Nm<>" pattern constructor not in map, class="<>C^0,
+				     'internal)
+	    }
+	  }
+	| node(pkrf(Pkg,node(iden(Nm),_,_)),_,_) -> {
+	    (NL,preA,pstA,QQ) = trPtnArgs(L,Q,Opts,Map);
+
+	    case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+	      moduleClass(_,mNm,_) -> 
+		valis (cons(mNm,NL),preA,pstA,QQ)
+	    | localClass(mNm,_,lbV,thV) -> 
+		valis (cons(mNm,NL<>[lbV,thV]),preA,pstA,merge([lbV,thV],QQ))
+	    | Mode -> {
+		reportError("illegal access: "<>Mode^0<>" to constructor: "<>Nm<>" from package "<>Pkg,Lc);
+		valis (vdel,[],[],Q)
+	      }
+	    }
+	  }
+	| _ -> {
+	    reportError("illegal constructor: "<>showTerm(C),Lc);
+	    valis (vdel,[],[],Q)
+	  }
+	}
+      }
+
+    | grd(E,G) => valof{
+        (GB,GQ) = trGoalList(G,Q,Opts,Map);
+        (NE,preNG,postNG,QQ) = trPtn(E,GQ,Opts,Map);
+        valis (NE,preNG<>GB,postNG,QQ)
+      }
+
+    | app(F,A) => trExp(Nd,Q,Opts,Map)
+
+    | flow(P,M) => case M in {
+        inpMode => valof{
+          (NP,preP,pstP,Q1) = trPtn(P,Q,Opts,Map);
+          valis (mtch(NP),preP,pstP,Q1)
+        }
+      | superMode => valof{			  -- treated like input mode
+          (NP,preP,pstP,Q1) = trPtn(P,Q,Opts,Map);
+          valis (mtch(NP),preP,pstP,Q1)
+        }
+      | biMode => trPtn(P,Q,Opts,Map)
+      | outMode => valof{
+          (NP,preP,pstP,Q1) = trPtn(P,Q,Opts,Map);
+          valis (bild(NP),preP,pstP,Q1)
+        }
+      }
+      
+    | _ => valof{
+        reportError("expression "++show(Nd)++" not permitted as a pattern",Lc);
+        valis (vdel,[],[],Q)
+      }
+    }
+  };
+
+  trValof(Nd::(node(vlof(QV,P),_,Lc).=Nd),Q,Opts,Map) => valof{
+    CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+    nFree =freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then{
+      "free vars of "<>show(Nd)<>" are "<>showCQuants(nFree)<>"\n">>stdout;
+      "initial local vars are "<>showCQuants(CQV)<>"\n">>stdout;
+      "extraVars are "<>showCQuants(extraVars(Map))<>"\n">>stdout;
+    };
+
+    (nEx,nBody,Q1) = trActionList(P,Lc,CQV<>nFree,Opts,Map);
+    (QQ,preL) = accessLabel(Map,Q1);
+
+    if nEx==vdel then{
+      vProg = seqn([clse(QQ,nFree,preL<>nBody<>[neck(Lc)],Lc)]);
+
+      if dbgCanon in Opts then{
+        "Transformed valof is "<>showCP(vProg)<>"\n">>stdout;
+      };
+
+      XN = prg(genNew(mungePrefix(Map)<>"$valof"),listlen(nFree));
+      defineProg(Map,XN,vProg);
+
+      valis (vdel,[call(XN,nFree,Lc)],[],Q)
+    }
+    else if idnt(_).=nEx then{
+      vProg = seqn([clse(QQ,[nEx,..nFree],preL<>nBody<>[neck(Lc)],Lc)]);
+      XV = idnt(genNew("$valis"));
+      XN = prg(genNew(mungePrefix(Map)<>"$valof"),listlen(nFree)+1);
+      defineProg(Map,XN,vProg);
+
+      if dbgCanon in Opts then{
+        "Transformed valof is "<>showCP(vProg)<>"\n">>stdout;
+      };
+
+      valis (XV,[call(XN,[XV,..nFree],Lc)],[],[XV,..Q])
+    }
+    else{
+      XV = idnt(genNew("$valis"));
+      vProg = seqn([clse([XV,..QQ],[XV,..nFree],preL<>nBody<>
+			 [neck(Lc),defn(XV,nEx,Lc)],Lc)]);
+
+      XN = prg(genNew(mungePrefix(Map)<>"$valof"),listlen(nFree)+1);
+      defineProg(Map,XN,vProg);
+
+      if dbgCanon in Opts then{
+        "Transformed valof is "<>showCP(vProg)<>"\n">>stdout;
+      };
+
+      valis (XV,[call(XN,[XV,..nFree],Lc)],[],[XV,..Q])
+    }
+  };
+
+  trGoal(Nd::node(N,Tp,Lc).=Nd,Q,Opts,Map) => {case N in {
+      enu("true") => ([],Q)
+    | enu("false") => ([fail(Lc)],Q)
+    | prd(node(iden("="),pTp,_),[Lhs,Rhs]) => valof{
+        (NL,preLG,postLG,Q1) = trExp(Lhs,Q,Opts,Map);
+        (NR,preRG,postRG,Q2) = trExp(Rhs,Q1,Opts,Map);
+
+        if idnt(V).=NL then
+          valis (preLG<>preRG<>postLG<>postRG<>[defn(NL,NR,Lc)]<>defnDebug(Lc,V,NR,Opts),Q2)
+        else if idnt(V).=NR then
+          valis (preLG<>preRG<>postLG<>postRG<>[defn(NR,NL,Lc)]<>defnDebug(Lc,V,NL,Opts),Q2)
+        else
+          valis (preLG<>preRG<>postLG<>postRG<>[ecall("=",[NL,NR],Lc)],Q2)
+      }
+      
+    | prd(node(iden("in"),_,_),[Ptn,List]) => valof{
+        -- Ptn in List becomes:
+        -- ..,in$(List,Free),..
+        --
+        -- in$([Ptn,.._],Free).
+        -- in$([_,..X],Free) :- in$(X,Free).
+        
+	inFr = freeVars(Ptn,Q,Opts,Map);
+   
+        (nP,preP,pstP,Q1) = trPtn(Ptn,inFr,Opts,Map);
+	(QQ,preL) = accessLabel(Map,Q1);
+        nV = idnt(genNew("_$"));
+        nX = idnt(genNew("_X"));
+        
+        XI = prg(genNew(mungePrefix(Map)<>"$I"),listlen(inFr)+1);
+
+        inD = [clse([nV,..QQ],[cons(strct("go.stdlib#,..",2),[nP,nV]),..inFr],preL<>preP<>pstP,Lc),
+               clse([nV,nX,..QQ],[cons(strct("go.stdlib#,..",2),[nX,nV]),..inFr],[call(XI,[nV,..inFr],Lc)],Lc)];
+
+        defineProg(Map,XI,seqn(inD));
+    
+        (nList,preE,pstE,Qa) = trExp(List,Q,Opts,Map);
+	
+        valis (preE<>pstE<>
+	       predDebug("in",[nP,nList],
+			 call(XI,[nList,..inFr],Lc),Opts,Map,Lc),Qa)
+      }
+
+    | prd(node(iden("<="),_,_),[Inst,Class]) => valof{
+        -- ..,Inst <= Class,.. becomes
+        -- ..,#(Inst,$label(Class),Inst),..
+        (nI,preI,pstI,iQ) = trExp(Inst,Q,Opts,Map);
+        (nC,preC,pstC,cQ) = trExp(Class,iQ,Opts,Map);
+
+	LbV = idnt(genNew("$LbV"));
+	Cl = idnt(genNew("$Cl"));
+	sCl = idnt(genNew("$<"));
+
+	valis (preI<>pstI<>preC<>pstC<>
+	       predDebug("<=",[nI,nC],ocall(cons(strct("$label",1),[nC]),nI,nI,Lc),
+			 Opts,Map,Lc),[Cl,..cQ])
+      }
+
+    | prd(node(F,fTp,fLc),A) => valof{      -- Predicate call
+        (NA,preA,postA,QQ) = trExpArgs(A,Q,Opts,Map);
+
+        case F in {
+          iden(Prd) -> {
+            if isEscape(Prd) then
+              valis (preA<>postA<>[ecall(Prd,NA,Lc)],QQ)
+            else{
+              case lookupRelName(Map,Prd,Opts) in {
+                localRel(Fn,clVr,tVr) -> {
+                  valis (preA<>postA<>
+			 predDebug(Prd,NA,call(Fn,NA<>[clVr,tVr],fLc),Opts,Map,Lc),
+                         merge(QQ,[clVr,tVr]))
+                }
+              | moduleRel(_,Fn) -> {
+                  valis (preA<>postA<>
+			 predDebug(Prd,NA,call(Fn,NA,fLc),Opts,Map,Lc),
+                         QQ)
+                }
+              | inheritField(Super,clVr,tVr) -> {
+                  C = cons(trCons(Prd,listlen(NA)),NA);
+                  valis (preA<>postA<>
+			 predDebug(Prd,NA,call(Super,[C,clVr,tVr],fLc),Opts,Map,Lc),
+                         merge(QQ,[clVr,tVr]))
+                }
+              | notInMap -> {
+                  reportError("predicate: "<>Prd<>" not defined",fLc);
+                  valis ([],QQ)
+                }
+              | _ -> exception error("cannot handle source: "<>Prd,'fail)
+              }
+            }
+          }
+
+        | pkrf(Pkg,node(iden(Prd),_,_)) -> {
+	    case lookupPackageRef(Map,Pkg,Prd,Opts) in {
+	      moduleRel(_,Rl) -> {
+		valis (preA<>postA<>
+		       predDebug(Prd,NA,call(Rl,NA,fLc),Opts,Map,Lc),QQ)
+	      }
+	    | _ -> exception error("cannot handle source: "<>Prd,'fail)
+	    }
+	  }
+
+        | dot(node(Rc,rFtp,rLc),Prd) -> { -- We had a predicate call of the form L.f(A)
+--	    _break(show(node(Rc,rFtp,rLc)));
+	    mArity = listlen(NA);
+            C = cons(trCons(Prd,mArity),NA);
+
+            case Rc in {
+              iden(Lbl) -> {
+                case lookupVarName(Map,Lbl) in {
+                  inherit(_,Super,clVr,tVr) -> {             -- This is a super call
+                    valis (preA<>postA<>
+			   predDebug(Prd,NA,call(Super,[C,clVr,tVr],Lc),Opts,Map,Lc),
+                           QQ)
+                  }
+                | _ -> {
+                    (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                    valis (preA<>postA<>preR<>pstR<>
+			   predDebug(Prd,NA,ocall(C,nR,nR,Lc),Opts,Map,Lc),Qx)
+                  }
+                }
+              }
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                valis (preA<>postA<>preR<>pstR<>
+		       predDebug(Prd,NA,ocall(C,nR,nR,Lc),Opts,Map,Lc),Qx)
+              }
+            }
+          }
+        | _ -> {
+            reportError("invalid predicate: "<>show(node(F,fTp,fLc)),fLc);
+            valis ([],Q)
+          }
+        }
+      }
+
+    | mtc(L,R) => valof{                -- A match test
+        (NL,preLG,postLG,Q1) = trPtn(L,Q,Opts,Map);
+        (NR,preRG,postRG,Q2) = trExp(R,Q1,Opts,Map);
+
+        valis (preRG<>postRG<>[defn(mtch(NL),NR,Lc)]<>preLG<>postLG,Q2)
+       }
+
+    | cnj(GoalList) => trGoalList(GoalList,Q,Opts,Map)
+
+    | neg(G) => valof{
+        Q0 = freeVars(Nd,Q,Opts,Map);
+
+        (Nbody,Q1) = trGoalList(G,Q0,Opts,Map);
+	(QQ,preL) = accessLabel(Map,Q1);
+
+        nArgs = merge(Q0,extraVars(Map));
+
+        XN = prg(genNew(mungePrefix(Map)<>"$!"),listlen(nArgs));
+        defineProg(Map,XN,
+                   seqn([clse(merge(nArgs,QQ),
+                              nArgs,preL<>Nbody<>[neck(Lc),fail(Lc)],Lc),
+                         clse(nArgs,nArgs,[],Lc)]));
+        valis ([call(XN,nArgs,Lc)],Q)
+      }
+
+    | one(G) => valof{
+        Q0 = freeVars(Nd,Q,Opts,Map);
+        (Nbody,Q1) = trGoalList(G,Q0,Opts,Map);
+	(QQ,preL) = accessLabel(Map,Q1);
+
+        Args = Q0<>extraVars(Map);
+        XN = prg(genNew(mungePrefix(Map)<>"$!"),listlen(Args));
+        defineProg(Map,XN,seqn([clse(QQ,Args,preL<>Nbody<>[neck(Lc)],Lc)]));
+        valis ([call(XN,Args,Lc)],Q)
+      }
+
+    | dsj(A,B) => trDisj(Nd,Q,Opts,Map)
+    
+    | iff(A,B,C) => valof{
+        Q0 = freeVars(Nd,Q,Opts,Map);
+        (tst,tQ) = trGoal(A,Q0,Opts,Map);
+        (thBody,tQ1) = trGoal(B,tQ,Opts,Map);
+	(thQ,preT) = accessLabel(Map,tQ1);
+        (elBody,eQ1) = trGoal(C,Q0,Opts,Map);
+	(elQ,preE) = accessLabel(Map,eQ1);
+
+
+        Args = merge(extraVars(Map),Q0);
+        XN = prg(genNew(mungePrefix(Map)<>"$!"),listlen(Args));
+        defineProg(Map,XN,
+                   seqn([clse(thQ,Args,preT<>tst<>[neck(Lc)]<>thBody,Lc),
+			 clse(elQ,Args,preE<>elBody,Lc)]));
+        valis ([call(XN,Args,Lc)],Q)
+      }
+
+      -- A *> B
+      -- becomes
+      -- lca(F) where { lca(F) :- A, lcb(F1), !, fail.
+      --             lca(F).
+      --             lcb(F1) :- B, !, fail.
+      --             lcb(F1).
+      --           }
+
+    | frll(SQ,A,B) => valof{
+        FQ = SQ//((.(Nm,_).)=>idnt(Nm));
+
+        aFree = freeVars(Nd,Q,Opts,Map);
+        bFree = freeVars(node(cnj(B),voidType,noLoc),FQ<>Q,Opts,Map);
+
+        if dbgCanon in Opts then{
+          "pred forall:"<>show(Nd)<>"\n">>stdout;
+          "Q = "<>showCQuants(Q)<>"\n">>stdout;
+          "FQ = "<>showCQuants(FQ)<>"\n">>stdout;
+          "aFree = "<>showCQuants(aFree)<>"\n">>stdout;
+          "bFree = "<>showCQuants(bFree)<>"\n">>stdout;
+        };
+        
+        NP = idnt(genNew("$"));
+        
+        (aBdy,aQ0) = trGoalList(A,merge(FQ,aFree),Opts,Map);
+--        (aBdy,aQ0) = trGoalList(A,FQ,Opts,Map);
+	(aQ,preA) = accessLabel(Map,aQ0);
+--        (bBdy,bQ0) = trGoalList(B,FQ,Opts,Map);
+	(bBdy,bQ0) = trGoalList(B,merge(FQ,bFree),Opts,Map);
+	(bQ,preB) = accessLabel(Map,bQ0);
+
+        aArgs = merge(extraVars(Map),aFree);
+        NA = prg(genNew(mungePrefix(Map)<>"$A"),listlen(aArgs));
+        bArgs = merge(extraVars(Map),bFree);
+        NB = prg(genNew(mungePrefix(Map)<>"$B"),listlen(bArgs));
+
+        lca = seqn([clse(merge(aQ,aFree),aArgs,aBdy<>[call(NB,bArgs,Lc),neck(Lc),fail(Lc)],Lc),
+                    clse(aArgs,aArgs,[],Lc)]);
+
+        lcb = seqn([clse(merge(bQ,bFree),bArgs,bBdy<>[neck(Lc),fail(Lc)],Lc),
+                    clse(bArgs,bArgs,[],Lc)]);
+
+        defineProg(Map,NA,lca);
+        defineProg(Map,NB,lcb);
+
+        if dbgCanon in Opts then{
+	  "NA = "<>NA^0<>"\n">>stdout;
+	  "NB = "<>NB^0<>"\n">>stdout;
+          "aArgs = "<>showCQuants(aArgs)<>"\n">>stdout;
+          "bArgs = "<>showCQuants(bArgs)<>"\n">>stdout;
+        };
+
+        valis ([call(NA,aArgs,Lc)],Q)
+      }
+
+    | lzy(E,G) => valof{
+        if G==[] then
+          valis ([],Q)
+        else{
+          Q0 = freeVars(Nd,Q,Opts,Map);
+	  if dbgCanon in Opts then{
+	    "Free vars of suspend are: "<>showCQuants(Q0)<>"\n">>stdout;
+	  };
+
+          XV = idnt(genNew("$::"));		  -- generate a new variable
+
+          (NE,preNG,postNG,Qa) = trExp(E,Q,Opts,Map);
+
+          (GB,Q1) = trGoalList(G,Q0,Opts,Map);
+          
+          Nargs = Q0<>extraVars(Map);
+	  (QQ,preL) = accessLabel(Map,Q1);
+
+	  /*
+	   * We have to define the equivalent of:
+ 	   * lbl(X)..{
+	   *   trigger() :: var(X) :-- __suspend(X,this).
+	   *   trigger() :-- <Goal>.
+           * }
+	   */
+	  thVar = idnt(genNew("$th"));
+          XP = genNew(mungePrefix(Map)<>"$::");
+	  XPf = strct(XP,3);
+	  XPp = prg(XP,3);
+
+          XPr = seqn([clse([thVar,..QQ], 
+			   [mtch(cons(trCons("trigger",0),[])),
+			    mtch(cons(XPf,Nargs)),thVar],
+			   preL<>triggerDebug(iName(NE),NE,Opts,Map,Lc)<>GB,Lc)]);
+
+          defineProg(Map,XPp,XPr);
+	   
+	  valis (preNG<>postNG<>[ecall("__suspend",[NE,cons(XPf,Nargs)],Lc)],Qa)
+        }
+      }
+
+    | nt(Gr,[Str]) => valof{                  -- handle a call to a grammar rule
+        (nS,preSG,postSG,Q1) = trExp(Str,Q,Opts,Map);
+        
+        (NB,QQ,Sx) = dcgBody(Gr,node(enu("[]"),ndType(Str),Lc),nS,Q1,Opts,Map);
+	valis (preSG<>postSG<>NB<>
+	       parseDebug("eof",[],Sx,Sx,
+			  ocall(cons(trCons("eof",0),[]),Sx,Sx,Lc),
+			  Opts,Map,Lc),QQ)
+      }
+      
+    | nt(Gr,[Str,Rst]) => valof{            -- handle a call to a grammar rule
+        (nS,preSG,postSG,Q1) = trExp(Str,Q,Opts,Map);
+        (nR,preRG,postRG,Q2) = trExp(Rst,Q1,Opts,Map);
+        
+        (NB,QQ,Sx) = dcgBody(Gr,node(enu("[]"),ndType(Str),Lc),nS,Q2,Opts,Map);
+        valis (preSG<>postSG<>preRG<>postRG<>NB<>
+               [ocall(cons(trCons("eq",1),[nR]),Sx,Sx,Lc)],QQ)
+      }
+      
+    | vlof(_,_) => valof{
+        (nEx,GG,_,QQ)  = trValof(Nd,Q,Opts,Map);
+        
+        if nEx==vdel then
+          valis (GG,QQ)
+        else
+          valis (GG<>[defn(nEx,cons(strct("go.stdlib#true",0),[]),Lc)],[nEx,..QQ])
+      }
+
+      -- G onerror ( error(E,C) => G | ... error(E,C) => G )
+      -- is mapped to
+      -- $Er(#fail,F1,...,Fn) where Fi are the free variables of G, etc.
+      -- Where $Er is a new program defined as:
+      -- $Er(._,F1,...,Fn) :- errr([G]). Mark the current cp as a trap point
+      -- $Er(.error(Ei,Ci),F1,..,Fn) :- !, Gi for each error handling clause
+      -- $Er(.#fail,_,...,_) :- !,fail.
+      -- $Er(F,_,...,_) :- raise(F) -- propogate the error
+      
+    | err(G,Er) => valof{
+	nFree = freeVars(Nd,Q,Opts,Map);
+
+	XC = idnt(genNew("$t"));		  -- the error trap value
+
+	trpProg = collect{
+	  (gBdy,gQ0) = trGoal(G,nFree,Opts,Map);
+	  (gQ,preG) = accessLabel(Map,gQ0);
+
+	  elemis clse([XC,..gQ]<>extraVars(Map),[XC,..nFree],
+		     [trpBegin]<>preG<>gBdy<>[trpEnd],Lc);
+
+          for node(cls(_,eQ,[ePtn],eGoal),_,eLc) in Er do{
+	    eQV = (eQ//((.(Nm,_).)=>idnt(Nm)))<>nFree;
+
+	    Key = symb(genNew("GERR"));
+                           
+	    (xOpts,dbgPreamble,dV) = debugPreamble("onerror",Opts,Lc,eQV);
+
+	    (NH,preHG,postHG,Q1) = trPtn(ePtn,merge(dV,nFree),xOpts,Map);
+
+            (NC,Q1) = trGoalList(eGoal,Q1,xOpts,Map);
+	    (QQ,preL) = accessLabel(Map,Q1);
+
+	    elemis clse(QQ<>extraVars(Map),
+			[mtch(NH),..nFree]<>extraVars(Map),
+			preL<>dbgPreamble<>
+			preHG<>postHG<>[neck(eLc)]<>
+			NC,eLc)
+	  };
+	  elemis clse(nFree<>extraVars(Map),
+		      [symb("#false"),..nFree]<>extraVars(Map),
+		      [neck(Lc),fail(Lc)],Lc);	  -- regular failure
+	  elemis clse([XC,..nFree]<>extraVars(Map),
+		      [XC,..nFree]<>extraVars(Map),
+		      [rais(XC,Lc)],Lc)
+	};
+
+	XP = prg(genNew(mungePrefix(Map)<>"$Er"),listlen(nFree)+1);
+	defineProg(Map,XP,seqn(trpProg));
+
+	valis ([call(XP,[symb("#false"),..nFree],Lc)],Q)
+      }
+      
+    | exc(G) => valof{
+        (EB,preEG,postEG,QQ) = trExp(G,Q,Opts,Map); -- The error exception
+
+        valis (preEG<>postEG<>[rais(EB,Lc)],QQ)
+      }
+
+    | _ => exception error("Cant handle canonicalization of goal "++show(Nd),'fail)
+    }
+  };
+
+  trDisj(Nd::node(N,Tp,Lc).=Nd,Q,Opts,Map) => valof{
+    nVars = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then{
+      "disjunction:"<>show(Nd)<>"\n">>stdout;
+      "nVars = "<>showCQuants(nVars)<>"\n">>stdout;
+      "Q = "<>showCQuants(Q)<>"\n">>stdout;
+    };
+
+    disProg = trDsj(Nd,nVars,Opts,Map);
+    XD = prg(genNew(mungePrefix(Map)<>"$|"),listlen(nVars));
+
+    defineProg(Map,XD,seqn(trDsj(Nd,nVars,Opts,Map)));
+
+    valis ([call(XD,nVars,Lc)],Q)
+  };
+
+  trDsj(Nd::node(NN,_,Lc).=Nd,Nvars,Opts,Map) => {
+    case NN in {
+      dsj(A,B) => 
+        trDsj(A,Nvars,Opts,Map)<>trDsj(B,Nvars,Opts,Map)
+    | cnj([Gl]) => trDsj(Gl,Nvars,Opts,Map)
+    | _ => valof{
+        (body,Q0) = trGoal(Nd,Nvars,Opts,Map);
+	(Q,preL) = accessLabel(Map,Q0);
+        valis [clse(Q,Nvars,preL<>body,Lc)]
+      }
+    }
+  };
+
+  trGoalList = {
+    ([],Q,_,_) => ([],Q)
+  | ([G,..Body],Q,Opts,Map) => valof{
+      (NG,NQ) = trGoal(G,Q,Opts,Map);
+      (AG,QQ) = trGoalList(Body,NQ,Opts,Map);
+      valis (NG<>AG,QQ)
+    }
+  };
+  
+  /* Handle DCG grammars */
+  
+  pushString(Str,Lc,S0,Q) => valof{
+    QQ : Q;
+    Sz : S0;
+    Gl = collect{
+      for C in Str do{
+        Sx = idnt(genNew("$S"));
+        QQ := [Sx,..QQ];
+        elemis ocall(cons(trCons("cons",2),[ch(C),Sx]),Sz,Sz,Lc);
+        Sz := Sx
+      }
+    };
+    valis (Gl,QQ,Sz)
+  };
+
+  dcgPushBack(Nd::(node(PB,Tp,Lc).=Nd),pre,S,Q,Opts,Map) => { 
+    case PB in {
+      enu("[]") => (pre,Q,S)
+    | con(node(iden(",.."),_,_),[H,T]) => valof{
+        S1 = idnt(genNew("$S1"));
+
+        (tG,tQ,S2) = dcgPushBack(T,pre,S,[S1,..Q],Opts,Map);
+
+        (NE,preEG,postEG,Q2) = trPtn(H,tQ,Opts,Map);
+
+        valis (tG<>[ocall(cons(trCons("cons",2),
+			       [NE,S1]),S2,S2,Lc)]<>preEG<>postEG,Q2,S1);
+      }
+    | str(Str) =>  valof{
+        (Gl,QQ,S1) = pushString(Str,Lc,S,Q);
+
+        valis (pre<>Gl,QQ,S1)
+      }
+
+    | grd(T,G) => valof{
+        (Tg,Tq,S2) = dcgPushBack(T,[],S,Q,Opts,Map);
+        (GB,GQ) = trGoalList(G,Tq,Opts,Map);
+        valis (pre<>Tg<>GB,GQ,S2)
+      }
+    | seq(L) => valof{
+        tG : pre;
+        tQ : Q;
+        tS : S;
+        
+        for xX in L do{
+          (tG,tQ,tS) := dcgPushBack(xX,tG,tS,tQ,Opts,Map);
+        };
+        
+        valis (tG,tQ,tS)
+      }
+    | _ => valof{
+        reportError("only literals allowed in lookahead, not: "++show(Nd),(Lc));
+        valis (pre,Q,S)
+      }
+    }
+  };
+
+  dcgBody(Nd::node(N,Tp,Lc).=Nd,PB,S0,Q,Opts,Map) => {
+    case N in {
+      enu("[]") => 
+        dcgPushBack(PB,[],S0,Q,Opts,Map)
+    | enu("eof")  =>      -- test for end of file
+        dcgPushBack(PB,[ocall(cons(trCons("eof",0),[]), S0,S0,Lc)],S0,Q,Opts,Map)
+        
+    | str(Str) =>  valof{
+        QQ : Q;
+        Sz : S0;
+        Gl = collect{
+          for C in Str do{
+            Sx = idnt(genNew("$S"));
+            QQ := [Sx,..QQ];
+            elemis ocall(cons(trCons("hdtl",2),[ch(C),Sx]),Sz,Sz,Lc);
+            Sz := Sx
+          }
+        };
+        valis dcgPushBack(PB,Gl,Sz,QQ,Opts,Map)
+      }
+
+    | seq(L) => dcgBodyList(L,PB,S0,Q,Opts,Map)
+    
+    | con(node(iden(",.."),_,_),[H,T]) => valof{
+        S = idnt(genNew("$S"));
+
+        (NH,preHG,postHG,Q1) = trPtn(H,[S,..Q],Opts,Map);
+        (TB,Q2,S1) = dcgBody(T,PB,S,Q1,Opts,Map);
+
+        valis (preHG<>
+	       tokenDebug(NH,S0,S,
+			  ocall(cons(trCons("hdtl",2),[NH,S]),S0,S0,Lc),
+			  Opts,Map,Lc)<>postHG<>TB,Q2,S1)
+      }
+        
+    | cnj(G) => valof{
+        (NG,QQ) = trGoalList(G,Q,Opts,Map);
+        valis dcgPushBack(PB,NG,S0,QQ,Opts,Map);
+      }
+
+    | grd(Body,Grd) => valof{
+        (NB,Q1,S) = dcgBody(Body,PB,S0,Q,Opts,Map);
+        (NG,Q2) = trGoalList(Grd,Q1,Opts,Map);
+        valis dcgPushBack(PB,NB<>NG,S,Q2,Opts,Map)
+      }
+
+    | dsj(H,T) => dcgDisj(Nd,PB,S0,Q,Opts,Map)      -- a disjunction in a rule body
+
+    | iff(_,_,_) => dcgConditional(Nd,PB,S0,Q,Opts,Map) -- conditional
+
+    | cse(_,_) => dcgCase(Nd,PB,S0,Q,Opts,Map) -- case grammar condition
+
+    | neg(N) => valof{                -- a negation in a rule body
+--        "Negated quants = "<>showCQuants(Q)<>"\n">>stdout;
+        NulPB = node(enu("[]"),uType("","logical",[]),Lc);
+        nFree = freeVars(Nd,Q,Opts,Map);
+--        "Negated nvars = "<>showCQuants(nFree)<>"\n">>stdout;
+        
+        S = idnt(genNew("$S"));
+
+        (tst,Q0,S1) = dcgBodyList(N,NulPB,S0,merge([S0],nFree),Opts,Map);
+	(Q1,preL) = accessLabel(Map,Q0);
+
+        XPr = seqn([clse(Q1,[S0,S1,..nFree],tst<>[neck(Lc),fail(Lc)],Lc),
+                    clse(merge([S0],nFree),[S0,S0,..nFree],[],Lc)]);
+
+	-- a sub-program to handle negation
+        XP = prg(genNew(mungePrefix(Map)<>"$not"),listlen(nFree)+2); 
+
+        defineProg(Map,XP,XPr);
+                
+        valis dcgPushBack(PB,[call(XP,[S0,S,..nFree],Lc)],S,merge([S0],[S,..Q]),Opts,Map)
+      }
+      
+    | one(One) => valof{                -- a one-of in a rule body
+        NulPB = node(enu("[]"),uType("","logical",[]),Lc);
+        nFree = freeVars(Nd,Q,Opts,Map);
+        
+        S = idnt(genNew("$S"));
+
+        (tst,Q0,S1) = dcgBodyList(One,NulPB,S0,nFree,Opts,Map);
+	(Q1,preL) = accessLabel(Map,Q0);
+
+        XPr = seqn([clse(merge([S0],Q1),[S0,S1,..nFree],preL<>tst<>[neck(Lc)],Lc)]);
+        XP = prg(genNew(mungePrefix(Map)<>"$one"),listlen(nFree)+2);
+        defineProg(Map,XP,XPr);
+                
+        valis dcgPushBack(PB,[call(XP,[S0,S,..nFree],Lc)],S,merge([S0],[S,..Q]),Opts,Map)
+      }
+      
+    | vlof(_,_) => valof{
+        (nEx,GG,_,QQ)  = trValof(Nd,Q,Opts,Map);
+        
+        if nEx==vdel then
+          valis dcgPushBack(PB,GG,S0,QQ,Opts,Map)
+        else
+          valis dcgPushBack(PB,GG<>[defn(nEx,cons(strct("go.stdlib#true",0),[]),Lc)],S0,QQ,Opts,Map)
+      }
+      
+    | nt(node(F,fTp,fLc),A) => valof{      -- Non-terminal grammar call
+        (NA,preA,postA,Q2) = trExpArgs(A,Q,Opts,Map);
+
+        S = idnt(genNew("$-"));
+--        "Grammar call "<>show(Nd)++"\n">>stdout;
+--        "Transforms to "<>showC(call(NP,NA<>[S0,S],Lc))<>"\n">>stdout;
+
+        case F in {
+          iden(Gram) -> {
+            if isEscape(Gram) then
+              valis dcgPushBack(PB,preA<>postA<>
+				parseDebug(Gram,NA,S0,S,
+					   ecall(Gram,NA<>[S0,S],Lc),
+					   Opts,Map,Lc),
+                                S, [S,..Q2],Opts,Map)
+            else{
+              case lookupGrmName(Map,Gram,Opts) in {
+                localGrm(Fn,clVr,tVr) -> {
+                  valis dcgPushBack(PB,preA<>postA<>
+				    parseDebug(Gram,NA,S0,S,
+					       call(Fn,NA<>[S0,S,clVr,tVr],Lc),
+					       Opts,Map,Lc),
+                                    S, merge([S,clVr,tVr],Q2),Opts,Map)
+                }
+              | moduleGrm(_,Fn) -> {
+                  valis dcgPushBack(PB,preA<>postA<>
+				    parseDebug(Gram,NA,S0,S,
+					       call(Fn,NA<>[S0,S],Lc),
+					       Opts,Map,Lc),
+                                    S, [S,..Q2],Opts,Map)
+                }
+              | inheritField(Super,clVr,tVr) -> {
+		  iArgs = NA<>[S0,S];
+                  C = cons(trCons(Gram,listlen(iArgs)),iArgs);
+
+                  valis dcgPushBack(PB,preA<>postA<>
+				    parseDebug(Gram,NA,S0,S,
+					       call(Super,[C,clVr,tVr],Lc),
+					       Opts,Map,Lc),
+                                    S, merge([S,..Q2],[clVr,tVr]),Opts,Map)
+                }
+
+              | notInMap -> {
+                  reportError("grammar: "<>Gram<>" not defined",Lc);
+                  valis dcgPushBack(PB,[],S0,Q2,Opts,Map)
+                }
+              | _ -> exception error("cannot handle source: "<>Gram,'fail)
+              }
+            }
+          }
+
+        | pkrf(Pkg,node(iden(Grm),_,_)) -> {
+            case lookupPackageRef(Map,Pkg,Grm,Opts) in {
+              moduleGrm(_,Fn) -> {
+                valis dcgPushBack(PB,preA<>postA<>
+				  parseDebug(Grm,NA,S0,S,
+					     call(Fn,NA<>[S0,S],Lc),
+					     Opts,Map,Lc),
+                                  S, [S,..Q2],Opts,Map)
+              }
+
+            | _ -> exception error("cannot handle source: "<>Grm,'fail)
+            }
+          }
+
+        | dot(node(Rc,rFtp,rLc),Fld) -> { -- We had a grammar call of the form L.f(A)
+	    mArity = listlen(NA)+2;
+            C = cons(trCons(Fld,mArity),NA<>[S0,S]);
+
+            case Rc in {
+              iden(Lbl) -> {
+                case lookupVarName(Map,Lbl) in {
+                  inherit(_,Super,clVr,tVr) -> {             -- This is a super call
+                    valis dcgPushBack(PB,preA<>postA<>
+				      parseDebug(Fld,NA,S0,S,
+						 call(Super,[C,clVr,tVr],Lc),
+						 Opts,Map,Lc),
+                                      S, [S,..Q2],Opts,Map)
+                  }
+                | _ -> {
+                    (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q2,Opts,Map);
+                    valis dcgPushBack(PB,preA<>postA<>preR<>pstR<>
+				      parseDebug(Fld,NA,S0,S,ocall(C,nR,nR,Lc),
+						 Opts,Map,Lc),
+                                      S, [S,..Qx],Opts,Map)
+                  }
+                }
+              }
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),Q2,Opts,Map);
+                valis dcgPushBack(PB,preA<>postA<>preR<>pstR<>
+				  parseDebug(Fld,NA,S0,S,ocall(C,nR,nR,Lc),
+					     Opts,Map,Lc),
+                                  S, [S,..Qx],Opts,Map)
+              }
+            }
+          }
+        | _ -> {
+            reportError("invalid grammar non-terminal: "<>show(node(F,fTp,fLc)),fLc);
+            valis dcgPushBack(PB,[],S0,Q2,Opts,Map)
+          }
+        }
+      }
+
+
+      -- A grammar iteration of the form G *
+      -- is compiled to:
+      --   ITR() --> G,!, ITR().
+      --   ITR() --> []
+
+    | itr(QV,B,node(vde,_,_),_) => valof{
+        if dbgCanon in Opts then
+          "Transforming iteration:"++show(Nd)++"\n">>stdout;
+
+        CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+        nFree = freeVars(Nd,Q,Opts,Map);
+      
+        NulPB = node(enu("[]"),voidType,Lc);
+        Sa = idnt(genNew("$S0"));
+        Sb = idnt(genNew("$S1"));
+        xL = idnt(genNew("$L"));
+        ITR = prg(genNew(mungePrefix(Map)<>"$I"),listlen(nFree)+3);
+
+        (body,Q1,S1) = dcgBody(B,NulPB,Sa,[Sa,..merge(CQV,nFree)],Opts,Map);
+
+	(QQ,preL) = accessLabel(Map,Q1);
+
+        Rule1 = clse([xL,Sb,..QQ],
+                     [Sa,Sb,..nFree],
+                     preL<>body<>[neck(Lc)]<>
+                     [call(ITR,[S1,Sb,..nFree],Lc)],Lc);
+        Rule2 = clse([Sa,..nFree],[Sa,Sa,..nFree],[],Lc);
+
+        defineProg(Map,ITR,seqn([Rule1,Rule2]));
+
+        S = idnt(genNew("$SS"));
+
+        valis dcgPushBack(PB,[call(ITR,[S0,S,..nFree],Lc)],S,[S,..Q],Opts,Map);
+      }
+
+
+      -- A grammar iteration of the form G * B ^ L
+      -- is compiled to:
+      -- ITR(L) .. {
+      --   ITR([B,..$1]) --> G,!, ITR($1).
+      --   ITR([]) --> []
+      -- }
+
+    | itr(QV,B,V,L) => valof{
+        if dbgCanon in Opts then
+          "Transforming iteration:"++show(Nd)++"\n">>stdout;
+
+        CQV = QV//((.(Nm,_).)=>idnt(Nm));
+
+        nFree = freeVars(Nd,Q,Opts,Map);
+      
+        NulPB = node(enu("[]"),voidType,Lc);
+        Sa = idnt(genNew("$S0"));
+        Sb = idnt(genNew("$S1"));
+        xL = idnt(genNew("$L"));
+        ITR = prg(genNew(mungePrefix(Map)<>"$I"),listlen(nFree)+3);
+
+        (body,Q1,S1) = dcgBody(B,NulPB,Sa,[Sa,..merge(CQV,nFree)],Opts,Map);
+        (nV,preV,pstV,Q2) = trExp(V,Q1,Opts,Map);
+	(QQ,preL) = accessLabel(Map,Q2);
+
+        Rule1 = clse([xL,Sb,..QQ],
+                     [Sa,Sb,cons(strct("go.stdlib#,..",2),[nV,xL]),..nFree],
+                     preL<>body<>[neck(Lc)]<>preV<>pstV<>
+                     [call(ITR,[S1,Sb,xL,..nFree],Lc)],Lc);
+        Rule2 = clse([Sa,..nFree],[Sa,Sa,cons(strct("go.stdlib#[]",0),[]),..nFree],[],Lc);
+
+        defineProg(Map,ITR,seqn([Rule1,Rule2]));
+
+        (nL,preE,pstE,Qe) = trExp(L,Q,Opts,Map);
+        S = idnt(genNew("$SS"));
+
+        valis dcgPushBack(PB,preE<>pstE<>[call(ITR,[S0,S,nL,..nFree],Lc)],S,[S,..Qe],Opts,Map);
+      }
+
+      -- NT onerror ( error(E1,C1) => NT1 | ... error(E1,C1) => NTn )
+      -- is mapped to
+      -- $Er(#fail,S0,Sx,F1,...,Fn) where Fi are the free variables
+      --  and S0,Sx are the steam variables
+      -- Where $Er is a new program defined as:
+      -- $Er(._,S0,Sx,F1,...,Fn) :- errr([NT]). Mark the current cp as a trap point
+      -- $Er(.error(Ei,Ci),S0,Sx,F1,..,Fn) :- !, NTi for each error handling clause
+      -- $Er(.#fail,_,_,...,_) :- !, fail  propagate normal failure
+      -- $Er(F,_,...,_) :- raise(F) -- propagate error
+      
+    | err(G,Er) => valof{
+	nFree = freeVars(Nd,Q,Opts,Map);
+
+	XC = idnt(genNew("$t"));		  -- the error trap value
+	Sx = idnt(genNew("$sx"));
+
+	trpProg = collect{
+	  (nBody,Qg,So) = dcgBody(G,PB,S0,nFree,Opts,Map); -- The controlled goal
+	  (Qgg,preG) = accessLabel(Map,Qg);
+
+	  elemis clse(merge([XC,S0],Qgg),
+		      [XC,S0,So,..nFree],[trpBegin]<>preG<>nBody<>[trpEnd],Lc);
+
+          for node(grl(eQ,[ePtn],_,eGd),_,eLc) in Er do{
+            eQV = eQ//((.(Nm,_).)=>idnt(Nm));
+
+            S = idnt(genNew("$s"));
+
+	    (xOpts,dbgPreamble,dV) = debugPreamble("onerror",Opts,Lc,eQV);
+            (NH,preHG,postHG,Q1) = trPtn(ePtn,merge(dV,nFree),xOpts,Map);
+
+            NulPB = node(enu("[]"),voidType,eLc);
+            (eBody,Q2,S1) = dcgBody(eGd,NulPB,Sx,Q1,xOpts,Map);
+	    (QQ,preL) = accessLabel(Map,Q2);
+
+            elemis clse(merge([S,Sx],QQ),
+                        [mtch(NH),Sx,S1]<>nFree,
+                        preL<>dbgPreamble<>
+			preHG<>postHG<>
+                        [neck(eLc)]<>eBody,eLc);
+          };
+
+	  elemis clse([S0,Sx,..nFree]<>extraVars(Map),
+		      [symb("#false"),S0,Sx,..nFree]<>extraVars(Map),
+		      [neck(Lc),fail(Lc)],Lc);
+	  elemis clse([XC,S0,Sx,..nFree]<>extraVars(Map),
+		      [XC,S0,Sx,..nFree]<>extraVars(Map),
+		      [rais(XC,Lc)],Lc)
+	};
+
+	XP = prg(genNew(mungePrefix(Map)<>"$Er"),listlen(nFree)+3);
+	defineProg(Map,XP,seqn(trpProg));
+
+        S1 = idnt(genNew("$s"));
+	valis dcgPushBack(PB,[call(XP,[symb("#false"),S0,S1,..nFree],Lc)],
+			  S1,merge([S0],[S1,..Q]),Opts,Map)
+      }
+        
+    | exc(G) => valof{
+       (EB,preEG,postEG,QQ) = trExp(G,Q,Opts,Map); -- The error exception
+       
+        valis dcgPushBack(PB,preEG<>postEG<>[rais(EB,Lc)],S0,QQ,Opts,Map);
+      }
+    }
+  };
+
+  dcgDisj(Nd,PB,S0,Q,Opts,Map) => valof{
+    FQ = freeVars(Nd,Q,Opts,Map);
+
+    XD = prg(genNew(mungePrefix(Map)<>"$|"),listlen(FQ)+2);
+    S = idnt(genNew("$S"));
+
+    chP = seqn(dcgDsj(Nd,S0,FQ,Opts,Map));
+
+    defineProg(Map,XD,chP);
+
+    valis dcgPushBack(PB,[call(XD,[S0,S,..FQ],ndContext(Nd))],S,merge([S0],[S,..Q]),Opts,Map)
+  };
+
+  dcgDsj(Nd::(node(El,_,Lc).=Nd),S0,FQ,Opts,Map) => case El in {
+    dsj(H,T) => dcgDsj(H,S0,FQ,Opts,Map)<>dcgDsj(T,S0,FQ,Opts,Map)
+  | _ => valof{                                  -- a disjunction in a rule body
+      (Abody,Q2,S) = dcgBody(Nd,node(enu("[]"),voidType,Lc),S0,FQ,Opts,Map);
+      (QQ,preG) = accessLabel(Map,Q2);
+      valis [clse(merge([S0],Q2),[S0,S,..FQ],Abody,Lc)]
+    }
+  };
+
+  dcgConditional(Nd,PB,S0,Q,Opts,Map) => valof{
+    FQ = freeVars(Nd,Q,Opts,Map);
+
+    S = idnt(genNew("$S"));
+
+    chP = seqn(dcgCond(Nd,S0,FQ,Opts,Map));
+
+    XD = prg(genNew(mungePrefix(Map)<>"$?"),listlen([S0,S,..FQ]));
+    defineProg(Map,XD,chP);
+
+    valis dcgPushBack(PB,[call(XD,[S0,S,..FQ],ndContext(Nd))],S,merge([S0],[S,..Q]),Opts,Map)
+  };
+
+  dcgCond(Nd::(node(El,_,Lc).=Nd),S0,FQ,Opts,Map) => case El in {
+    iff(T,H,E) => valof{
+      NulPB = node(enu("[]"),voidType,Lc);
+
+      (tst,tQ,St) = dcgBody(T,NulPB,S0,FQ,Opts,Map);
+      (Abody,Q1,S1) = dcgBody(H,NulPB,St,tQ,Opts,Map);
+      (Q2,preG) = accessLabel(Map,Q1);
+      
+      valis [clse(merge([S0],Q2),[S0,S1,..FQ],preG<>tst<>[neck(Lc)]<>Abody,Lc)]
+    } <> dcgCond(E,S0,FQ,Opts,Map)
+  | _ => valof{                                  -- a disjunction in a rule body
+      (Abody,Q1,S) = dcgBody(Nd,node(enu("[]"),voidType,Lc),S0,FQ,Opts,Map);
+      (Q2,preG) = accessLabel(Map,Q1);
+      valis [clse(merge([S0],Q2),[S0,S,..FQ],preG<>Abody,Lc)]
+    }
+  };
+
+  dcgCase(Nd::node(cse(Exp,Rules),_,Lc).=Nd,PB,S0,Q,Opts,Map) => valof{
+    nFree = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then
+      "Free vars of case grammar "++show(Nd)++" are: "++showCQuants(nFree)++"\n">>stdout;
+        
+    S = idnt(genNew("$S"));
+    
+    foundTuples : node(con(node(iden(","),_,_),_),_,_).=Exp;      -- are all the cases tuples?
+
+    commonVars = extraVars(Map)<>nFree;           -- all the programs here need these arguments
+    (nE,preE,pstE,eQ) = trExp(Exp,Q,Opts,Map);	  -- the governing expression
+
+    -- collect information about the case handling rules ...
+
+    phase1 = collect{
+      for node(grl(QV,[Ptn],_,Body),_,mLc) in Rules do{
+        CQV = (QV//((.(Nm,VT).)=>idnt(Nm)))<>nFree<>[S0];
+        (nP,preP,postP,Q1) = trPtn(Ptn,CQV,Opts,Map);
+
+	(cBody,Q2,cS) = dcgBody(Body,PB,S0,Q1,Opts,Map);
+	(Q3,preG) = accessLabel(Map,Q2);
+
+        if !cons(strct("go.stdlib#,",2),_).=nP then
+          foundTuples := false;
+
+        elemis (Q3,nP,cS,preG<>preP<>postP<>[neck(mLc)]<>cBody,mLc)
+      }
+    };
+
+    -- set up the specific message processing programs
+    caseError = cons(strct("go.stdlib#error",2),
+		     [strg("unexpected failure: "<>showLocation(Lc)),
+		      symb("eFAIL")]);
+
+    CaseProc = collect{
+      for (vQ,vP,vS,vB,vLc) in phase1 do{
+	if foundTuples && cons(strct("go.stdlib#,",2),_).=vP then
+	  elemis clse(vQ,(deComma(vP)//(X=>mtch(X)))<>[S0,vS]<>commonVars,vB,vLc)
+	else
+	  elemis clse(vQ,[mtch(vP),S0,vS,..commonVars],vB,vLc)
+      };
+
+      dummyArgs = {
+	if foundTuples then{
+	  collect{
+	    cons(_,eArgs).=nE;
+	    for X in eArgs do
+	      elemis idnt(genNew("_"));
+	    elemis idnt(genNew("_"));		  -- for the input stream
+	    elemis idnt(genNew("_"));		  -- for the result stream
+	  }
+	}
+	else
+	  [idnt(genNew("_")),idnt(genNew("_")),idnt(genNew("_"))]
+      };
+
+      elemis clse(dummyArgs<>commonVars,dummyArgs<>commonVars,[rais(caseError,Lc)],Lc)
+    };
+
+
+    if foundTuples && cons(strct("go.stdlib#,",2),_).=nE then{
+      xArgs = deComma(nE)<>[S0,S]<>commonVars;
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(xArgs));      -- case handling procedure
+      defineProg(Map,CaseP,seqn(CaseProc));
+
+      valis (preE<>pstE<>[call(CaseP,xArgs,Lc)],[S,..eQ],S)
+    }
+    else{
+      xArgs = [nE,S0,S,..commonVars];
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(xArgs));      -- case handling procedure
+      defineProg(Map,CaseP,seqn(CaseProc));
+
+      valis (preE<>pstE<>[call(CaseP,xArgs,Lc)],[S,..eQ],S)
+    }
+  };
+
+  dcgCond(Nd::(node(El,_,Lc).=Nd),S0,FQ,Opts,Map) => case El in {
+    iff(T,H,E) => valof{
+      NulPB = node(enu("[]"),voidType,Lc);
+
+      (tst,tQ,St) = dcgBody(T,NulPB,S0,FQ,Opts,Map);
+      (Abody,Q1,S1) = dcgBody(H,NulPB,St,tQ,Opts,Map);
+      (Q2,preG) = accessLabel(Map,Q1);
+      
+      valis [clse(merge([S0],Q2),[S0,S1,..FQ],preG<>tst<>[neck(Lc)]<>Abody,Lc)]
+    } <> dcgCond(E,S0,FQ,Opts,Map)
+  | _ => valof{                                  -- a disjunction in a rule body
+      (Abody,Q1,S) = dcgBody(Nd,node(enu("[]"),voidType,Lc),S0,FQ,Opts,Map);
+      (Q2,preG) = accessLabel(Map,Q1);
+      valis [clse(merge([S0],Q2),[S0,S,..FQ],preG<>Abody,Lc)]
+    }
+  };
+
+  dcgBodyList(L,PB,S0,Q,Opts,Map) => case L in {
+    [] => dcgPushBack(PB,[],S0,Q,Opts,Map)
+  | [H,..T] => valof{
+      Lc=ndContext(H);
+      (HB,Q1,S1) = dcgBody(H,node(enu("[]"),uType("","logical",[]),Lc),S0,Q,Opts,Map);
+      (TB,Q2,S2) = dcgBodyList(T,PB,S1,Q1,Opts,Map);
+      valis (HB<>TB,Q2,S2)
+    }
+  };
+
+  trActionList(Acts,Lc,Q,Opts,Map) => valof{
+    QQ:Q;
+    Cde : [];
+    V : vdel;
+
+    for A in Acts do{
+      (aV,aG,Q0) = trAction(A,QQ,Opts,Map);
+
+      Cde := Cde<>aG;
+
+      (nV,VG,vQ) = mergeValis(V,aV,Lc,Q0);
+
+      V := nV;
+      Cde := Cde<>VG;
+      QQ := vQ;
+    };
+    valis (V,Cde,QQ)
+  };
+      
+  trAction(Nd::(node(G,gTp,Lc).=Nd),Q,Opts,Map) => {
+    case G in {
+      iden("{}") => (vdel,[],Q)
+    | act(node(F,fTp,fLc),A) => valof{      -- Procedure call
+        (NA,preA,postA,QQ) = trExpArgs(A,Q,Opts,Map);
+
+        case F in {
+          iden(Act) -> {
+            if isEscape(Act) then
+              valis (vdel,preA<>postA<>[ecall(Act,NA,Lc)],QQ)
+            else{
+              case lookupPrcName(Map,Act,Opts) in {
+                localPrc(Fn,clVr,tVr) -> {
+                  valis (vdel,preA<>postA<>
+			 execDebug(Act,NA,call(Fn,NA<>[clVr,tVr],Lc),Opts,Map,Lc),
+                         merge(QQ,[clVr,tVr]))
+                }
+              | modulePrc(_,Fn) -> {
+                  valis (vdel,preA<>postA<>
+			 execDebug(Act,NA,call(Fn,NA,Lc),Opts,Map,Lc),QQ)
+                }
+              | inheritField(Super,clVr,tVr) -> {
+                  C = cons(trCons(Act,listlen(NA)),NA);
+                  valis (vdel,preA<>postA<>
+			 execDebug(Act,NA,call(Super,[C,clVr,tVr],Lc),Opts,Map,Lc),
+                         merge(QQ,[clVr,tVr]))
+                }
+              | notInMap -> {
+                  reportError("action procedure: "<>Act<>" not defined",Lc);
+                  valis (vdel,[],QQ)
+                }
+              | _ -> exception error("cannot handle source: "<>Act,'fail)
+              }
+            }
+          }
+
+        | pkrf(Pkg,node(iden(Nm),_,_)) -> {
+	    if dbgCanon in Opts then
+	      showMap(Map)>>stdout;
+
+            case lookupPackageRef(Map,Pkg,Nm,Opts) in {
+              modulePrc(_,Fn) -> {
+                valis (vdel,preA<>postA<>
+		       execDebug(Nm,NA,call(Fn,NA,Lc),Opts,Map,Lc),QQ)
+              }
+            | _ -> exception error("cannot handle source: "<>show(Nd),'fail)
+            }
+          }
+
+        | dot(node(Rc,rFtp,rLc),Fld) -> { -- We had an action call of the form L.f(A)
+	    mArity = listlen(NA);
+            C = cons(trCons(Fld,mArity),NA);
+--	    _break(show(Nd));
+            case Rc in {
+              iden(Lbl) -> {
+                case lookupVarName(Map,Lbl) in {
+                  inherit(_,Super,clVr,tVr) -> {  -- This is a super call
+--		    Super^0<>"\n">>stdout;
+                    valis (vdel,preA<>postA<>
+			   execDebug(Fld,NA,
+				     call(Super,[C,clVr,tVr],Lc),Opts,Map,Lc),
+			   QQ)
+                  }
+                | _ -> {
+                    (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                    
+                    valis (vdel,preR<>pstR<>preA<>postA<>
+			   execDebug(Fld,NA,ocall(C,nR,nR,Lc),Opts,Map,Lc),Qx)
+                  }
+                }
+              }
+
+            | _ -> {
+                (nR,preR,pstR,Qx) = trExp(node(Rc,rFtp,rLc),QQ,Opts,Map);
+                    valis (vdel,preR<>pstR<>preA<>postA<>
+			   execDebug(Fld,NA,ocall(C,nR,nR,Lc),Opts,Map,Lc),Qx)
+              }
+            }
+          }
+        | _ -> {
+            reportError("invalid predicate: "<>show(node(F,fTp,fLc)),fLc);
+            valis (vdel,[],Q)
+          }
+        }
+      }
+      
+    | grd(A,Grd) => valof{
+        (nG,qG) = trGoalList(Grd,Q,Opts,Map);
+        (vA,xA,qA) = trAction(A,qG,Opts,Map);
+        valis (vA,nG<>xA,qA)
+      }
+
+    | asg(Vr,_,Rhs) => valof{
+        (NR,preRG,postRG,Q2) = trExp(Rhs,Q,Opts,Map);
+
+        case lookupVarName(Map,Vr) in {
+          localAsgn(xVr,clVr,tVr) -> {
+            if extraVars(Map)!=[] then
+              valis (vdel,preRG<>postRG<>[ecall("__setProp",[tVr,symb(Vr),NR],Lc)]<>
+                     defnDebug(Lc,Vr,NR,Opts),merge(Q2,[clVr,tVr]))
+            else{
+              reportError("assignment to "<>Vr<>" not permitted here",Lc);
+              valis (vdel,[],Q)
+            }
+          }
+              
+        | moduleAsgn(xVr,_,aName) -> {
+	    valis (vdel,preRG<>postRG<>[call(aName,[NR],Lc)]<>
+		   defnDebug(Lc,Vr,NR,Opts),Q2)
+          }
+        | _ -> {
+            reportError("assignment to "<>Vr<>" not permitted",Lc);
+            valis (vdel,[],Q)
+          }
+        }
+      }
+      
+    | seq(L) => trActionList(L,Lc,Q,Opts,Map)
+
+    | cse(_,_) => trCase(Nd,Q,Opts,Map)
+
+    | one(G) => valof{
+        nFree =freeVars(Nd,Q,Opts,Map);
+
+        (Nbody,Q0) = trGoalList(G,nFree,Opts,Map);
+	(QQ,preG) = accessLabel(Map,Q0);
+
+        OP = prg(genNew(mungePrefix(Map)<>"$!"),listlen(nFree));
+        oP = seqn([clse(QQ,nFree,preG<>Nbody<>[neck(Lc)],Lc),
+                   clse(QQ,nFree,[rais(cons(strct("go.stdlib#error",2),
+					    [strg(showLocation(Lc)), 
+					     symb("eFAIL")]),Lc)],Lc)]);
+
+        defineProg(Map,OP,oP);
+        valis (vdel,[call(OP,nFree,Lc)],Q)
+      }
+
+      -- A synchronized action where the body is a set of conditional rules ...
+      
+    | sync(_,_,_) =>
+        trSync(Nd,Q,Opts,Map)
+      
+    | exc(G) => valof{
+        (EB,preEG,postEG,QQ) = trExp(G,Q,Opts,Map); -- The error exception
+
+        valis (vdel,preEG<>postEG<>[rais(EB,Lc)],QQ)
+      }
+
+    | vlis(node(cnj(Goal),gT,gL)) => valof{
+        nFree = freeVars(Nd,Q,Opts,Map);
+        R = idnt(genNew(mungePrefix(Map)<>"!"));
+
+        (tst,Q0) = trGoalList(Goal,nFree,Opts,Map);
+	(tQ,preT) = accessLabel(Map,Q0);
+
+        XPr = [clse([R,..tQ],[R,..nFree<>extraVars(Map)],
+                    preT<>tst<>[neck(gL),
+				defn(R,cons(strct("go.stdlib#true",0),[]),Lc)],Lc),
+               clse([R,..nFree],
+                    [R,..nFree<>extraVars(Map)],
+                    [defn(R,cons(strct("go.stdlib#false",0),[]),Lc)],Lc)];
+
+	vArgs = [R,..nFree<>extraVars(Map)];
+        XP = prg(genNew(mungePrefix(Map)<>"$?"),listlen(vArgs));
+        defineProg(Map,XP,seqn(XPr));
+          
+        valis (R,[call(XP,vArgs,Lc)],[R,..Q])
+      }
+
+    | vlis(Ex) => valof{
+        (nE,preB,pstB,nQ) = trExp(Ex,Q,Opts,Map);
+        
+        valis (nE,preB<>pstB<>valisDebug(Lc,nE,Opts),nQ)
+      }
+
+      -- Ac onerror ( error(E,C) => A1 | ... error(E,C) => An )
+      -- is mapped to
+      -- $Er(#false,V,F1,...,Fn) where Fi are the free variables
+      --  and V is the valis variable if present
+      -- Where $Er is a new program defined as:
+      -- $Er(._,V,F1,...,Fn) :- errr([Ac]). Mark the current cp as a trap point
+      -- $Er(.error(Ei,Ci),V,F1,..,Fn) :- !, Vi for each error handling clause
+      -- $Er(.#false,_,...,_) :- raise unexpected failure
+      -- $Er(F,_,...,_) :- raise(F) -- propogate the error
+      
+    | err(Ac,Er) => valof{
+	nFree = freeVars(Nd,Q,Opts,Map);
+
+	XV = idnt(genNew("$v"));	 -- result returned by the error handler
+	XC = idnt(genNew("$t"));		  -- the error trap value
+
+        valisFound : false;			  -- Is there a valis?
+
+        phase1 = collect{
+          for node(prl(eQ,[ePtn],eGd,eAct),_,eLc) in Er do{
+            eQV = eQ//((.(Nm,_).)=>idnt(Nm));
+
+	    (xOpts,dbgPreamble,dV) = debugPreamble("onerror",Opts,Lc,eQV);
+            (nP,preP,postP,Q1) = trPtn(ePtn,merge(dV,nFree),Opts,Map);
+            (nG,Q2) = trGoalList(eGd,Q1,xOpts,Map);
+            (eVl,nA,Q3) = trActionList(eAct,eLc,Q2,xOpts,Map);
+	    (QQ,preA) = accessLabel(Map,Q3);
+
+            if eVl!=vdel then
+              valisFound := true;
+
+            elemis (eVl,[XC,..QQ],[XC,..nFree],
+		    [defn(mtch(nP),XC,Lc)]<>preA<>
+		    dbgPreamble<>
+		    preP<>postP<>
+                    nG<>[neck(eLc)]<>nA,eLc);
+          };
+	  eX = idnt(genNew("$er"));
+
+	  elemis (vdel,[XC,..nFree],[XC,..nFree],
+		  [defn(mtch(symb("#false")),XC,Lc),
+		   rais(cons(strct("go.stdlib#error",2),
+			     [strg("unexpected failure: "<>showLocation(Lc)),
+			      symb("eFAIL")]),Lc)],Lc);
+
+	  elemis (vdel,[eX,..nFree],[eX,..nFree],[rais(eX,Lc)],Lc)
+        };
+
+        (vA,xA,Q0) = trAction(Ac,nFree,Opts,Map);
+	(NQ,preA) = accessLabel(Map,Q0);
+
+        if vA!=vdel then
+          valisFound := true;
+
+        if valisFound then{
+          trpProg = collect{
+	    if vA!=vdel then
+	      elemis clse([XC,..NQ],[XC,..nFree<>[vA]],
+			  [trpBegin]<>preA<>xA<>[trpEnd],Lc)
+	    else
+	      elemis clse([XV,XC,..NQ],[XC,..nFree<>[XV]],
+			  [trpBegin]<>preA<>xA<>[trpEnd],Lc);
+
+            for (vL,vV,vArgs,vB,vLc) in phase1 do{
+              if vL==vdel then
+                elemis clse(merge([XV],vV),vArgs<>[XV],vB,vLc)
+              else
+                elemis clse(vV,vArgs<>[vL],vB,vLc)
+            }
+          };
+	  XP = prg(genNew(mungePrefix(Map)<>"$Er"),listlen(nFree)+2);
+          defineProg(Map,XP,seqn(trpProg));
+
+          valis (XV,[call(XP,[symb("#false"),..nFree<>[XV]],Lc)],[XV,..Q])
+        }
+        else{					-- no valis in the error handler
+          trpProg = collect{
+	    elemis clse([XC,..NQ],[XC,..nFree],
+			[trpBegin]<>preA<>xA<>[trpEnd],Lc);
+
+            for (_,vV,vArgs,vB,vLc) in phase1 do
+              elemis clse(vV,vArgs,vB,vLc)
+          };
+	  XP = prg(genNew(mungePrefix(Map)<>"$Er"),listlen(nFree)+1);
+          defineProg(Map,XP,seqn(trpProg));
+
+          valis (vdel,[call(XP,[symb("#false"),..nFree],Lc)],Q)
+        }
+      }
+
+    | frk(_,_) => valof{
+        (_,Pre,Pst,QQ) = trSpawn(Nd,Q,Opts,Map);
+        valis (vdel,Pre<>Pst,QQ)
+      }
+
+    | iff(A,B,C) => valof{
+        nFree = freeVars(Nd,Q,Opts,Map);
+        
+        (tst,tQ) = trGoal(A,nFree,Opts,Map);
+        (vT,thBody,tQ0) = trAction(B,tQ,Opts,Map);
+	(thQ,preT) = accessLabel(Map,tQ0);
+        (vE,elBody,eQ0) = trAction(C,nFree,Opts,Map);
+	(elQ,preE) = accessLabel(Map,eQ0);
+
+        if vT==vdel && vE==vdel then{
+          XPr = [clse(thQ,nFree<>extraVars(Map),
+                      preT<>tst<>[neck(ndContext(A))]<>thBody,Lc),
+                 clse(elQ,nFree<>extraVars(Map), preE<>elBody,Lc)];
+
+	  XP = prg(genNew(mungePrefix(Map)<>"$?"),listlen(nFree<>extraVars(Map)));
+
+          defineProg(Map,XP,seqn(XPr));
+          valis (vdel,[call(XP,nFree<>extraVars(Map),Lc)],Q)
+        }
+        else{
+          VV = idnt(genNew("_v"));
+          XPr = [clse(thQ,
+                      nFree<>[(if vT==vdel then idnt("_") else vT)]<>extraVars(Map),
+                      preT<>tst<>[neck(ndContext(A))]<>thBody,Lc),
+                 clse(elQ,
+                      nFree<>[(if vE==vdel then idnt("_") else vE)]<>extraVars(Map),
+		      preE<>elBody,Lc)];
+	  XP = prg(genNew(mungePrefix(Map)<>"$?"),listlen(nFree<>[VV]<>extraVars(Map)));
+          defineProg(Map,XP,seqn(XPr));
+          valis (VV,[call(XP,nFree<>[VV]<>extraVars(Map),Lc)],merge([VV],Q))
+        }
+      }
+
+      -- A forall action 
+      -- A *> B
+      -- is translated to 
+      -- xx() .. {
+      --   xx() :- A, (B!), fail.
+      --   xx().
+      -- }
+    | frll(SQ,A,B) => valof{
+        FQ = SQ//((.(Nm,_).)=>idnt(Nm));
+        aFree = freeVars(Nd,Q,Opts,Map);
+        bFree = freeVars(node(cnj(B),voidType,noLoc),Q<>FQ,Opts,Map);
+
+        if dbgCanon in Opts then{
+          "Forall action: "<>show(Nd)<>"\n">>stdout;
+          "aFree = "<>showCQuants(aFree)<>"\n">>stdout;
+          "bFree = "<>showCQuants(bFree)<>"\n">>stdout;
+        };
+
+        (aBdy,aQ0) = trGoalList(A,merge(FQ,aFree),Opts,Map);
+	(aQ,preA) = accessLabel(Map,aQ0);
+        (vD,bBdy,bQ0) = trActionList(B,Lc,merge(FQ,bFree),Opts,Map);
+	(bQ,preB) = accessLabel(Map,bQ0);
+
+        aArgs = aFree<>extraVars(Map);
+        bArgs = bFree<>extraVars(Map);
+
+        NA = prg(genNew(mungePrefix(Map)<>"$A"),listlen(aArgs));
+        NB = prg(genNew(mungePrefix(Map)<>"$B"),listlen(bArgs));
+
+        lca = seqn([clse(aQ,
+                         aArgs,preA<>aBdy<>[call(NB,bArgs,Lc),neck(Lc),fail(Lc)],Lc),
+                    clse(aArgs,aArgs,[],Lc)]);
+
+        lcb = seqn([clse(bQ,
+                         bArgs,preB<>bBdy<>[neck(Lc),fail(Lc)],Lc),
+                    clse(bArgs,bArgs,[],Lc)]);
+
+        defineProg(Map,NA,lca);
+        defineProg(Map,NB,lcb);
+
+        if dbgCanon in Opts then{
+          "Forall becomes:\n"<>NA^0<>":"<>showCP(lca)<>"\n">>stdout;
+          NB^0<>":"<>showCP(lcb)<>"\n">>stdout;
+        };
+
+        valis (vdel,[call(NA,aArgs,Lc)],Q)
+      }
+    | _ => exception error("Cant handle action: "++show(Nd),'fail)
+    }
+  };
+
+  mergeValis(V1,V2,Lc,Q) => valof{
+    if V1==vdel then
+      valis (V2,[],Q)
+    else if V2==vdel then
+      valis (V1,[],Q)
+    else{
+      if idnt(_).=V2 then
+        valis (V2,[ecall("=",[V2,V1],Lc)],Q)
+      else if idnt(_).=V1 then
+        valis (V1,[ecall("=",[V1,V2],Lc)],Q)
+      else{
+        VV = idnt(genNew("$Val"));
+        valis (VV,[ecall("=",[VV,V1],Lc),ecall("=",[VV,V2],Lc)],[VV,..Q])
+      }
+    }
+  };
+  
+  
+  /*
+     A guarded sync  with timeouts and/or multiple clauses is compiled:
+     L = O.lock;
+     Tout = now()+T;
+     syncA(L,Tout,Free) onerror ( E -> release(L), exception E )
+
+     where
+
+     syncA(L,Tout,Free) :-
+       acquire(L,Tout),!,   This fails if lock not available and time expired
+       testNact(L,Tout,Free),
+       release(L).
+     syncA(L,Tout,Free) :-
+         timeOutAction.       -- We come here if acquire failed
+         
+     testNact(L,Tout,Free) :-              -- The separate clauses 
+         Tst1, !, A1.
+     testNact(L,Tout,Free) :-
+         Tst2, !, A2.
+     testNact(L,Tout,Free) :-
+         wait(L,Tout), !, syncA(L,Tout,Free).  -- This releases the lock, but keeps us on the lock Queue fails if timeout expired
+     testNact(L,Tout,Free) :-
+           timeOutAction.
+     } )
+       
+   */
+
+  -- There are four possible combinations:
+  --   timeout vs no timeout
+  --   valis vs no valis
+  -- this leads to ugly code...
+
+  trSync(Nd::(node(sync(Lk,Rules,Tout),_,Lc).=Nd),Q,Opts,Map) => valof{
+    nFree = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then
+      "Free vars of synchronized action "++show(Nd)++" are: "++showCQuants(nFree)++"\n">>stdout;
+
+    (lckV,preL,pstL,Q1) = trExp(Lk,Q,Opts,Map);
+
+    commonArgs = merge([lckV],merge(extraVars(Map),nFree));
+
+    if dbgCanon in Opts then
+      "commonArgs = "<>showCQuants(commonArgs)<>"\n">>stdout;
+
+    foundValis : false;  -- we need to record whether there is a valis somewhere
+
+    testPhase1 : collect{
+      for node(Rule,_,rLc) in Rules do{
+        case Rule in {
+          prl(QV,_,Grd,Act) -> {
+            CQV = QV//((.(Nm,VT).)=>idnt(Nm));
+            (grdBody,sQ1) = trGoalList(Grd,CQV<>commonArgs,Opts,Map);
+            (Vl,NC,sQ2) = trActionList(Act,rLc,sQ1,Opts,Map);
+	    (sQ,preA) = accessLabel(Map,sQ2);
+
+            elemis (Vl,sQ,commonArgs,preA<>grdBody<>
+		    [neck(rLc)]<>NC,rLc);
+
+            if Vl!=vdel then
+              foundValis := true;
+          }
+        }
+      }
+    };
+
+    tG : preL<>pstL;                              -- lock & timeout calculation code
+    QQ : Q1;
+    VVAR = idnt(genNew("_"));                     -- the valis variable, when we need it
+    tCl : [];                                     -- timeout code
+    tV : intgr(0);				  -- timeout value
+
+    XE = idnt(genNew("%XE"));			  -- the error code
+
+    valExtra : [];                                -- extra argument for valis
+    toutExtra : [];                               -- extra argument for timeout variable
+    toutArg : [];
+
+    if node(tmout(TQV,Tmr,TBody),_,tLc).=Tout then{ -- synchronize with a timeout
+      (Tt,preTm,postTm,Q2) = trExp(Tmr,Q1,Opts,Map);
+
+      tG := tG<>preTm<>postTm;
+      tV := idnt(genNew("$t"));
+      QQ := [tV,..Q2];
+      toutExtra := [tV];
+      toutArg := [Tt];
+
+      (tVal,tAct,tQ) = trActionList(TBody,Lc,(TQV//((.(Nm,VT).)=>idnt(Nm)))<>commonArgs,Opts,Map);
+      (Qt,preT) = accessLabel(Map,tQ);
+
+      -- compute the timeout handler clause
+      if tVal!=vdel then{
+        foundValis := true;
+        tCl := [clse([VVAR,..Qt]<>toutExtra,[tVal]<>toutExtra<>commonArgs,preT<>tAct,tLc)];
+        valExtra := [VVAR];
+      }
+      else if foundValis then{
+        dummy = idnt(genNew("_"));
+        valExtra := [VVAR];
+        tCl := [clse([VVAR,dummy,..Qt]<>toutExtra,[dummy]<>toutExtra<>commonArgs,
+		     preT<>tAct,tLc)];
+      }
+      else
+        tCl := [clse(Qt<>toutExtra,toutExtra<>commonArgs,preT<>tAct,tLc)];
+
+      vCommon = valExtra<>toutExtra<>commonArgs;
+
+      -- the wrapper for syncNtest program
+      commArity = listlen(vCommon);
+      SYNT = prg(genNew(mungePrefix(Map)<>"$WR"),commArity+1);
+      TST = prg(genNew(mungePrefix(Map)<>"$tA"),commArity); -- the testNact program
+      SYN = prg(genNew(mungePrefix(Map)<>"$SY"),commArity); -- the syncNtest program
+
+      defineProg(Map,SYNT,seqn(
+                   collect{
+                     elemis clse([XE,..vCommon],[XE,..vCommon],
+                                 [trpBegin,
+				  ecall("__acquireLock",[lckV,tV],Lc),
+				  call(TST,vCommon,Lc),
+				  ecall("__releaseLock",[lckV],Lc),
+				  trpEnd,neck(Lc)],
+				 Lc);
+                     elemis clse(vCommon,[mtch(symb("#false")),..vCommon],
+                                 [neck(Lc),
+				  ecall("__waitLock",[lckV,tV],Lc),neck(Lc),
+                                  call(SYN,vCommon,Lc)],Lc);
+		     elemis clse([XE,..vCommon],[XE,..vCommon],
+				 [ecall("__releaseLock",[lckV],Lc),
+				  rais(XE,Lc)],Lc)
+                   }));
+
+      defineProg(Map,SYN,seqn(
+                   collect{
+                     elemis clse(vCommon,vCommon,
+                                 [call(SYNT,[symb("#false"),..vCommon],Lc),
+				  neck(Lc)],
+				 Lc);
+                     for E in tCl do
+                       elemis E;
+                   }));
+
+      if foundValis then{
+        defineProg(Map,TST,seqn(
+                     collect{
+                       for (rVl,rQ,rArgs,rBody,rLc) in testPhase1 do{
+                         if rVl==vdel then
+                           elemis clse(valExtra<>toutExtra<>rQ,
+				       valExtra<>toutExtra<>rArgs,rBody,rLc)
+			 else
+                           elemis clse(toutExtra<>rQ,[rVl]<>toutExtra<>rArgs,
+				       rBody,rLc)
+                       };
+                     }));
+        valis (VVAR,tG<> [call(SYN,[VVAR]<>toutArg<>commonArgs,Lc)],
+               merge(merge(commonArgs,[lckV]),[VVAR,..QQ]))
+      }
+      else{
+        defineProg(Map,TST,seqn(
+                     collect{
+                       for (_,rQ,rArgs,rBody,rLc) in testPhase1 do{
+                         elemis clse(toutExtra<>rQ,toutExtra<>rArgs,rBody,rLc);
+		       }
+                     }));
+        valis (vdel,tG<> [call(SYN,toutArg<>commonArgs,Lc)],
+               merge(merge(commonArgs,[lckV]),QQ))
+      }
+    }
+    else{                                         -- no timeout to deal with
+      if foundValis then
+        valExtra := [VVAR];
+
+      vCommon = valExtra<>commonArgs;
+      commArity = listlen(vCommon);
+      SYNT = prg(genNew(mungePrefix(Map)<>"$WR"),commArity+1);
+      TST = prg(genNew(mungePrefix(Map)<>"$tA"),commArity); -- the testNact program
+      SYN = prg(genNew(mungePrefix(Map)<>"$SY"),commArity); -- the syncNtest program
+
+      defineProg(Map,SYN,seqn(
+                   collect{
+                     elemis clse([XE,..vCommon],[XE,..vCommon],
+                                 [trpBegin,
+				  ecall("__acquireLock",[lckV,tV],Lc),
+				  call(TST,vCommon,Lc),
+				  ecall("__releaseLock",[lckV],Lc),
+				  trpEnd,neck(Lc)],Lc);
+                     
+                     elemis clse([XE,..vCommon],
+				 [XE,..vCommon],
+                                 [defn(mtch(symb("#false")),XE,Lc),
+				  neck(Lc),
+				  ecall("__waitLock",[lckV,tV],Lc),neck(Lc),
+                                  call(SYN,[XE,..vCommon],Lc)],Lc);
+		     elemis clse([XE,..vCommon],[XE,..vCommon],
+				 [ecall("__releaseLock",[lckV],Lc),
+				  rais(XE,Lc)],Lc);
+                   }));
+
+      if foundValis then{
+        defineProg(Map,TST,seqn(
+                     collect{
+                       for (rVl,rQ,rArgs,rBody,rLc) in testPhase1 do{
+                         if rVl==vdel then
+                           elemis clse(valExtra<>rQ,valExtra<>rArgs,rBody,rLc)
+                         else
+                           elemis clse(rQ,[rVl]<>rArgs,rBody,rLc)
+                       };
+                     }));
+        valis (VVAR,tG<>[call(SYN,[symb("#false"),VVAR]<>commonArgs,Lc)],
+               merge(merge(commonArgs,[lckV]),[VVAR,..QQ]))
+      }
+      else{                                         -- no valis to deal with
+        defineProg(Map,TST,seqn(
+                     collect{
+                       for (_,rQ,rArgs,rBody,rLc) in testPhase1 do
+                         elemis clse(rQ,rArgs,rBody,rLc);
+                     }));
+        valis (vdel,tG<>[call(SYN,[symb("#false"),..commonArgs],Lc)],
+               merge(merge(commonArgs,[lckV]),QQ))
+      }
+    }
+  };
+
+    -- A case analysis is mapped to a new program with a call to it.
+
+  trCase(Nd::node(cse(Exp,Rules),_,Lc).=Nd,Q,Opts,Map) => valof{
+    nFree = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then
+      "Free vars of case action "++show(Nd)++" are: "++showCQuants(nFree)++"\n">>stdout;
+        
+    VVAR = idnt(genNew("_"));                     -- the valis variable, when we need it
+
+    foundValis : false;
+    foundTuples : node(con(node(iden(","),_,_),_),_,_).=Exp;      -- are all the cases tuples?
+
+    commonVars = extraVars(Map)<>nFree;           -- all the programs here need these arguments
+    (nE,preE,pstE,eQ) = trExp(Exp,Q,Opts,Map);
+
+    -- collect information about the case handling rules ...
+
+    phase1 = collect{
+      for node(prl(QV,[Ptn],Grd,Body),_,mLc) in Rules do{
+        CQV = (QV//((.(Nm,VT).)=>idnt(Nm)))<>extraVars(Map)<>nFree;
+        (nP,preP,postP,Q1) = trPtn(Ptn,CQV,Opts,Map);
+        (nG,Q2) = trGoalList(Grd,Q1,Opts,Map);
+        (vL,nA,Q3) = trActionList(Body,mLc,Q2,Opts,Map);
+	(aQ,preA) = accessLabel(Map,Q3);
+
+        if !cons(strct("go.stdlib#,",2),_).=nP then
+          foundTuples := false;
+
+        if vL!=vdel then
+          foundValis := true;
+
+        elemis (vL,aQ,nP,preA<>preP<>postP<>nG<>[neck(mLc)]<>nA,mLc)
+      }
+    };
+
+    -- set up the specific message processing programs
+    caseError = cons(strct("go.stdlib#error",2),
+		     [strg("unexpected failure: "<>showLocation(Lc)),symb("eFAIL")]);
+
+    if foundValis then{
+      CaseProg = collect{
+        for (vL,vQ,vA,vB,vLc) in phase1 do{
+          if vL==vdel then{
+            if foundTuples && cons(strct("go.stdlib#,",2),_).=vA then
+              elemis clse([VVAR,..vQ],[VVAR]<>(deComma(vA)//(X=>mtch(X)))<>commonVars,vB,vLc)
+            else
+              elemis clse([VVAR,..vQ],[VVAR,mtch(vA),..commonVars],vB,vLc)
+          }
+          else{
+            if foundTuples && cons(strct("go.stdlib#,",2),_).=vA then
+              elemis clse(vQ,[vL]<>(deComma(vA)//(X=>mtch(X)))<>commonVars,vB,vLc)
+            else
+              elemis clse(vQ,[vL,mtch(vA),..commonVars],vB,vLc)
+          }
+        };
+
+        dummyArgs = {
+          if foundTuples then{
+            collect{
+              cons(_,eArgs).=nE;
+              for X in eArgs do
+                elemis idnt(genNew("_"))
+            }
+          }
+          else
+            [idnt(genNew("_"))]                     -- A dummy variable
+        };
+
+        elemis clse(dummyArgs<>[VVAR,..commonVars],[VVAR]<>dummyArgs<>commonVars,[rais(caseError,Lc)],Lc)
+      };
+                      
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(commonVars)+2); -- case handling procedure
+    
+      defineProg(Map,CaseP,seqn(CaseProg));
+
+      if foundTuples && cons(strct("go.stdlib#,",2),_).=nE then
+        valis (VVAR,preE<>pstE<>[call(CaseP,[VVAR]<>deComma(nE)<>commonVars,Lc)],[VVAR,..eQ])
+      else
+        valis (VVAR,preE<>pstE<>[call(CaseP,[VVAR,nE,..commonVars],Lc)],[VVAR,..eQ])
+    }
+    else{
+      CaseProc = collect{
+        for (vL,vQ,vA,vB,vLc) in phase1 do{
+          if foundTuples && cons(strct("go.stdlib#,",2),_).=vA then
+            elemis clse(vQ,(deComma(vA)//(X=>mtch(X)))<>commonVars,vB,vLc)
+          else
+            elemis clse(vQ,[mtch(vA),..commonVars],vB,vLc)
+        };
+
+
+        dummyArgs = {
+          if foundTuples then{
+            collect{
+              cons(_,eArgs).=nE;
+              for X in eArgs do
+                elemis idnt(genNew("_"))
+            }
+          }
+          else
+            [idnt(genNew("_"))]                   -- A dummy variable
+        };
+
+        elemis clse(dummyArgs<>commonVars,dummyArgs<>commonVars,[rais(caseError,Lc)],Lc)
+      };
+
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(commonVars)+1); -- case handling procedure
+      defineProg(Map,CaseP,seqn(CaseProc));
+
+      if foundTuples && cons(strct("go.stdlib#,",2),_).=nE then
+        valis (vdel,preE<>pstE<>[call(CaseP,deComma(nE)<>commonVars,Lc)],[VVAR,..eQ])
+      else
+        valis (vdel,preE<>pstE<>[call(CaseP,[nE,..commonVars],Lc)],[VVAR,..eQ])
+    }
+  };
+
+  deComma(El) => case El in {
+    cons(strct("go.stdlib#,",2),[L,R]) => deComma(L)<>deComma(R)
+  | _ => [El]
+  };
+
+    -- A case expression analysis is mapped to a new program with a call to it.
+
+  trCaseExp(Nd::node(cse(Exp,Rules),_,Lc).=Nd,Q,Opts,Map) => valof{
+    nFree = freeVars(Nd,Q,Opts,Map);
+
+    if dbgCanon in Opts then
+      "Free vars of case expression "++show(Nd)++" are: "++showCQuants(nFree)++"\n">>stdout;
+        
+    VV = idnt(genNew("_"));                     -- the result variable
+
+    foundTuples : node(con(node(iden(","),_,_),_),_,_).=Exp;          -- are all the cases tuples?
+
+    commonVars = extraVars(Map)<>nFree;           -- all the programs here need these arguments
+    (nE,preE,pstE,eQ) = trExp(Exp,Q,Opts,Map);
+
+    -- collect information about the case handling rules ...
+
+    phase1 = collect{
+      for node(eqn(_,QV,[Ptn],R,Grd),_,mLc) in Rules do{
+        CQV = (QV//((.(Nm,VT).)=>idnt(Nm)))<>extraVars(Map)<>nFree;
+        (nP,preP,postP,Q1) = trPtn(Ptn,CQV,Opts,Map);
+        (nG,Q2) = trGoalList(Grd,Q1,Opts,Map);
+        (nR,preR,pstR,Q3) = trExp(R,Q2,Opts,Map);
+	(rQ,preL) = accessLabel(Map,Q3);
+
+        if !cons(strct("()",_),_).=nP then
+          foundTuples := false;
+
+        elemis (rQ,nP,nR,preL<>preP<>postP<>nG<>[neck(mLc)]<>preR<>pstR,mLc)
+      }
+    };
+
+    -- set up the specific message processing programs
+    caseError = cons(strct("go.stdlib#error",2),
+		     [strg("unexpected failure: "<>showLocation(Lc)),symb("eFAIL")]);
+
+    CaseProc = collect{
+      for (vQ,vA,vR,vB,vLc) in phase1 do{
+        if foundTuples && cons(strct("()",_),cArgs).=vA then
+          elemis clse(vQ,(cArgs//(X=>mtch(X)))<>[vR]<>commonVars,vB,vLc)
+        else
+          elemis clse(vQ,[mtch(vA),vR,..commonVars],vB,vLc)
+      };
+      
+      dummyArgs = {
+        if foundTuples then{
+          collect{
+            cons(_,eArgs).=nE;
+            for X in eArgs do
+              elemis idnt(genNew("_"))
+          }
+        }
+        else
+          [idnt(genNew("_"))]                   -- A dummy variable
+      };
+      
+      elemis clse(dummyArgs<>commonVars<>[VV],dummyArgs<>[VV]<>commonVars,
+                  [rais(caseError,Lc)],Lc)
+    };
+
+    if foundTuples && cons(strct("()",_),eArgs).=nE then{
+      cArgs = eArgs<>[VV]<>commonVars;
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(cArgs)); -- case handling procedure
+      defineProg(Map,CaseP,seqn(CaseProc));
+    
+      valis (VV,preE<>pstE,[call(CaseP,cArgs,Lc)],[VV,..eQ])
+    }
+    else{
+      cArgs = [nE,VV,..commonVars];
+      CaseP = prg(genNew(mungePrefix(Map)<>"$$C"),listlen(cArgs)); -- case handling procedure
+      defineProg(Map,CaseP,seqn(CaseProc));
+      valis (VV,preE<>pstE,[call(CaseP,cArgs,Lc)],[VV,..eQ])
+    }
+  };
+  
+  decTree(X,_)=>X;
+
+  generateEntryCl(Name,lName,Args,Lc,Map) => valof{
+    thisVar = idnt(genNew("$this"));
+    clsVar = idnt(genNew("$lbl"));
+
+    Q = Args<>[clsVar,thisVar];
+    
+    valis clse(Q,[mtch(cons(strct(Name++"%"++listlen(Args)^0,
+				  listlen(Args)),Args)),clsVar,thisVar],
+	       [neck(Lc),call(lName,Q,Lc)],Lc)
+  };
+
+  trCons(Name,Arity) => strct(Name<>"%"<>Arity^0,Arity);
+
+} export (trClass,trPredicate,trStrongPredicate,
+	  trFunction,trProcedure,trGrammar,trValof,trVariable,trConstant,trCons,
+	  genLazyVersion);

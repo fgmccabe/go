@@ -1,0 +1,2 @@
+print X+Y;
+print X*Y+3;

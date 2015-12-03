@@ -1,0 +1,480 @@
+\indexentry {syntax of \go |hyperpage}{3}
+\indexentry {syntax!lexical|hyperpage}{3}
+\indexentry {UNICODE|hyperpage}{3}
+\indexentry {UNICODE!byte mark|hyperpage}{3}
+\indexentry {character categories|hyperpage}{4}
+\indexentry {syntax!tokens|hyperpage}{5}
+\indexentry {syntax!line comment|hyperpage}{6}
+\indexentry {syntax!block comment|hyperpage}{7}
+\indexentry {\q {/*}\ldots \q {*/} comments|hyperpage}{7}
+\indexentry {syntax!identifiers|hyperpage}{7}
+\indexentry {UNICODE!identifiers|hyperpage}{7}
+\indexentry {syntax!character literal|hyperpage}{9}
+\indexentry {syntax!string character|hyperpage}{9}
+\indexentry {syntax!character reference|hyperpage}{9}
+\indexentry {character reference|hyperpage}{9}
+\indexentry {syntax!symbols|hyperpage}{11}
+\indexentry {symbol syntax|hyperpage}{11}
+\indexentry {syntax!strings|hyperpage}{12}
+\indexentry {string syntax|hyperpage}{12}
+\indexentry {syntax!numbers|hyperpage}{12}
+\indexentry {number syntax|hyperpage}{12}
+\indexentry {Character!numeric value of|hyperpage}{13}
+\indexentry {syntax!negative numbers|hyperpage}{14}
+\indexentry {syntax!standard operators|hyperpage}{14}
+\indexentry {|dotspace operator}{14}
+\indexentry {operator!|dotspace}{14}
+\indexentry {syntax!graphic operators|hyperpage}{15}
+\indexentry {syntax!tokenizer|hyperpage}{16}
+\indexentry {type terms|hyperpage}{33}
+\indexentry {semantics of types|hyperpage}{33}
+\indexentry {type inference|hyperpage}{38}
+\indexentry {types|hyperpage}{40}
+\indexentry {type variable|hyperpage}{41}
+\indexentry {unversally qunatified types|hyperpage}{41}
+\indexentry {type variable!universal|hyperpage}{41}
+\indexentry {types!standard types|hyperpage}{41}
+\indexentry {thing@\q {thing} type|hyperpage}{42}
+\indexentry {type!thing@\q {thing} type|hyperpage}{42}
+\indexentry {number@\q {number} type|hyperpage}{42}
+\indexentry {type! number@\q {number} type|hyperpage}{42}
+\indexentry {integer@\q {integer} type|hyperpage}{42}
+\indexentry {type!integer@\q {integer} type|hyperpage}{42}
+\indexentry {float@\q {float} type|hyperpage}{43}
+\indexentry {type! float@\q {float} type|hyperpage}{43}
+\indexentry {char@\q {char} type|hyperpage}{43}
+\indexentry {type!char@\q {char} type|hyperpage}{43}
+\indexentry {symbol@\q {symbol} type|hyperpage}{43}
+\indexentry {type!symbol@\q {symbol} type|hyperpage}{43}
+\indexentry {logical@\q {logical} type|hyperpage}{43}
+\indexentry {type!logical@\q {logical} type|hyperpage}{43}
+\indexentry {opaque@\q {opaque} type|hyperpage}{44}
+\indexentry {type!opaque@\q {opaque} type|hyperpage}{44}
+\indexentry {meta@\q {meta} type|hyperpage}{44}
+\indexentry {type!meta@\q {meta} type|hyperpage}{44}
+\indexentry {tuple@\q {,} type|hyperpage}{44}
+\indexentry {type!tuple@\q {,} type|hyperpage}{44}
+\indexentry {type mode|hyperpage}{45}
+\indexentry {type!class|hyperpage}{49}
+\indexentry {class type|hyperpage}{49}
+\indexentry {type!@= type operator|hyperpage}{49}
+\indexentry {contructor function definition|hyperpage}{52}
+\indexentry {functions!constructor|hyperpage}{52}
+\indexentry {functions|hyperpage}{55}
+\indexentry {equations|hyperpage}{55}
+\indexentry {equation!argument matching|hyperpage}{56}
+\indexentry {argument matching in equations|hyperpage}{56}
+\indexentry {match predicate|hyperpage}{57}
+\indexentry {\q {.=} predicate|hyperpage}{57}
+\indexentry {type inference!equation|hyperpage}{57}
+\indexentry {expression!symbols|hyperpage}{57}
+\indexentry {symbol literal expression|hyperpage}{57}
+\indexentry {type inference!symbol|hyperpage}{58}
+\indexentry {expression!character|hyperpage}{58}
+\indexentry {character expression|hyperpage}{58}
+\indexentry {type inference!character|hyperpage}{58}
+\indexentry {expression!number|hyperpage}{58}
+\indexentry {number@\q {number} expression|hyperpage}{58}
+\indexentry {integer|hyperpage}{58}
+\indexentry {integer!hexadecimal|hyperpage}{59}
+\indexentry {integer!character code|hyperpage}{59}
+\indexentry {Unicode!character code|hyperpage}{59}
+\indexentry {type inference!integer|hyperpage}{59}
+\indexentry {floating point|hyperpage}{60}
+\indexentry {number!floating point|hyperpage}{60}
+\indexentry {type inference!float|hyperpage}{60}
+\indexentry {expression!variable|hyperpage}{60}
+\indexentry {variable expression|hyperpage}{60}
+\indexentry {type inference!variable|hyperpage}{60}
+\indexentry {variable!scope|hyperpage}{61}
+\indexentry {identifier!scope|hyperpage}{61}
+\indexentry {scope of identifiers|hyperpage}{61}
+\indexentry {variable!scope!holes in|hyperpage}{61}
+\indexentry {identifier!scope!holes in|hyperpage}{61}
+\indexentry {variable!singleton occurrence|hyperpage}{62}
+\indexentry {scope!of type variables|hyperpage}{63}
+\indexentry {type variables!scope of|hyperpage}{63}
+\indexentry {structured terms|hyperpage}{63}
+\indexentry {list expression|hyperpage}{63}
+\indexentry {expression!lists|hyperpage}{63}
+\indexentry {lists!pattern|hyperpage}{64}
+\indexentry {type inference!lists|hyperpage}{64}
+\indexentry {type inference!complex expressions|hyperpage}{64}
+\indexentry {expression!strings|hyperpage}{65}
+\indexentry {strings!lists of characters|hyperpage}{65}
+\indexentry {lists of characters are strings|hyperpage}{65}
+\indexentry {expression!tuple|hyperpage}{65}
+\indexentry {tuple epxressions|hyperpage}{65}
+\indexentry {applicative expressions|hyperpage}{66}
+\indexentry {function!call expression|hyperpage}{66}
+\indexentry {expression!applicative|hyperpage}{66}
+\indexentry {type inference!applicative expression|hyperpage}{66}
+\indexentry {type!annotation|hyperpage}{67}
+\indexentry {expression!object creation|hyperpage}{70}
+\indexentry {object creation|hyperpage}{70}
+\indexentry {\q {\new } operator|hyperpage}{70}
+\indexentry {operator!|q{\$}}{70}
+\indexentry {dot expression|hyperpage}{70}
+\indexentry {Attribute sets!dot expression|hyperpage}{70}
+\indexentry {\q {.} operator|hyperpage}{70}
+\indexentry {operator!|q{.}}{70}
+\indexentry {guarded pattern|hyperpage}{72}
+\indexentry {pattern!guarded|hyperpage}{72}
+\indexentry {type inference!guarded expression|hyperpage}{72}
+\indexentry {Object matching expression|hyperpage}{73}
+\indexentry {valof@\q {valof} expression|hyperpage}{75}
+\indexentry {expression!valof@\q {valof}|hyperpage}{75}
+\indexentry {\q {spawn} sub-thread|hyperpage}{76}
+\indexentry {action!\q {spawn} sub-thread|hyperpage}{76}
+\indexentry {operator!\q {spawn}|hyperpage}{76}
+\indexentry {multi-threaded programming|hyperpage}{76}
+\indexentry {raise@\q {raise} exception expression|hyperpage}{77}
+\indexentry {Expression!raise@\q {raise} exception|hyperpage}{77}
+\indexentry {unification|hyperpage}{77}
+\indexentry {goals|hyperpage}{79}
+\indexentry {predicate definition|hyperpage}{79}
+\indexentry {type inference!clause|hyperpage}{79}
+\indexentry {predicate!strong clause|hyperpage}{80}
+\indexentry {strong clause|hyperpage}{80}
+\indexentry {type inference!strong clause|hyperpage}{80}
+\indexentry {strong clause|hyperpage}{81}
+\indexentry {clause!strong|hyperpage}{81}
+\indexentry {goals!type inference|hyperpage}{81}
+\indexentry {type inference!goals|hyperpage}{81}
+\indexentry {true/false goal|hyperpage}{82}
+\indexentry {goals!\q {true}|hyperpage}{82}
+\indexentry {goals!\q {false}|hyperpage}{82}
+\indexentry {predication|hyperpage}{82}
+\indexentry {goals!predication|hyperpage}{82}
+\indexentry {goals!class relative goal|hyperpage}{83}
+\indexentry {equality|hyperpage}{83}
+\indexentry {goals!equality|hyperpage}{83}
+\indexentry {inequality|hyperpage}{84}
+\indexentry {goals!inequality|hyperpage}{84}
+\indexentry {match test|hyperpage}{84}
+\indexentry {goals!match test|hyperpage}{84}
+\indexentry {identicality test|hyperpage}{84}
+\indexentry {goals!identicality test|hyperpage}{84}
+\indexentry {element of test|hyperpage}{85}
+\indexentry {goals!element of test|hyperpage}{85}
+\indexentry {goals!in@\q {in} test|hyperpage}{85}
+\indexentry {goal!sub class|hyperpage}{85}
+\indexentry {inherits goal|hyperpage}{85}
+\indexentry {goals!conjunction|hyperpage}{86}
+\indexentry {conjunction goal|hyperpage}{86}
+\indexentry {goals!disjunction|hyperpage}{86}
+\indexentry {disjunction goal|hyperpage}{86}
+\indexentry {goals!conditional|hyperpage}{86}
+\indexentry {conditional goal|hyperpage}{86}
+\indexentry {goals!if-then-else goal|hyperpage}{86}
+\indexentry {if-then-else goal|hyperpage}{86}
+\indexentry {goals!negated|hyperpage}{87}
+\indexentry {negated goal|hyperpage}{87}
+\indexentry {negation as failure|hyperpage}{87}
+\indexentry {goals!one-of|hyperpage}{87}
+\indexentry {one-of goal|hyperpage}{87}
+\indexentry {single solution goal|hyperpage}{87}
+\indexentry {goals!forall|hyperpage}{87}
+\indexentry {forall goal|hyperpage}{87}
+\indexentry {universally true condition|hyperpage}{87}
+\indexentry {action goal|hyperpage}{88}
+\indexentry {goals!action|hyperpage}{88}
+\indexentry {delayed goal|hyperpage}{88}
+\indexentry {goals!delayed|hyperpage}{88}
+\indexentry {trigger goal|hyperpage}{88}
+\indexentry {goals!error protected|hyperpage}{89}
+\indexentry {exception handler!goal|hyperpage}{89}
+\indexentry {handling exceptions in goals|hyperpage}{89}
+\indexentry {raise exception goal|hyperpage}{90}
+\indexentry {goals!raise exception|hyperpage}{90}
+\indexentry {raising an exception|hyperpage}{90}
+\indexentry {grammar condition goal|hyperpage}{90}
+\indexentry {goals!grammar goal|hyperpage}{90}
+\indexentry {parsing goal|hyperpage}{90}
+\indexentry {action|hyperpage}{93}
+\indexentry {program!procedure definition|hyperpage}{93}
+\indexentry {procedure definition|hyperpage}{93}
+\indexentry {action!action rule|hyperpage}{93}
+\indexentry {rule!action rule|hyperpage}{93}
+\indexentry {procedure|hyperpage}{93}
+\indexentry {type inference!actions|hyperpage}{93}
+\indexentry {type inference!action rule|hyperpage}{94}
+\indexentry {action!basic|hyperpage}{94}
+\indexentry {basic actions|hyperpage}{94}
+\indexentry {action rule!non failure|hyperpage}{94}
+\indexentry {error exception!in action rule|hyperpage}{94}
+\indexentry {eFAIL@\q {eFAIL} exception|hyperpage}{94}
+\indexentry {empty action|hyperpage}{94}
+\indexentry {action!empty|hyperpage}{94}
+\indexentry {action!equality definition|hyperpage}{95}
+\indexentry {type inference!equality definition|hyperpage}{95}
+\indexentry {\q {=} operator|hyperpage}{95}
+\indexentry {operator!\q {=}|hyperpage}{95}
+\indexentry {action!assignment|hyperpage}{95}
+\indexentry {:=@\q {:=} operator|hyperpage}{95}
+\indexentry {operator!\q {:=}|hyperpage}{95}
+\indexentry {\q {eINSUFARG} exception|hyperpage}{95}
+\indexentry {action!invoke procedure|hyperpage}{96}
+\indexentry {procedure invocation|hyperpage}{96}
+\indexentry {type!safety of procedure call|hyperpage}{96}
+\indexentry {action!class relative action|hyperpage}{97}
+\indexentry {action!combined|hyperpage}{97}
+\indexentry {action!sequence|hyperpage}{98}
+\indexentry {sequence of actions|hyperpage}{98}
+\indexentry {\q {;} operator|hyperpage}{98}
+\indexentry {operator!\q {;}|hyperpage}{98}
+\indexentry {type inference!action sequence|hyperpage}{98}
+\indexentry {action!goal action|hyperpage}{98}
+\indexentry {goal action|hyperpage}{98}
+\indexentry {\pling \xspace {}operator|hyperpage}{98}
+\indexentry {operator!\pling |hyperpage}{98}
+\indexentry {type inference!goal action|hyperpage}{98}
+\indexentry {\q {eFAIL} exception|hyperpage}{98}
+\indexentry {action!conditional action|hyperpage}{98}
+\indexentry {conditional action|hyperpage}{98}
+\indexentry {test goal!in conditional action|hyperpage}{98}
+\indexentry {type inference!conditional action|hyperpage}{99}
+\indexentry {action!forall action|hyperpage}{99}
+\indexentry {forall action|hyperpage}{99}
+\indexentry {\q {*>} operator|hyperpage}{99}
+\indexentry {operator!\q {*>}|hyperpage}{99}
+\indexentry {type inference!forall action|hyperpage}{99}
+\indexentry {action!\q {case} action|hyperpage}{99}
+\indexentry {case@\q {case} action|hyperpage}{99}
+\indexentry {operator!case@\q {case}|hyperpage}{99}
+\indexentry {action!\q {valis} action|hyperpage}{100}
+\indexentry {\q {valis} action|hyperpage}{100}
+\indexentry {\q {valof} expression!returning a value|hyperpage}{100}
+\indexentry {action!error handling|hyperpage}{101}
+\indexentry {error handling!in actions|hyperpage}{101}
+\indexentry {\q {onerror} action|hyperpage}{101}
+\indexentry {operator!\q {onerror}|hyperpage}{101}
+\indexentry {type inference!\q {onerror} action|hyperpage}{101}
+\indexentry {raise exception action|hyperpage}{102}
+\indexentry {action!raise@\q {raise} an exception|hyperpage}{102}
+\indexentry {operator!\q {raise}|hyperpage}{102}
+\indexentry {\q {spawn} sub-thread|hyperpage}{102}
+\indexentry {action!\q {spawn} sub-thread|hyperpage}{102}
+\indexentry {operator!\q {spawn}|hyperpage}{102}
+\indexentry {multi-threaded programming|hyperpage}{102}
+\indexentry {\q {sync} action|hyperpage}{103}
+\indexentry {action!\q {sync} action|hyperpage}{103}
+\indexentry {operator!\q {sync}|hyperpage}{103}
+\indexentry {Synchronized action|hyperpage}{103}
+\indexentry {shared resources|hyperpage}{103}
+\indexentry {objects!sharing|hyperpage}{103}
+\indexentry {synchronizing statefull objects|hyperpage}{103}
+\indexentry {thread-safe libraries|hyperpage}{106}
+\indexentry {logic grammars|hyperpage}{109}
+\indexentry {grammar rule|hyperpage}{109}
+\indexentry {logic grammars!basic conditions|hyperpage}{110}
+\indexentry {logic grammars!terminal|hyperpage}{110}
+\indexentry {type inference!terminal grammar condition|hyperpage}{110}
+\indexentry {logic grammars!non terminal|hyperpage}{111}
+\indexentry {type inference!non-terminal grammar condition|hyperpage}{111}
+\indexentry {logic grammars!class relative non terminal|hyperpage}{111}
+\indexentry {grammar!equality condition|hyperpage}{112}
+\indexentry {type inference!equality definition|hyperpage}{112}
+\indexentry {\q {=} operator|hyperpage}{112}
+\indexentry {operator!\q {=}|hyperpage}{112}
+\indexentry {inequality|hyperpage}{112}
+\indexentry {grammar!inequality|hyperpage}{112}
+\indexentry {logic grammars!goal condition|hyperpage}{112}
+\indexentry {type inference!goal grammar condition|hyperpage}{112}
+\indexentry {type inference!disjunction grammar condition|hyperpage}{113}
+\indexentry {logic grammars!conditional|hyperpage}{113}
+\indexentry {type inference!conditional grammar condition|hyperpage}{113}
+\indexentry {logic grammars!negated condition|hyperpage}{114}
+\indexentry {Iterated grammar condition|hyperpage}{114}
+\indexentry {logic grammar!iteration|hyperpage}{114}
+\indexentry {error handling!in logic grammars|hyperpage}{115}
+\indexentry {logic grammars!error handling|hyperpage}{115}
+\indexentry {logic grammars!raise exception|hyperpage}{116}
+\indexentry {error handling!exceptions in logic grammars|hyperpage}{116}
+\indexentry {logic grammars!end of file condition|hyperpage}{117}
+\indexentry {object oriented programming|hyperpage}{119}
+\indexentry {class!type|hyperpage}{119}
+\indexentry {polymorphic classes|hyperpage}{121}
+\indexentry {type variables in a class|hyperpage}{121}
+\indexentry {Class body|hyperpage}{121}
+\indexentry {objects!class body|hyperpage}{121}
+\indexentry {Private methods in an object|hyperpage}{123}
+\indexentry {Object!Private methods|hyperpage}{123}
+\indexentry {class!constant|hyperpage}{124}
+\indexentry {class!evaluating constants|hyperpage}{124}
+\indexentry {class!constant!groundedness|hyperpage}{124}
+\indexentry {variable!in class body|hyperpage}{124}
+\indexentry {variable!object!groundedness|hyperpage}{125}
+\indexentry {variable!object!evaluation of|hyperpage}{126}
+\indexentry {initialization!static|hyperpage}{126}
+\indexentry {Class rules|hyperpage}{127}
+\indexentry {objects!class rule|hyperpage}{127}
+\indexentry {inheritance|hyperpage}{127}
+\indexentry {multiple inheritance|hyperpage}{130}
+\indexentry {objects!multiple inheritance|hyperpage}{130}
+\indexentry {inheritance!multiple|hyperpage}{130}
+\indexentry {Accessing definitions of a class|hyperpage}{130}
+\indexentry {objects!creation|hyperpage}{131}
+\indexentry {creating objects|hyperpage}{131}
+\indexentry {\new {} operator|hyperpage}{131}
+\indexentry {operator!|new}{131}
+\indexentry {objects!\q {this} keyword|hyperpage}{132}
+\indexentry {accessing the created object in a class|hyperpage}{132}
+\indexentry {objects!created|hyperpage}{132}
+\indexentry {objects!accessing super class elements|hyperpage}{133}
+\indexentry {accessing elements of a super class|hyperpage}{133}
+\indexentry {class!inner|hyperpage}{134}
+\indexentry {inner class|hyperpage}{134}
+\indexentry {Format of packages|hyperpage}{139}
+\indexentry {Packages|hyperpage}{139}
+\indexentry {Modules@\go packages|hyperpage}{139}
+\indexentry {Package names!file names of packages|hyperpage}{139}
+\indexentry {package!name|hyperpage}{139}
+\indexentry {name of package|hyperpage}{139}
+\indexentry {files and packages|hyperpage}{139}
+\indexentry {Contents of a package|hyperpage}{140}
+\indexentry {Order of definitions|hyperpage}{140}
+\indexentry {Packages!order of definitions in|hyperpage}{140}
+\indexentry {Constants in packages|hyperpage}{140}
+\indexentry {Packages!constant in|hyperpage}{140}
+\indexentry {type inference!variable definition|hyperpage}{141}
+\indexentry {Variables in packages|hyperpage}{142}
+\indexentry {Packages!variables in|hyperpage}{142}
+\indexentry {Importing packages|hyperpage}{144}
+\indexentry {Packages!importing of|hyperpage}{144}
+\indexentry {import@\q {import} directive|hyperpage}{144}
+\indexentry {Circular chains of \q {import}s|hyperpage}{145}
+\indexentry {Packages!recursive \q {import} not permitted|hyperpage}{145}
+\indexentry {Packages!commonly loaded package|hyperpage}{147}
+\indexentry {numeric addition|hyperpage}{154}
+\indexentry {\q {+} operator|hyperpage}{154}
+\indexentry {arithmetic!addition|hyperpage}{154}
+\indexentry {operator!\q {+}|hyperpage}{154}
+\indexentry {<>@\q {<>} function|hyperpage}{174}
+\indexentry {Appending lists!with \q {<>} function|hyperpage}{174}
+\indexentry {append@\q {append} predicate|hyperpage}{174}
+\indexentry {Appending lists!with \q {append} predicate|hyperpage}{174}
+\indexentry {length of a list|hyperpage}{174}
+\indexentry {{\tt listlen} function|hyperpage}{174}
+\indexentry {in@\q {in} predicate|hyperpage}{175}
+\indexentry {Test for list membership|hyperpage}{175}
+\indexentry {reverse@\q {reverse} a list function|hyperpage}{175}
+\indexentry {Function to reverse lists|hyperpage}{175}
+\indexentry {Nth element of a list|hyperpage}{175}
+\indexentry {nth@\q {nth} function|hyperpage}{175}
+\indexentry {front@\q {front} of list function|hyperpage}{176}
+\indexentry {Get front portion of list|hyperpage}{176}
+\indexentry {tail@\q {tail} of list function|hyperpage}{176}
+\indexentry {Get back portion of list|hyperpage}{176}
+\indexentry {drop@\q {drop} from list function|hyperpage}{176}
+\indexentry {{\tt iota} function|hyperpage}{177}
+\indexentry {construct a list of integers|hyperpage}{177}
+\indexentry {character primitives|hyperpage}{181}
+\indexentry {\q {\_\_isCcChar} predicate|hyperpage}{181}
+\indexentry {character!Other control category|hyperpage}{181}
+\indexentry {UNICODE!Other control category|hyperpage}{181}
+\indexentry {error code!\q {eINSUFARG}|hyperpage}{181}
+\indexentry {whitespace@\q {whiteSpace} predicate|hyperpage}{193}
+\indexentry {read/write resource|hyperpage}{202}
+\indexentry {\q {cell} package|hyperpage}{202}
+\indexentry {read/write resources!creating|hyperpage}{202}
+\indexentry {variable!read/write!declaration|hyperpage}{202}
+\indexentry {cell@\q {cell}!accessing its value|hyperpage}{203}
+\indexentry {accessing the value of a \q {cell} resource|hyperpage}{203}
+\indexentry {freshening unbound variables|hyperpage}{203}
+\indexentry {action!assignment|hyperpage}{203}
+\indexentry {assignment action|hyperpage}{203}
+\indexentry {type inference!assignment|hyperpage}{203}
+\indexentry {read/write variable|hyperpage}{203}
+\indexentry {permanence of assignment|hyperpage}{203}
+\indexentry {Hash table|hyperpage}{204}
+\indexentry {Hash tables!new|hyperpage}{205}
+\indexentry {Hash tables!finding elements|hyperpage}{205}
+\indexentry {Hash tables!checking for elements|hyperpage}{206}
+\indexentry {Hash tables!adding elements|hyperpage}{206}
+\indexentry {Hash tables!deleting elements|hyperpage}{207}
+\indexentry {Hash tables!finding all elements|hyperpage}{207}
+\indexentry {Hash tables!finding all keys|hyperpage}{207}
+\indexentry {Hash tables!count elements|hyperpage}{208}
+\indexentry {dynamic relations|hyperpage}{208}
+\indexentry {dynamic relations!initialization|hyperpage}{209}
+\indexentry {Dynamic relations!type inference|hyperpage}{209}
+\indexentry {Type inference!dynamic relations|hyperpage}{209}
+\indexentry {dynamic relations!invoking|hyperpage}{209}
+\indexentry {dynamic relations!adding to|hyperpage}{210}
+\indexentry {adding to a dynamic relation|hyperpage}{210}
+\indexentry {dynamic relations!extension as a list|hyperpage}{210}
+\indexentry {accessing extension of a dynamic relation|hyperpage}{210}
+\indexentry {freshening variables in a dynamic relation|hyperpage}{210}
+\indexentry {dynamic relations!freshening|hyperpage}{210}
+\indexentry {removal from a dynamic relation|hyperpage}{211}
+\indexentry {dynamic relations!removal|hyperpage}{211}
+\indexentry {conditional removal!from a dynamic relation|hyperpage}{211}
+\indexentry {dynamic relations!conditional removal|hyperpage}{211}
+\indexentry {multiple removal from a dynamic relation|hyperpage}{212}
+\indexentry {dynamic relations!multiple removal|hyperpage}{212}
+\indexentry {conditional removal!multiple entries|hyperpage}{212}
+\indexentry {dynamic relations!extension as a list|hyperpage}{212}
+\indexentry {accessing extension of a dynamic relation|hyperpage}{212}
+\indexentry {dynamic relations!sharing across threads|hyperpage}{213}
+\indexentry {threads!sharing dynamic relations|hyperpage}{213}
+\indexentry {Synchronizing access to dynamic relations|hyperpage}{213}
+\indexentry {File names|hyperpage}{215}
+\indexentry {URL|hyperpage}{215}
+\indexentry {file@\q {file:}|hyperpage}{216}
+\indexentry {http@\q {http:}|hyperpage}{216}
+\indexentry {ftp@\q {ftp:}|hyperpage}{216}
+\indexentry {Character encoding in files|hyperpage}{217}
+\indexentry {Files!Character encoding in|hyperpage}{217}
+\indexentry {ffile@\q {ffile} predicate|hyperpage}{219}
+\indexentry {file presence|hyperpage}{219}
+\indexentry {ftype@\q {ftype} function|hyperpage}{219}
+\indexentry {file type|hyperpage}{219}
+\indexentry {fmodees@\q {fmodes} function|hyperpage}{220}
+\indexentry {file permissions|hyperpage}{220}
+\indexentry {fsize@\q {fsize} function|hyperpage}{221}
+\indexentry {file size|hyperpage}{221}
+\indexentry {frm@\q {frm} action procedure|hyperpage}{221}
+\indexentry {delete a file|hyperpage}{221}
+\indexentry {fmv@\q {fmv} action procedure|hyperpage}{222}
+\indexentry {rename a file|hyperpage}{222}
+\indexentry {append mode file open|hyperpage}{225}
+\indexentry {file open!append mode|hyperpage}{225}
+\indexentry {TCP server|hyperpage}{234}
+\indexentry {inter-thread communication|hyperpage}{237}
+\indexentry {message!based communication|hyperpage}{237}
+\indexentry {sending and receiving messages|hyperpage}{237}
+\indexentry {mailbox@\q {mailbox} type|hyperpage}{238}
+\indexentry {message!sending|hyperpage}{238}
+\indexentry {action!message send|hyperpage}{238}
+\indexentry {message!receiving|hyperpage}{239}
+\indexentry {action!message receive|hyperpage}{239}
+\indexentry {receiving messages|hyperpage}{239}
+\indexentry {thread message queue|hyperpage}{239}
+\indexentry {message!receiving|hyperpage}{240}
+\indexentry {action!message receive|hyperpage}{240}
+\indexentry {receiving messages|hyperpage}{240}
+\indexentry {thread message queue|hyperpage}{240}
+\indexentry {message!timeout|hyperpage}{240}
+\indexentry {Timing out a message receive|hyperpage}{240}
+\indexentry {Why \q {timeout}s are bad for your program's health|hyperpage}{241}
+\indexentry {message!receiving|hyperpage}{241}
+\indexentry {action!message receive|hyperpage}{241}
+\indexentry {receiving messages|hyperpage}{241}
+\indexentry {thread message queue|hyperpage}{241}
+\indexentry {Convert time to date value|hyperpage}{247}
+\indexentry {Convert time to date value|hyperpage}{247}
+\indexentry {return specific date value|hyperpage}{247}
+\indexentry {Date in rfc822 format|hyperpage}{248}
+\indexentry {RFC822 format date|hyperpage}{248}
+\indexentry {command line arguments|hyperpage}{253}
+\indexentry {terminate execution|hyperpage}{253}
+\indexentry {{\tt exit} \go execution|hyperpage}{253}
+\indexentry {terminate thread|hyperpage}{253}
+\indexentry {{\tt kill} \go execution|hyperpage}{253}
+\indexentry {XML document type structure|hyperpage}{257}
+\indexentry {xmlText@\q {xmlTEXT} xmlDOM constructor|hyperpage}{259}
+\indexentry {xmlPI@\q {xmlPI} xmlDOM constructor|hyperpage}{259}
+\indexentry {xmlElement@\q {xmlElement} xmlDOM constructor|hyperpage}{259}
+\indexentry {xmlAtt@\q {xmlAtt} xmlDOM attribute constructor|hyperpage}{260}
+\indexentry {exception@\q {exception} type|hyperpage}{283}

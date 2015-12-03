@@ -1,0 +1,5 @@
+/* automatically generated -- do not edit */
+/* Module interface file for meta.aam */
+({
+    (att_tree(attTree),compOpt[],mp(dynInt(char[], canonCode)))=>canonCode[]
+   }?genMeta) from "meta.aam";

@@ -1,0 +1,348 @@
+\chapter{Functions and Expressions}
+\label{expressions}
+
+\go has a rich variety of expressions: there are expressions that relate expressions to actions and predicates as well as regular evaluable forms.
+
+\section{Functions}
+\label{expression:functions}
+\index{functions}
+\index{equations}
+
+Functions are defined using sequences of equations. Each equation is a \emph{rewrite} equation that shows how to rewrite terms of one form -- representing the function call -- to terms of another form -- representing the value.
+All the equations for a given function must be grouped together.
+
+The general form of an equation is:
+\begin{alltt}
+\emph{Fun}(\emph{Ptn\sub1},\ldots,\emph{Ptn\subn} :: \emph{Condition} => \emph{Exp}
+\end{alltt}
+The equations in a function are applied in a left-to-right order. There is no deep backtracking in function evaluation: once an equation has been found that matches then no other equations will be attempted. In the event that none of the equations match an error exception is raised.
+
+By default, the \emph{modes} of a function are \emph{input}. This implies that the patterns in the head of the equation are matched with the arguments to a function call. This also means that the actual arguments to a function call are required to be either the same type as the corresponding argument type or a sub-type of the required type.
+
+\section{Basic Expressions}
+\label{expression:atomic}
+
+The basic \go expressions are literal terms and function calls of various forms.
+
+\subsection{Literals}
+\label{expression:symbol}
+
+\subsubsection{Symbols}
+\index{expression!symbols}
+\index{symbol literal expression}As outlined in Section~\vref{token:symbol}, a symbol is a sequence of characters enclosed in single quotes:
+\begin{alltt}
+'A symbol'
+\end{alltt} 
+
+\subsubsection{Characters}
+\label{expression:character}
+
+\index{expression!character}
+\index{character expression}
+Characters are written as a back-tick character followed by the character itself; which may be a string character reference.
+
+\subsubsection{Numbers}
+\label{expression:number}
+
+\index{expression!number}
+\index{number@\q{number} expression}
+fall into two categories: \q{integer}s and \q{float}ing point numbers.
+
+\paragraph{Integers}
+\index{integer}
+are written as a sequence of decimal digit characters -- with an optional leading minus sign to denote negative integers.
+
+\paragraph{Hexadecimal numbers}
+\index{integer!hexadecimal}
+are written with a leading \q{0x} followed by hexadecimal digits.:
+\begin{alltt}
+0xffff 0xabd 0x0
+\end{alltt}
+are all integers, written using hexadecimal notation.
+
+\paragraph{Character codes}
+\index{integer!character code}
+\index{Unicode!character code}
+are derived from the code value of a character. For example:
+\begin{alltt}
+0cA
+\end{alltt}
+is the number 65.
+
+\paragraph{Floating point numbers}
+\index{floating point}
+\index{number!floating point}
+are written using a normal floating point notation:
+\begin{alltt}
+34.56 2.0e45 2.04E-99
+\end{alltt}
+
+\subsection{Variables}
+\label{expression:variable}
+
+\index{expression!variable}
+\index{variable expression}
+Variables are written as identifiers. Identifiers which have not been defined as class labels or names of rule programs or declared as enumerated symbols or constructor functions in an algebraic type definition are considered to be variables.
+ 
+\subsubsection{Scope of identifiers}
+\label{variable:scope}
+
+\index{variable!scope}
+\index{identifier!scope}
+\index{scope of identifiers}
+For identifiers such as program names, type names and class names, introduced in the body of a class or package, they are in scope across the entire class body or package -- there is no implied scope arising from the order of declarations. For variables in rules, the scope of the variable is the entire rule.
+
+For a rule, such as an equation or a clause, any variables mentioned in the rule that are not defined in an outer scope -- either in an enclosing class body or as package variables -- are local to that rule.
+
+\paragraph{Holes in the scope}
+\index{variable!scope!holes in}
+\index{identifier!scope!holes in}
+of identifiers can occur when the inner identifier is the name of a defined program of a class body.  The inner name masks out, throughout its natural scope,  any variable of the same name defined in outer contexts. 
+
+Note that variable identifiers in rules \emph{do not} mask out variables of the same name in outer scopes.
+
+\paragraph{Anonymous variable}
+The special variable written as just a single underscore character \q{\_} is \emph{anonymous}:  each occurrence of the \q{\_} identifier refers to a different variable.
+
+\subsection{Lists}
+\label{expression:lists}
+
+\index{list expression}
+\index{expression!lists}
+Lists are written as a sequence of comma-separated expressions enclosed in square brackets. For example, the list
+\begin{alltt}
+[1,2,3]
+\end{alltt}
+is a list of three \q{number}s: 1, 2 and 3.
+
+\paragraph{List pattern notation}
+\index{lists!pattern}
+A list pattern is written using list notation but with a final \q{,..} operator followed by the tail of the list:
+\begin{alltt}
+[\emph{H},..\emph{T}]
+\end{alltt}
+There is a direct correspondence between list patterns and list terms: the expression:
+\begin{alltt}
+[1,[2,[3,..[]]]
+\end{alltt}
+is equivalent to the list \q{[1,2,3]}.
+
+\subsection{Strings}
+\label{expression:string}
+\index{expression!strings}
+\index{strings!lists of characters}
+\index{lists of characters are strings}
+\go string literal values are synonyms for lists of \q{char}s; i.e., a string literal such as \q{"foo"} is equivalent to the list:
+\begin{alltt}
+[`f,`o,`o]
+\end{alltt}
+and the empty string \q{""} is equivalent to
+\begin{alltt}
+[]:list[char]
+\end{alltt}
+i.e., an empty list with the added type annotation that it's type is list of \q{char}s.
+
+\subsection{Tuples}
+\label{expression:tuples}
+
+\index{expression!tuple}
+\index{tuple epxressions}
+A tuple is written as a sequence of elements, separated by \q{,} and enclosed in parentheses:
+\begin{alltt}
+\label{foo:bar:tuple}('foo',23,['bar'])
+\end{alltt}
+Unlike lists, the elements of a tuple do not need to be of the same type. 
+
+It is possible to combine tuples:
+\begin{alltt}
+('joe',23,"his place",tonight)
+\end{alltt}
+is equivalent to:
+\begin{alltt}
+('joe',(23,("his place",tonight)))
+\end{alltt}
+
+\subsection{Function Call Expression}
+\label{expression:applicative}
+
+\index{applicative expressions}
+\index{function!call expression}
+\index{expression!applicative}
+A function call is an expression of the form:
+\begin{alltt}
+\emph{Fun}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+Note that if an applied function fails, if none of the function's equations apply to the arguments of the application, then an \q{'eFAIL'} error exception is raised.
+
+\section{Special expressions}
+\label{expression:special}
+There are a number of special forms of expressions which have specific roles in \go programs.
+
+\subsection{Type annotation}
+\label{expression:typeannotation}
+\index{type!annotation}
+A \firstterm{type annotated expression}{An expression whose type is explicitly marked by the programmer.}  takes the form:
+\begin{alltt}
+\emph{Ex}:\emph{Type}
+\end{alltt}
+A type annotated expression has the same value as its non-annotated component. The only effect of the type annotation is to add a type constraint to the expression.
+
+\subsection{Bag of expression}
+\label{expression:bagof}
+
+The \firstterm{bag of}{A list-valued expression whose value is determined by finding all solutions to a predicate condition.} expression is written:
+\begin{alltt}
+\{ \emph{Ex} || \emph{Goal} \}
+\end{alltt}
+The value of a bag of expression is a list consisting of a copy of the value of \emph{Ex} for each way that \emph{Goal} can be satisfied by backtracking.
+
+\paragraph{Variables in bags}
+may arise when \emph{Ex} is not completely ground for one or more solutions to \emph{Goal}. The list returned will contain fresh instances of those variables.
+
+\subsection{Bounded set expression}
+\label{expression:bounded}
+
+The \firstterm{bounded set}{A list valued expression whose value is determined by applying a predicate test to all elements of a base list.} expression is similar in form to the \emph{bag of} expression. However, it has quite different semantics.
+
+The value of a bounded set expression:
+\begin{alltt}
+\{ \emph{Ex} .. \emph{Ptn} in \emph{List} \}
+\end{alltt}
+is a list consisting of evaluating the expression \emph{Ex} for each member of \emph{List} that matches with \emph{Ptn}.
+
+\subsection{Conditional expressions}
+\label{expression:conditional}
+
+The value of a \firstterm{conditional expression}{An expression whose value is one of two possible values -- depending on the success or otherwise of a predicate test.}:
+\begin{alltt}
+(\emph{Goal}?\emph{E\sub1}|\emph{E\sub2})
+\end{alltt}
+depends on if \emph{Goal} succeeds, when the value of the conditional expression is the value of \emph{E\sub1} -- otherwise it is the value of \emph{E\sub2}. \emph{Goal} is evaluated in a `one-of' context -- only one solution for \emph{Goal} is attempted.
+
+\subsection{Dot expressions}
+\label{expression:dot}
+\index{dot expression}
+\index{Attribute sets!dot expression}
+\index{\q{.} operator}
+\index{operator!|q{.}}
+
+A dot expression is a request to invoke a program from an object's interface. The form of a dot expression is:
+\begin{alltt}
+\emph{Exp}.\emph{att}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+Note there must be no spaces between the dot and the \q{att} name.
+
+For example, the expression:
+\begin{alltt}
+joe.age(now())
+\end{alltt}
+denotes the value of \q{age()} within the class identified by \q{joe}.
+
+\subsection{Guarded patterns}
+\label{patterns:guard}
+
+\index{guarded pattern}
+\index{pattern!guarded}
+A \firstterm{guarded pattern}{A pattern whose semantics is governed by a predicate: a unification or pattern match of the pattern with a term is deemed to succeed only if the guard is satisfied.} takes the form
+\begin{alltt}
+\emph{Ptn}::\emph{Goal}
+\end{alltt}
+\index{type inference!guarded expression}
+In most cases the guarded pattern must be enclosed in parentheses, for example when it occurs as an argument of a  function call. However, guarded patterns in the left hand sides of equations and action rules do not require parentheses:
+\begin{alltt}
+fact(N)::N>1 => fact(N-1)*N.
+\end{alltt}
+
+\subsection{Tau pattern}
+\label{expression:tau}
+\index{Object matching expression}
+
+The \emph{tau} pattern is a shorthand for invoking a predicate from a class. Tau patterns take the form:
+\begin{alltt}
+\emph{Var}@\emph{P}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+or, in the case that \emph{Var} is not needed, simply:
+\begin{alltt}
+@\emph{P}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+A pattern of this form matches any object \emph{O} for which \q{\emph{O.P}(\emph{A\sub1},\ldots,\emph{A\subn})} holds. It is equivalent to the guarded pattern:
+\begin{alltt}
+\emph{Var}::\emph{Var}.\emph{P}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+
+\subsection{Parse expression}
+\label{expression:grammarexp}
+
+A parse expression is of the form:
+\begin{alltt}
+\emph{G} \%\% \emph{S}
+\end{alltt}
+which denotes a request to parse the \emph{S} using the grammar \emph{G} -- which must be a single argument grammar that is defined over the type of \emph{S}. The value returned is the value found in \emph{G}'s single argument.
+
+A variation of the grammar expression is:
+\begin{alltt}
+\emph{G} \%\% \emph{S} \tilda\emph{R}
+\end{alltt}
+In this case \emph{R} is unified with the remaining portion of \emph{S} -- that was not parsed by \emph{G}.
+
+\subsection{Valof expressions}
+\label{expression:valof}
+\index{valof@\q{valof} expression}
+\index{expression!valof@\q{valof}}
+A \firstterm{valof expression}{An expression whose value is determined as a result of executing an action.} is written:
+\begin{alltt}
+valof\{ \emph{A\sub1};\ldots;\emph{A\sub{i-1}};valis \emph{Ex};\emph{A\sub{i+1}};\ldots;\emph{A\subn}\}
+\end{alltt}
+The \q{valis} action may occur anywhere within \qe{A\subi}, it denotes the \emph{value} of the \q{valof} expression; however, the expression only terminates when \qe{A\subn} completes.
+
+If there is more than one \q{valis} action in a \q{valof} body, they must all  agree on their value.
+
+
+\subsection{Delayed query}
+\label{goal:delayed}
+\index{delayed goal}
+\index{goals!delayed}
+\index{trigger goal}
+The form of a delayed query is:
+\begin{alltt}
+\emph{V} @@ \emph{G}
+\end{alltt}
+If \qe{V} is not instantiated at the time this expression is evaluation then the query \qe{G} is suspended. Later, when \qe{V} becomes instantiated then the delayed query \qe{G} will be attempted. If \qe{G} fails then backtracking may undo the binding to \qe{V}.
+
+Note that if the variable is never instantiated, then the delayed query will not be attempted.
+
+\subsection{Spawn Sub-thread}
+\label{expression:spawn}
+
+\index{\q{spawn} sub-thread}
+\index{action!\q{spawn} sub-thread}
+\index{operator!\q{spawn}}
+\index{multi-threaded programming}
+A \firstterm{spawn expression}{An expression denoting an action that has been spawned to executed  as an independent thread of execution.} is used to spawn an action as a sub-thread. The form of a \q{spawn} expression is:
+\begin{alltt}
+spawn \{ \emph{Action} \}
+\end{alltt}
+The value of a \q{spawn} is a \q{thread} value that represents the handle of the sub-thread created.
+
+The sub-thread executes its action independently of the invoking thread; and terminates independently.
+
+\subsection{Exception recovery expression}
+\label{expression:errorrecovery}
+
+An \firstterm{exception recovery expression}{An expression which incorporates a exception handler -- if an exception is \q{raise}d during the evaluation of an expression then its evaluation is terminated and an error handler executed instead.} is:
+\begin{alltt}
+\emph{Ex} onerror (\emph{P\sub1} => \emph{E\sub1} | \ldots{} | \emph{P\subn} => \emph{E\subn})
+\end{alltt}
+The value of this expression is \qe{Ex}; unless a run-time problem arises. In this case, the value is the value returned by the first exception handler that matches the raised exception.
+
+\subsection{Raise exception expression}
+\label{expression:exception}
+\index{raise@\q{raise} exception expression}
+\index{Expression!raise@\q{raise} exception}
+
+A \firstterm{raise exception expression}{Not a normal expression -- evaluation of a \q{raise} exception expression results in the exception being raised -- and the current evaluation aborted up to an enclosing exception handler. The value of the \q{raise} exception expression is used by the exception handler.} takes the form:
+\begin{alltt}
+raise \emph{Ex}
+\end{alltt}
+Exception expressions do not return a value; instead, the current evaluation is terminated with a raised error exception. The error value \q{Ex} must be caught by an enclosing \q{onerror} clause. 
+

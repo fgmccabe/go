@@ -1,0 +1,84 @@
+\chapter{The \gcl}
+\label{gcl}
+
+The \gcl is a language that is intended for use between \go systems; particularly agent systems. It is not a programming language in the normal sense of the word -- but a language that is designed to facilitate communication of semantically grounded content.\footnote{This chapter documents an experimental extension to \go.}
+
+\gcl has a number of distinct layers within it:
+\begin{description}
+\item[the propositional layer] has constructs that correspond to propositional forms, such as truth-valued formulae and action expressions,
+\item[the communicative act layer] encapsulates the `speech act' that represents the basic units of a conversation,
+\item[the contract layer] encapsulates the notion of an agreement. An agreement is a mutually binding constraint on the behavior of two or more entities, and\footnote{A binding agreement on a single entity is somewhat moot by definition.}
+\item[the entity layer] encapsulates the notion of a free entity. Entities include individual agents, resources mediated by software and groups of entities.
+\end{description}
+
+\gcl is strongly typed, as befits a \go extension. However, it is in a sense merely a shell into which application-specific information must be embedded. The `root' types for the \gcl are \q{propForm} which defines the legal forms of logical proposition in \gcl, \q{ontForm} which defines the legal form of an ontology reference, \q{caForm} which defines the legal communicative acts, \q{actForm} which defines the legal action expressions, and ctForm which defines the legal form of an agreement or contract. Each of these types are polymorphic, and are expected to be `instantiated' with application-specific -- i.e., your -- types that represent the domain information.
+
+
+
+For example, if \q{agent1} wishes to inform \q{agentX} that the color of a particular car is blue, then it will send a message of the form:
+\begin{alltt}
+inform(\emph{agentX},
+   ?+(color(?!(X,&(?+(topicOf('abc\#234154',X)),
+                  ?+(isA(X,
+                      inOnt('org.gVM','car'))))),
+            inOnt('org.intColor','blue')))
+)
+\end{alltt}
+where \q{inform} means `I assert the truth of', \q{?+} means `proposition', \q{?!(X,$\phi$)} means `the \q{X} that satisfies $\phi$, \q{topicOf} is an application predicate that refers to the  topic of some ongoing conversation, \q{inOnt} is a constructor that links a symbol to a particular ontology.
+
+Informally, we can read such a message as:
+\begin{quote}
+I assert that the color of the entity that is the topic of conversation \q{abc\#234154}, which is also a car -- as defined by the \q{gVM} org (global Vehicle Manufacturer's association) -- is \q{blue} -- in turn as defined by the international Color organization.\footnote{Any resemblance to actual organizations is purely coincidental.}
+\end{quote}
+
+\section{The propositional forms}
+\label{gcl:propositional}
+
+The propositional forms in are used to denote logical formulae. \gcl is a rule-based language, rather than admit arbitrary shaped propositional forms, \gcl propositions all take the form of rules. This does not limit the logical expressiveness of the language; however, it does make interpretation significantly simpler.
+
+The legal formulae are those of the \q{propForm} type:
+\begin{alltt}
+-- An agent's name has no structure
+agent ::= aId(symbol).
+
+
+-- CT is a content ontology, AT an action ontology and ST a social ontology
+propForm(CT,AT,ST) ::=  TRUE |
+		?+(CT)  | ?\nasf(CT) | ?=(T,T) | ?\bsl{}=(T,T) |
+       or(propForm(CT,AT,ST),propForm(CT,AT,ST)) | 
+		&(propForm(CT,AT,ST),propForm(CT,AT,ST)) | 
+		not(propForm(CT,AT,ST)) | 
+	    md(modal(CT,AT,ST)).
+
+-- A rule is either a logical rule or a modal rule
+rule(CT,AT,ST) ::= rl(CT,propForm(CT,AT,ST)) |
+       cl(modal(CT,AT,ST),propForm(CT,AT,ST)).
+
+-- modal conditions are somewhat different from regular predicates
+  modal(CT,AT,ST) ::= 
+    allowed(ST,agent,AT) | obliged(ST,agent,AT) |    -- deontic operators
+    feasable(agent,AT) | done(agent,AT,propForm(CT,AT,ST)) |       -- action operators
+    authorized(ST,agent,propForm(CT,AT,ST)) |        -- empowerment operators
+    entitled(ST,agent,propForm(CT,AT,ST)).
+\end{alltt}
+
+\subsection{\q{aId} -- agent identifier}
+\label{gcl:aid}
+
+An agent is identified by a simple structure which merely encapsulates a symbol. For the purposes of the \gcl, agent names have no internal structure -- their main r\^ole is to allow reasoning about agents across sequences of messages.
+
+\subsection{\q{propForm} -- the proposition type}
+
+\subsection{\q{?+} -- leaf proposition}
+\label{gcl:leaf}
+
+The \q{?+} constructor denotes a leaf proposition; corresponding to base predicates in the domain. The form of the \q{?+} constructor is:
+\funsynopsis{?+(\param{A}:\type{CT})}{\type{propForm(CT,AT,ST)}}
+where \param{A} is the atomic proposition and \type{CT} is the type of such propositions. Typically, \type{CT} will be a type in the user's domain; for example, the expression:
+\begin{alltt}
+?+(male('f'))
+\end{alltt}
+would be of type \q{propForm(people,T\sub1,T\sub2)} if \q{male} is of type \q{people}:
+\begin{alltt}
+people ::= male(symbol) | \ldots
+\end{alltt}

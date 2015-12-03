@@ -1,0 +1,27 @@
+types{
+  -- A demonstration of using DL for capturing types
+
+  -- We assume some base types built-in: Integer, Float, Char, Symbol, Thing.
+
+  -- A list type has a head and a tail....
+
+  List == $head:Thing && $tail:List | { nil } .
+
+  -- $tail introduces the tail role, and $tail=List declares that the domain
+  -- of tail is List.
+
+  -- The convention is that classes are capitalized and individuals are not
+
+  -- A list of integers is a list with an additional restriction
+
+  IntList == List && $head:Integer.
+
+  -- We can define a list of 1's by making an existential commitment:
+
+  OneList == List && $head=1.
+
+  -- An enumeration is defined by giving the explicit individuals in the class
+
+  WeekDays  = { sunday, monday, ..., saturday }.
+
+

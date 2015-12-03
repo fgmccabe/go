@@ -1,0 +1,23 @@
+<? xml version="1.0" ?>
+<! DOCTYPE module
+  [
+   <!ENTITY foo "bar">
+   ]>
+<module>
+  <rules name="fact" export="true">
+    <on><_>0</_><do><return>1</return></do></on>
+    <on><_><arg name="X"/></_>
+      <do>
+        <return>
+          <times>
+            <call var="fact">
+              <minus><var var="X"/>&foo;&amp;&foo;</minus>
+            </call>
+            <var var="X"/>
+          </times>
+        </return>
+      </do>
+    </on>
+  </rules>
+ 
+</module>

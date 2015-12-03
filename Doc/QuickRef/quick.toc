@@ -1,0 +1,550 @@
+\contentsline {chapter}{List of Programs}{xxv}{chapter*.2}
+\contentsline {chapter}{List of Figures}{xxvii}{chapter*.3}
+\contentsline {chapter}{List of Examples}{xxix}{chapter*.4}
+\contentsline {chapter}{List of Tables}{xxxi}{section*.7}
+\contentsline {part}{I\hspace {1em}Syntax and semantics of {Go!}\xspace \ programs}{1}{part.1}
+\contentsline {chapter}{\numberline {1}Language Syntax}{3}{chapter.1}
+\contentsline {section}{\numberline {1.1}Unicode character encoding}{3}{section.1.1}
+\contentsline {section}{\numberline {1.2}Tokens}{3}{section.1.2}
+\contentsline {subsection}{\numberline {1.2.1}Comments}{4}{subsection.1.2.1}
+\contentsline {subsubsection}{Line comment}{4}{section*.8}
+\contentsline {subsubsection}{Block comment}{4}{section*.9}
+\contentsline {subsection}{\numberline {1.2.2}Identifiers}{5}{subsection.1.2.2}
+\contentsline {subsection}{\numberline {1.2.3}Characters}{5}{subsection.1.2.3}
+\contentsline {subsubsection}{Character reference}{5}{section*.10}
+\contentsline {subsection}{\numberline {1.2.4}Symbols}{6}{subsection.1.2.4}
+\contentsline {subsection}{\numberline {1.2.5}String literals}{7}{subsection.1.2.5}
+\contentsline {subsection}{\numberline {1.2.6}Number literals}{7}{subsection.1.2.6}
+\contentsline {section}{\numberline {1.3}Operator Grammar}{9}{section.1.3}
+\contentsline {subsection}{\numberline {1.3.1}Standard operators}{9}{subsection.1.3.1}
+\contentsline {subsection}{\numberline {1.3.2}Primitive parse expression}{12}{subsection.1.3.2}
+\contentsline {paragraph}{Literal values}{12}{section*.11}
+\contentsline {paragraph}{Identifiers and applicative expressions}{13}{section*.12}
+\contentsline {paragraph}{Parenthesised expressions}{15}{section*.13}
+\contentsline {paragraph}{List expressions}{15}{section*.14}
+\contentsline {subsubsection}{Operator expression}{16}{section*.15}
+\contentsline {paragraph}{Prefix operator expressions}{16}{section*.16}
+\contentsline {paragraph}{Infix and postfix operator expressions}{17}{section*.17}
+\contentsline {paragraph}{Special infix operators}{18}{section*.18}
+\contentsline {chapter}{\numberline {2}Types}{19}{chapter.2}
+\contentsline {section}{\numberline {2.1}{Go!}\xspace 's type language}{19}{section.2.1}
+\contentsline {subsection}{\numberline {2.1.1}Sub-type constraint}{20}{subsection.2.1.1}
+\contentsline {subsubsection}{A lattice of types}{21}{section*.19}
+\contentsline {subsection}{\numberline {2.1.2}Polymorphism}{23}{subsection.2.1.2}
+\contentsline {section}{\numberline {2.2}Standard Types}{24}{section.2.2}
+\contentsline {subsection}{\numberline {2.2.1}Type variables}{25}{subsection.2.2.1}
+\contentsline {paragraph}{Universally quantified types}{25}{section*.20}
+\contentsline {subsection}{\numberline {2.2.2}Standard value types}{26}{subsection.2.2.2}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt thing}}{thing}} type}{26}{section*.21}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt number}}{number}} type}{27}{section*.22}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt integer}}{integer}} type}{27}{section*.23}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt float}}{float}} type}{27}{section*.24}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt char}}{char}} type}{28}{section*.25}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt symbol}}{symbol}} type}{28}{section*.26}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt logical}}{logical}} type}{28}{section*.27}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt opaque}}{opaque}} type}{29}{section*.28}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt meta}}{meta}} type}{29}{section*.29}
+\contentsline {subsubsection}{Tuple type}{29}{section*.30}
+\contentsline {subsubsection}{{\texorpdfstring {\unhbox \voidb@x \hbox {\tt list}}{list}} type}{29}{section*.31}
+\contentsline {subsection}{\numberline {2.2.3}Program types}{30}{subsection.2.2.3}
+\contentsline {subsubsection}{Type modes}{30}{section*.32}
+\contentsline {subsubsection}{Function type}{33}{section*.33}
+\contentsline {subsubsection}{Predicate type}{33}{section*.34}
+\contentsline {subsubsection}{Action type}{34}{section*.35}
+\contentsline {subsubsection}{Grammar type}{34}{section*.36}
+\contentsline {subsubsection}{Class type}{35}{section*.37}
+\contentsline {section}{\numberline {2.3}Algebraic type definitions}{36}{section.2.3}
+\contentsline {subsection}{\numberline {2.3.1}Type parameters of a type definition}{37}{subsection.2.3.1}
+\contentsline {subsection}{\numberline {2.3.2}Enumerated symbol}{37}{subsection.2.3.2}
+\contentsline {subsection}{\numberline {2.3.3}Constructor functions}{38}{subsection.2.3.3}
+\contentsline {subsection}{\numberline {2.3.4}Type extension}{39}{subsection.2.3.4}
+\contentsline {chapter}{\numberline {3}Functions and Expressions}{41}{chapter.3}
+\contentsline {section}{\numberline {3.1}Functions}{41}{section.3.1}
+\contentsline {section}{\numberline {3.2}Basic Expressions}{42}{section.3.2}
+\contentsline {subsection}{\numberline {3.2.1}Literals}{42}{subsection.3.2.1}
+\contentsline {subsubsection}{Symbols}{42}{section*.38}
+\contentsline {subsubsection}{Characters}{42}{section*.39}
+\contentsline {subsubsection}{Numbers}{42}{section*.40}
+\contentsline {paragraph}{Integers}{42}{section*.41}
+\contentsline {paragraph}{Hexadecimal numbers}{43}{section*.42}
+\contentsline {paragraph}{Character codes}{43}{section*.43}
+\contentsline {paragraph}{Floating point numbers}{43}{section*.44}
+\contentsline {subsection}{\numberline {3.2.2}Variables}{43}{subsection.3.2.2}
+\contentsline {subsubsection}{Scope of identifiers}{43}{section*.45}
+\contentsline {paragraph}{Holes in the scope}{44}{section*.46}
+\contentsline {paragraph}{Anonymous variable}{44}{section*.47}
+\contentsline {subsection}{\numberline {3.2.3}Lists}{44}{subsection.3.2.3}
+\contentsline {paragraph}{List pattern notation}{44}{section*.48}
+\contentsline {subsection}{\numberline {3.2.4}Strings}{45}{subsection.3.2.4}
+\contentsline {subsection}{\numberline {3.2.5}Tuples}{45}{subsection.3.2.5}
+\contentsline {subsection}{\numberline {3.2.6}Function Call Expression}{46}{subsection.3.2.6}
+\contentsline {section}{\numberline {3.3}Special expressions}{46}{section.3.3}
+\contentsline {subsection}{\numberline {3.3.1}Type annotation}{46}{subsection.3.3.1}
+\contentsline {subsection}{\numberline {3.3.2}Bag of expression}{46}{subsection.3.3.2}
+\contentsline {paragraph}{Variables in bags}{47}{section*.49}
+\contentsline {subsection}{\numberline {3.3.3}Bounded set expression}{47}{subsection.3.3.3}
+\contentsline {subsection}{\numberline {3.3.4}Conditional expressions}{47}{subsection.3.3.4}
+\contentsline {subsection}{\numberline {3.3.5}Dot expressions}{47}{subsection.3.3.5}
+\contentsline {subsection}{\numberline {3.3.6}Guarded patterns}{48}{subsection.3.3.6}
+\contentsline {subsection}{\numberline {3.3.7}Tau pattern}{48}{subsection.3.3.7}
+\contentsline {subsection}{\numberline {3.3.8}Parse expression}{49}{subsection.3.3.8}
+\contentsline {subsection}{\numberline {3.3.9}Valof expressions}{49}{subsection.3.3.9}
+\contentsline {subsection}{\numberline {3.3.10}Delayed query}{49}{subsection.3.3.10}
+\contentsline {subsection}{\numberline {3.3.11}Spawn Sub-thread}{50}{subsection.3.3.11}
+\contentsline {subsection}{\numberline {3.3.12}Exception recovery expression}{50}{subsection.3.3.12}
+\contentsline {subsection}{\numberline {3.3.13}Raise exception expression}{50}{subsection.3.3.13}
+\contentsline {chapter}{\numberline {4}Predicates and queries}{53}{chapter.4}
+\contentsline {section}{\numberline {4.1}Predicates}{53}{section.4.1}
+\contentsline {paragraph}{Regular clause}{53}{section*.50}
+\contentsline {paragraph}{Strong clauses}{54}{section*.51}
+\contentsline {section}{\numberline {4.2}Basic queries}{54}{section.4.2}
+\contentsline {subsection}{\numberline {4.2.1}True/false goal}{54}{subsection.4.2.1}
+\contentsline {subsection}{\numberline {4.2.2}Predication}{55}{subsection.4.2.2}
+\contentsline {subsection}{\numberline {4.2.3}Class relative query}{55}{subsection.4.2.3}
+\contentsline {subsection}{\numberline {4.2.4}Equality}{55}{subsection.4.2.4}
+\contentsline {subsection}{\numberline {4.2.5}Inequality}{56}{subsection.4.2.5}
+\contentsline {subsection}{\numberline {4.2.6}Match test}{56}{subsection.4.2.6}
+\contentsline {subsection}{\numberline {4.2.7}Identicality test}{56}{subsection.4.2.7}
+\contentsline {subsection}{\numberline {4.2.8}Membership test}{56}{subsection.4.2.8}
+\contentsline {subsection}{\numberline {4.2.9}Sub-class of query}{57}{subsection.4.2.9}
+\contentsline {subsection}{\numberline {4.2.10}Conjunction}{57}{subsection.4.2.10}
+\contentsline {subsection}{\numberline {4.2.11}Disjunction}{57}{subsection.4.2.11}
+\contentsline {subsection}{\numberline {4.2.12}Conditional}{58}{subsection.4.2.12}
+\contentsline {subsection}{\numberline {4.2.13}Negation}{58}{subsection.4.2.13}
+\contentsline {subsection}{\numberline {4.2.14}One-of}{58}{subsection.4.2.14}
+\contentsline {subsection}{\numberline {4.2.15}Forall}{58}{subsection.4.2.15}
+\contentsline {section}{\numberline {4.3}Special goals}{59}{section.4.3}
+\contentsline {subsection}{\numberline {4.3.1}Action query}{59}{subsection.4.3.1}
+\contentsline {subsection}{\numberline {4.3.2}Exception handler}{59}{subsection.4.3.2}
+\contentsline {subsection}{\numberline {4.3.3}Raise exception}{60}{subsection.4.3.3}
+\contentsline {subsection}{\numberline {4.3.4}Grammar query}{60}{subsection.4.3.4}
+\contentsline {chapter}{\numberline {5}Procedures and Actions}{61}{chapter.5}
+\contentsline {section}{\numberline {5.1}Basic actions}{61}{section.5.1}
+\contentsline {subsection}{\numberline {5.1.1}Empty action}{61}{subsection.5.1.1}
+\contentsline {subsection}{\numberline {5.1.2}Equality}{62}{subsection.5.1.2}
+\contentsline {subsection}{\numberline {5.1.3}Variable assignment}{62}{subsection.5.1.3}
+\contentsline {subsection}{\numberline {5.1.4}Invoke procedure}{62}{subsection.5.1.4}
+\contentsline {subsection}{\numberline {5.1.5}Class relative invocation}{62}{subsection.5.1.5}
+\contentsline {subsection}{\numberline {5.1.6}Action sequence}{63}{subsection.5.1.6}
+\contentsline {subsection}{\numberline {5.1.7}Query action}{63}{subsection.5.1.7}
+\contentsline {subsection}{\numberline {5.1.8}Conditional action}{63}{subsection.5.1.8}
+\contentsline {subsection}{\numberline {5.1.9}Forall action}{63}{subsection.5.1.9}
+\contentsline {subsection}{\numberline {5.1.10}Case analysis action}{64}{subsection.5.1.10}
+\contentsline {subsection}{\numberline {5.1.11}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt valis}}{valis}} Action}{64}{subsection.5.1.11}
+\contentsline {subsection}{\numberline {5.1.12}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt istrue}}{istrue}} Action}{64}{subsection.5.1.12}
+\contentsline {subsection}{\numberline {5.1.13}error handler}{64}{subsection.5.1.13}
+\contentsline {subsection}{\numberline {5.1.14}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt raise}}{raise}} action}{65}{subsection.5.1.14}
+\contentsline {section}{\numberline {5.2}Threads}{65}{section.5.2}
+\contentsline {subsection}{\numberline {5.2.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt spawn}}{spawn}} Sub-thread}{65}{subsection.5.2.1}
+\contentsline {subsection}{\numberline {5.2.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt sync}}{sync}} action}{65}{subsection.5.2.2}
+\contentsline {subsection}{\numberline {5.2.3}Conditional {\texorpdfstring {\unhbox \voidb@x \hbox {\tt sync}}{sync}} action}{66}{subsection.5.2.3}
+\contentsline {chapter}{\numberline {6}Grammar rules}{67}{chapter.6}
+\contentsline {section}{\numberline {6.1}Grammar conditions}{67}{section.6.1}
+\contentsline {subsection}{\numberline {6.1.1}Terminal grammar condition}{67}{subsection.6.1.1}
+\contentsline {subsection}{\numberline {6.1.2}Non-terminal grammar call}{67}{subsection.6.1.2}
+\contentsline {subsection}{\numberline {6.1.3}Class relative grammar call}{68}{subsection.6.1.3}
+\contentsline {subsection}{\numberline {6.1.4}Equality condition}{68}{subsection.6.1.4}
+\contentsline {subsection}{\numberline {6.1.5}Inequality condition}{68}{subsection.6.1.5}
+\contentsline {subsection}{\numberline {6.1.6}Query condition}{68}{subsection.6.1.6}
+\contentsline {subsection}{\numberline {6.1.7}Disjunction grammar condition}{69}{subsection.6.1.7}
+\contentsline {subsection}{\numberline {6.1.8}Conditional grammar condition}{69}{subsection.6.1.8}
+\contentsline {subsection}{\numberline {6.1.9}Negated grammar condition}{69}{subsection.6.1.9}
+\contentsline {subsection}{\numberline {6.1.10}Iterated grammar}{69}{subsection.6.1.10}
+\contentsline {subsection}{\numberline {6.1.11}Error handler}{70}{subsection.6.1.11}
+\contentsline {subsection}{\numberline {6.1.12}Raise exception}{70}{subsection.6.1.12}
+\contentsline {subsection}{\numberline {6.1.13}End of file}{70}{subsection.6.1.13}
+\contentsline {chapter}{\numberline {7}Logic and Objects}{71}{chapter.7}
+\contentsline {section}{\numberline {7.1}Class types}{72}{section.7.1}
+\contentsline {paragraph}{Polymorphic classes}{73}{section*.52}
+\contentsline {section}{\numberline {7.2}Class body}{73}{section.7.2}
+\contentsline {subsection}{\numberline {7.2.1}Class labels}{74}{subsection.7.2.1}
+\contentsline {subsection}{\numberline {7.2.2}Constructors, patterns and modes of use}{74}{subsection.7.2.2}
+\contentsline {subsection}{\numberline {7.2.3}Class theta environment}{76}{subsection.7.2.3}
+\contentsline {paragraph}{Private definitions}{76}{section*.53}
+\contentsline {subsection}{\numberline {7.2.4}Special elements in state-full class theta environments}{77}{subsection.7.2.4}
+\contentsline {subsubsection}{Object Constant}{77}{section*.54}
+\contentsline {paragraph}{Rules for evaluation}{77}{section*.55}
+\contentsline {paragraph}{Groundedness}{77}{section*.56}
+\contentsline {subsubsection}{Object Variable}{77}{section*.57}
+\contentsline {paragraph}{Rules for evaluation}{79}{section*.58}
+\contentsline {subsubsection}{Static initialization}{80}{section*.59}
+\contentsline {section}{\numberline {7.3}Inheritance and Class rules}{81}{section.7.3}
+\contentsline {subsubsection}{Inheritance and types}{82}{section*.60}
+\contentsline {subsection}{\numberline {7.3.1}Multiple inheritance}{84}{subsection.7.3.1}
+\contentsline {section}{\numberline {7.4}Accessing and using classes}{85}{section.7.4}
+\contentsline {subsection}{\numberline {7.4.1}Creating objects}{86}{subsection.7.4.1}
+\contentsline {subsection}{\numberline {7.4.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt this}}{this}} object}{87}{subsection.7.4.2}
+\contentsline {subsection}{\numberline {7.4.3}Super and inherited definitions}{88}{subsection.7.4.3}
+\contentsline {section}{\numberline {7.5}Inner Classes}{90}{section.7.5}
+\contentsline {subsection}{\numberline {7.5.1}Anonymous classes}{92}{subsection.7.5.1}
+\contentsline {paragraph}{Free variables}{94}{section*.61}
+\contentsline {chapter}{\numberline {8}Packages}{95}{chapter.8}
+\contentsline {section}{\numberline {8.1}Package contents}{96}{section.8.1}
+\contentsline {subsection}{\numberline {8.1.1}Package constants}{97}{subsection.8.1.1}
+\contentsline {subsection}{\numberline {8.1.2}Package variables}{99}{subsection.8.1.2}
+\contentsline {subsection}{\numberline {8.1.3}Package initialization}{100}{subsection.8.1.3}
+\contentsline {subsection}{\numberline {8.1.4}Package exports}{101}{subsection.8.1.4}
+\contentsline {section}{\numberline {8.2}Importing packages}{102}{section.8.2}
+\contentsline {paragraph}{Circular chains of {\texorpdfstring {\unhbox \voidb@x \hbox {\tt import}}{import}}s}{102}{section*.62}
+\contentsline {section}{\numberline {8.3}Top-level main programs}{104}{section.8.3}
+\contentsline {section}{\numberline {8.4}Standard Packages}{105}{section.8.4}
+\contentsline {part}{II\hspace {1em}Standard library}{109}{part.2}
+\contentsline {chapter}{\numberline {9}Arithmetic Primitives}{113}{chapter.9}
+\contentsline {section}{\numberline {9.1}Basic arithmetic primitives}{114}{section.9.1}
+\contentsline {subsection}{\numberline {9.1.1}\unhbox \voidb@x \hbox {\tt +} -- Numeric addition}{114}{subsection.9.1.1}
+\contentsline {subsection}{\numberline {9.1.2}\unhbox \voidb@x \hbox {\tt -} -- Numeric subtraction}{114}{subsection.9.1.2}
+\contentsline {subsection}{\numberline {9.1.3}\unhbox \voidb@x \hbox {\tt *} -- Numeric product}{115}{subsection.9.1.3}
+\contentsline {subsection}{\numberline {9.1.4}\unhbox \voidb@x \hbox {\tt /} -- Numeric division}{115}{subsection.9.1.4}
+\contentsline {subsection}{\numberline {9.1.5}\unhbox \voidb@x \hbox {\tt quot} -- Integer quotient}{115}{subsection.9.1.5}
+\contentsline {subsection}{\numberline {9.1.6}\unhbox \voidb@x \hbox {\tt rem} -- Remainder}{115}{subsection.9.1.6}
+\contentsline {subsection}{\numberline {9.1.7}\unhbox \voidb@x \hbox {\tt abs} -- Absolute value}{115}{subsection.9.1.7}
+\contentsline {subsection}{\numberline {9.1.8}\unhbox \voidb@x \hbox {\tt **} -- Exponentiation}{116}{subsection.9.1.8}
+\contentsline {subsection}{\numberline {9.1.9}\unhbox \voidb@x \hbox {\tt integral} -- Integer predicate}{116}{subsection.9.1.9}
+\contentsline {subsection}{\numberline {9.1.10}\unhbox \voidb@x \hbox {\tt trunc} -- Extract integral part}{116}{subsection.9.1.10}
+\contentsline {subsection}{\numberline {9.1.11}\unhbox \voidb@x \hbox {\tt itrunc} -- Extract integral part}{117}{subsection.9.1.11}
+\contentsline {subsection}{\numberline {9.1.12}\unhbox \voidb@x \hbox {\tt floor} -- Largest integer that is smaller}{117}{subsection.9.1.12}
+\contentsline {subsection}{\numberline {9.1.13}\unhbox \voidb@x \hbox {\tt ceil} -- Smallest integer that is larger}{117}{subsection.9.1.13}
+\contentsline {subsection}{\numberline {9.1.14}\unhbox \voidb@x \hbox {\tt n2float} -- Convert to float}{117}{subsection.9.1.14}
+\contentsline {section}{\numberline {9.2}Modulo arithmetic}{118}{section.9.2}
+\contentsline {subsection}{\numberline {9.2.1}\unhbox \voidb@x \hbox {\tt iplus} -- modulo addition}{118}{subsection.9.2.1}
+\contentsline {subsection}{\numberline {9.2.2}\unhbox \voidb@x \hbox {\tt iminus} -- modulo subtraction}{118}{subsection.9.2.2}
+\contentsline {subsection}{\numberline {9.2.3}\unhbox \voidb@x \hbox {\tt itimes} -- modulo multiplication}{118}{subsection.9.2.3}
+\contentsline {subsection}{\numberline {9.2.4}\unhbox \voidb@x \hbox {\tt idiv} -- modulo division}{119}{subsection.9.2.4}
+\contentsline {subsection}{\numberline {9.2.5}\unhbox \voidb@x \hbox {\tt imod} -- modulus }{119}{subsection.9.2.5}
+\contentsline {section}{\numberline {9.3}Bit Oriented Arithmetic Primitives}{119}{section.9.3}
+\contentsline {subsection}{\numberline {9.3.1}\unhbox \voidb@x \hbox {\tt band} -- Bitwise and function}{119}{subsection.9.3.1}
+\contentsline {subsection}{\numberline {9.3.2}\unhbox \voidb@x \hbox {\tt bor} -- Bitwise or function}{119}{subsection.9.3.2}
+\contentsline {subsection}{\numberline {9.3.3}\unhbox \voidb@x \hbox {\tt bnot} -- Binary negation}{120}{subsection.9.3.3}
+\contentsline {subsection}{\numberline {9.3.4}\unhbox \voidb@x \hbox {\tt bxor} -- Bitwise exclusive or function}{120}{subsection.9.3.4}
+\contentsline {subsection}{\numberline {9.3.5}\unhbox \voidb@x \hbox {\tt bleft} -- Bitwise left shift function}{120}{subsection.9.3.5}
+\contentsline {subsection}{\numberline {9.3.6}\unhbox \voidb@x \hbox {\tt bright} -- Bitwise right shift function}{120}{subsection.9.3.6}
+\contentsline {section}{\numberline {9.4}Arithmetic inequalities}{121}{section.9.4}
+\contentsline {subsection}{\numberline {9.4.1}\unhbox \voidb@x \hbox {\tt <} -- Less than predicate}{121}{subsection.9.4.1}
+\contentsline {subsection}{\numberline {9.4.2}\unhbox \voidb@x \hbox {\tt =<} -- Less than or equal predicate}{121}{subsection.9.4.2}
+\contentsline {subsection}{\numberline {9.4.3}\unhbox \voidb@x \hbox {\tt >} -- Greater than predicate}{121}{subsection.9.4.3}
+\contentsline {subsection}{\numberline {9.4.4}\unhbox \voidb@x \hbox {\tt >=} -- Greater than or equal predicate}{122}{subsection.9.4.4}
+\contentsline {section}{\numberline {9.5}Trigonometric functions}{122}{section.9.5}
+\contentsline {subsection}{\numberline {9.5.1}\unhbox \voidb@x \hbox {\tt sin} -- Sine function}{122}{subsection.9.5.1}
+\contentsline {subsection}{\numberline {9.5.2}\unhbox \voidb@x \hbox {\tt asin} -- Arc Sine function}{122}{subsection.9.5.2}
+\contentsline {subsection}{\numberline {9.5.3}\unhbox \voidb@x \hbox {\tt cos} -- Cosine function}{122}{subsection.9.5.3}
+\contentsline {subsection}{\numberline {9.5.4}\unhbox \voidb@x \hbox {\tt acos} -- Arc Cosine function}{123}{subsection.9.5.4}
+\contentsline {subsection}{\numberline {9.5.5}\unhbox \voidb@x \hbox {\tt tan} -- Tangent function}{123}{subsection.9.5.5}
+\contentsline {subsection}{\numberline {9.5.6}\unhbox \voidb@x \hbox {\tt atan} -- Arc Tangent function}{123}{subsection.9.5.6}
+\contentsline {subsection}{\numberline {9.5.7}\unhbox \voidb@x \hbox {\tt pi} -- return $\pi $}{123}{subsection.9.5.7}
+\contentsline {section}{\numberline {9.6}Other math functions}{124}{section.9.6}
+\contentsline {subsection}{\numberline {9.6.1}\unhbox \voidb@x \hbox {\tt irand} -- random integer generator}{124}{subsection.9.6.1}
+\contentsline {subsection}{\numberline {9.6.2}\unhbox \voidb@x \hbox {\tt rand} -- random number generator}{124}{subsection.9.6.2}
+\contentsline {subsection}{\numberline {9.6.3}\unhbox \voidb@x \hbox {\tt srand} -- seed random number generation}{124}{subsection.9.6.3}
+\contentsline {subsection}{\numberline {9.6.4}\unhbox \voidb@x \hbox {\tt sqrt} -- square root function}{125}{subsection.9.6.4}
+\contentsline {subsection}{\numberline {9.6.5}\unhbox \voidb@x \hbox {\tt exp} -- exponentiation function}{125}{subsection.9.6.5}
+\contentsline {subsection}{\numberline {9.6.6}\unhbox \voidb@x \hbox {\tt log} -- natural logarithm function}{125}{subsection.9.6.6}
+\contentsline {subsection}{\numberline {9.6.7}\unhbox \voidb@x \hbox {\tt log10} -- decimal logarithm function}{125}{subsection.9.6.7}
+\contentsline {section}{\numberline {9.7}Floating point manipulation}{126}{section.9.7}
+\contentsline {subsection}{\numberline {9.7.1}\unhbox \voidb@x \hbox {\tt ldexp} -- multiply by power of 2}{126}{subsection.9.7.1}
+\contentsline {subsection}{\numberline {9.7.2}\unhbox \voidb@x \hbox {\tt frexp} -- split into fraction and mantissae}{126}{subsection.9.7.2}
+\contentsline {subsection}{\numberline {9.7.3}\unhbox \voidb@x \hbox {\tt modf} -- split into integer and fraction parts}{127}{subsection.9.7.3}
+\contentsline {chapter}{\numberline {10}Standard Library}{129}{chapter.10}
+\contentsline {section}{\numberline {10.1}List manipulation}{129}{section.10.1}
+\contentsline {subsection}{\numberline {10.1.1}\unhbox \voidb@x \hbox {\tt <>} -- List append}{130}{subsection.10.1.1}
+\contentsline {subsection}{\numberline {10.1.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt append}}{append}} -- List append predicate}{130}{subsection.10.1.2}
+\contentsline {subsection}{\numberline {10.1.3}\unhbox \voidb@x \hbox {\tt listlen} -- Length of a list}{131}{subsection.10.1.3}
+\contentsline {subsection}{\numberline {10.1.4}\unhbox \voidb@x \hbox {\tt in} -- List membership}{131}{subsection.10.1.4}
+\contentsline {subsection}{\numberline {10.1.5}\unhbox \voidb@x \hbox {\tt reverse} -- List reverse}{132}{subsection.10.1.5}
+\contentsline {subsection}{\numberline {10.1.6}\unhbox \voidb@x \hbox {\tt nth} -- Nth element of a list}{132}{subsection.10.1.6}
+\contentsline {subsection}{\numberline {10.1.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt front}}{front}} -- the front portion of a list}{132}{subsection.10.1.7}
+\contentsline {subsection}{\numberline {10.1.8}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt tail}}{tail}} -- the tail portion of a list}{133}{subsection.10.1.8}
+\contentsline {subsection}{\numberline {10.1.9}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt drop}}{drop}} -- drop n elements from a list}{133}{subsection.10.1.9}
+\contentsline {subsection}{\numberline {10.1.10}\unhbox \voidb@x \hbox {\tt iota} -- List construction}{134}{subsection.10.1.10}
+\contentsline {section}{\numberline {10.2}Set manipulation}{134}{section.10.2}
+\contentsline {subsection}{\numberline {10.2.1}\unhbox \voidb@x \hbox {\tt {\tt {\tt \char '134}/}\xspace } -- Set union}{134}{subsection.10.2.1}
+\contentsline {subsection}{\numberline {10.2.2}\unhbox \voidb@x \hbox {\tt {\tt /{\tt \char '134}}\xspace } -- Set intersection}{135}{subsection.10.2.2}
+\contentsline {subsection}{\numberline {10.2.3}\unhbox \voidb@x \hbox {\tt {\tt {\tt \char '134}}\xspace } -- Set difference}{135}{subsection.10.2.3}
+\contentsline {subsection}{\numberline {10.2.4}\unhbox \voidb@x \hbox {\tt subset} -- Subset predicate}{136}{subsection.10.2.4}
+\contentsline {chapter}{\numberline {11}Character Primitives}{137}{chapter.11}
+\contentsline {section}{\numberline {11.1}Basic character class primitives}{137}{section.11.1}
+\contentsline {subsection}{\numberline {11.1.1}\unhbox \voidb@x \hbox {\tt \_\_isCcChar} -- Other, control character}{137}{subsection.11.1.1}
+\contentsline {paragraph}{Error exceptions}{137}{section*.63}
+\contentsline {subsection}{\numberline {11.1.2}\unhbox \voidb@x \hbox {\tt \_\_isCfChar} -- Other, format character}{138}{subsection.11.1.2}
+\contentsline {paragraph}{Error exceptions}{138}{section*.64}
+\contentsline {subsection}{\numberline {11.1.3}\unhbox \voidb@x \hbox {\tt \_\_isCsChar} -- Other, surrogate character}{138}{subsection.11.1.3}
+\contentsline {paragraph}{Error exceptions}{138}{section*.65}
+\contentsline {subsection}{\numberline {11.1.4}\unhbox \voidb@x \hbox {\tt \_\_isCoChar} -- Other, private character}{138}{subsection.11.1.4}
+\contentsline {paragraph}{Error exceptions}{139}{section*.66}
+\contentsline {subsection}{\numberline {11.1.5}\unhbox \voidb@x \hbox {\tt \_\_isCnChar} -- Other, unassigned character}{139}{subsection.11.1.5}
+\contentsline {paragraph}{Error exceptions}{139}{section*.67}
+\contentsline {subsection}{\numberline {11.1.6}\unhbox \voidb@x \hbox {\tt \_\_isLuChar} -- Letter, uppercase character}{139}{subsection.11.1.6}
+\contentsline {paragraph}{Error exceptions}{140}{section*.68}
+\contentsline {subsection}{\numberline {11.1.7}\unhbox \voidb@x \hbox {\tt \_\_isLlChar} -- Letter, lowercase character}{140}{subsection.11.1.7}
+\contentsline {paragraph}{Error exceptions}{140}{section*.69}
+\contentsline {subsection}{\numberline {11.1.8}\unhbox \voidb@x \hbox {\tt \_\_isLtChar} -- Letter, titlecase character}{140}{subsection.11.1.8}
+\contentsline {paragraph}{Error exceptions}{140}{section*.70}
+\contentsline {subsection}{\numberline {11.1.9}\unhbox \voidb@x \hbox {\tt \_\_isLmChar} -- Letter, modifier character}{141}{subsection.11.1.9}
+\contentsline {paragraph}{Error exceptions}{141}{section*.71}
+\contentsline {subsection}{\numberline {11.1.10}\unhbox \voidb@x \hbox {\tt \_\_isLoChar} -- Letter, other character}{141}{subsection.11.1.10}
+\contentsline {paragraph}{Error exceptions}{141}{section*.72}
+\contentsline {subsection}{\numberline {11.1.11}\unhbox \voidb@x \hbox {\tt \_\_isMnChar} -- Mark nonspacing character}{141}{subsection.11.1.11}
+\contentsline {paragraph}{Error exceptions}{142}{section*.73}
+\contentsline {subsection}{\numberline {11.1.12}\unhbox \voidb@x \hbox {\tt \_\_isMcChar} -- Mark, spacing combining character}{142}{subsection.11.1.12}
+\contentsline {paragraph}{Error exceptions}{142}{section*.74}
+\contentsline {subsection}{\numberline {11.1.13}\unhbox \voidb@x \hbox {\tt \_\_isMeChar} -- Mark, enclosing character}{142}{subsection.11.1.13}
+\contentsline {paragraph}{Error exceptions}{142}{section*.75}
+\contentsline {subsection}{\numberline {11.1.14}\unhbox \voidb@x \hbox {\tt \_\_isNdChar} -- Number, decimal digit character}{143}{subsection.11.1.14}
+\contentsline {paragraph}{Error exceptions}{143}{section*.76}
+\contentsline {subsection}{\numberline {11.1.15}\unhbox \voidb@x \hbox {\tt \_\_isNlChar} -- Number, letter character}{143}{subsection.11.1.15}
+\contentsline {paragraph}{Error exceptions}{144}{section*.77}
+\contentsline {subsection}{\numberline {11.1.16}\unhbox \voidb@x \hbox {\tt \_\_isNoChar} -- Number, other character}{144}{subsection.11.1.16}
+\contentsline {paragraph}{Error exceptions}{144}{section*.78}
+\contentsline {subsection}{\numberline {11.1.17}\unhbox \voidb@x \hbox {\tt \_\_isScChar} -- Symbol, currency character}{144}{subsection.11.1.17}
+\contentsline {paragraph}{Error exceptions}{144}{section*.79}
+\contentsline {subsection}{\numberline {11.1.18}\unhbox \voidb@x \hbox {\tt \_\_isSkChar} -- Symbol, modifier character}{145}{subsection.11.1.18}
+\contentsline {paragraph}{Error exceptions}{145}{section*.80}
+\contentsline {subsection}{\numberline {11.1.19}\unhbox \voidb@x \hbox {\tt \_\_isSmChar} -- Symbol, math character}{145}{subsection.11.1.19}
+\contentsline {paragraph}{Error exceptions}{145}{section*.81}
+\contentsline {subsection}{\numberline {11.1.20}\unhbox \voidb@x \hbox {\tt \_\_isSoChar} -- Symbol, other character}{145}{subsection.11.1.20}
+\contentsline {paragraph}{Error exceptions}{146}{section*.82}
+\contentsline {subsection}{\numberline {11.1.21}\unhbox \voidb@x \hbox {\tt \_\_isPcChar} -- Punctuation, connector character}{146}{subsection.11.1.21}
+\contentsline {paragraph}{Error exceptions}{146}{section*.83}
+\contentsline {subsection}{\numberline {11.1.22}\unhbox \voidb@x \hbox {\tt \_\_isPdChar} -- Punctuation, dash character}{146}{subsection.11.1.22}
+\contentsline {paragraph}{Error exceptions}{146}{section*.84}
+\contentsline {subsection}{\numberline {11.1.23}\unhbox \voidb@x \hbox {\tt \_\_isPeChar} -- Punctuation, close character}{147}{subsection.11.1.23}
+\contentsline {paragraph}{Error exceptions}{147}{section*.85}
+\contentsline {subsection}{\numberline {11.1.24}\unhbox \voidb@x \hbox {\tt \_\_isPfChar} -- Punctuation, final quote character}{147}{subsection.11.1.24}
+\contentsline {paragraph}{Error exceptions}{147}{section*.86}
+\contentsline {subsection}{\numberline {11.1.25}\unhbox \voidb@x \hbox {\tt \_\_isPiChar} -- Punctuation, initial quote character}{147}{subsection.11.1.25}
+\contentsline {paragraph}{Error exceptions}{148}{section*.87}
+\contentsline {subsection}{\numberline {11.1.26}\unhbox \voidb@x \hbox {\tt \_\_isPoChar} -- Punctuation, other character}{148}{subsection.11.1.26}
+\contentsline {paragraph}{Error exceptions}{148}{section*.88}
+\contentsline {subsection}{\numberline {11.1.27}\unhbox \voidb@x \hbox {\tt \_\_isPsChar} -- Punctuation, open character}{148}{subsection.11.1.27}
+\contentsline {paragraph}{Error exceptions}{148}{section*.89}
+\contentsline {subsection}{\numberline {11.1.28}\unhbox \voidb@x \hbox {\tt \_\_isZlChar} -- Separator, line character}{149}{subsection.11.1.28}
+\contentsline {paragraph}{Error exceptions}{149}{section*.90}
+\contentsline {subsection}{\numberline {11.1.29}\unhbox \voidb@x \hbox {\tt \_\_isZpChar} -- Separator, paragraph character}{149}{subsection.11.1.29}
+\contentsline {paragraph}{Error exceptions}{149}{section*.91}
+\contentsline {subsection}{\numberline {11.1.30}\unhbox \voidb@x \hbox {\tt \_\_isZsChar} -- Separator, space character}{149}{subsection.11.1.30}
+\contentsline {paragraph}{Error exceptions}{150}{section*.92}
+\contentsline {subsection}{\numberline {11.1.31}\unhbox \voidb@x \hbox {\tt \_\_isLetterChar} -- Letter character}{150}{subsection.11.1.31}
+\contentsline {paragraph}{Error exceptions}{150}{section*.93}
+\contentsline {subsection}{\numberline {11.1.32}\unhbox \voidb@x \hbox {\tt \_\_digitCode} -- Decimal value of a digit character}{150}{subsection.11.1.32}
+\contentsline {paragraph}{Error exceptions}{150}{section*.94}
+\contentsline {subsection}{\numberline {11.1.33}\unhbox \voidb@x \hbox {\tt \_\_charOf} -- Unicode to character}{151}{subsection.11.1.33}
+\contentsline {paragraph}{Error exceptions}{151}{section*.95}
+\contentsline {subsection}{\numberline {11.1.34}\unhbox \voidb@x \hbox {\tt \_\_charCode} -- Character's Unicode value}{151}{subsection.11.1.34}
+\contentsline {paragraph}{Error exceptions}{151}{section*.96}
+\contentsline {subsection}{\numberline {11.1.35}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt whiteSpace}}{whiteSpace}} -- predicate for whitespace characters}{152}{subsection.11.1.35}
+\contentsline {chapter}{\numberline {12}String and symbol primitives}{153}{chapter.12}
+\contentsline {section}{\numberline {12.1}Symbol and string processing}{153}{section.12.1}
+\contentsline {subsection}{\numberline {12.1.1}\unhbox \voidb@x \hbox {\tt explode} -- convert a symbol to a string}{153}{subsection.12.1.1}
+\contentsline {paragraph}{Error exceptions}{154}{section*.97}
+\contentsline {subsection}{\numberline {12.1.2}\unhbox \voidb@x \hbox {\tt implode} -- convert a string to a symbol}{154}{subsection.12.1.2}
+\contentsline {paragraph}{Error exceptions}{154}{section*.98}
+\contentsline {subsection}{\numberline {12.1.3}\unhbox \voidb@x \hbox {\tt gensym} -- generate a symbol}{154}{subsection.12.1.3}
+\contentsline {paragraph}{Error exceptions}{155}{section*.99}
+\contentsline {subsection}{\numberline {12.1.4}\unhbox \voidb@x \hbox {\tt int2str} -- format an integer}{155}{subsection.12.1.4}
+\contentsline {paragraph}{Error exceptions}{156}{section*.100}
+\contentsline {section}{\numberline {12.2}Parsing Strings}{156}{section.12.2}
+\contentsline {subsection}{\numberline {12.2.1}\unhbox \voidb@x \hbox {\tt expand} -- Simple tokenizer}{156}{subsection.12.2.1}
+\contentsline {subsection}{\numberline {12.2.2}\unhbox \voidb@x \hbox {\tt collapse} -- List collapse}{157}{subsection.12.2.2}
+\contentsline {subsection}{\numberline {12.2.3}\unhbox \voidb@x \hbox {\tt integerOf} -- parse a string for an {\texorpdfstring {\unhbox \voidb@x \hbox {\tt integer}}{integer}}}{157}{subsection.12.2.3}
+\contentsline {subsection}{\numberline {12.2.4}\unhbox \voidb@x \hbox {\tt naturalOf} -- parse a string for a positive {\texorpdfstring {\unhbox \voidb@x \hbox {\tt integer}}{integer}}}{158}{subsection.12.2.4}
+\contentsline {subsection}{\numberline {12.2.5}\unhbox \voidb@x \hbox {\tt hexNum} -- parse a string for a hexadecimal {\texorpdfstring {\unhbox \voidb@x \hbox {\tt integer}}{integer}}}{158}{subsection.12.2.5}
+\contentsline {subsection}{\numberline {12.2.6}\unhbox \voidb@x \hbox {\tt floatOf} -- parse a string for a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt float}}{float}}}{159}{subsection.12.2.6}
+\contentsline {subsection}{\numberline {12.2.7}\unhbox \voidb@x \hbox {\tt skipWhiteSpace} -- skip white space in a string }{159}{subsection.12.2.7}
+\contentsline {subsection}{\numberline {12.2.8}\unhbox \voidb@x \hbox {\tt str2integer} -- parse a string to get integer}{160}{subsection.12.2.8}
+\contentsline {paragraph}{Error exceptions}{160}{section*.101}
+\contentsline {chapter}{\numberline {13}Dynamic knowledge bases}{161}{chapter.13}
+\contentsline {section}{\numberline {13.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt cell}}{cell}} class -- Shareable resource}{162}{section.13.1}
+\contentsline {subsection}{\numberline {13.1.1}Creating a new {\texorpdfstring {\unhbox \voidb@x \hbox {\tt cell}}{cell}} resource}{163}{subsection.13.1.1}
+\contentsline {subsection}{\numberline {13.1.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {cell}.get}}{\emph {cell}.get}} -- The value of a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt cell}}{cell}} resource}{163}{subsection.13.1.2}
+\contentsline {subsection}{\numberline {13.1.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {cell}.set}}{\emph {cell}.set}} -- Assign to a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt cell}}{cell}} variable}{164}{subsection.13.1.3}
+\contentsline {subsection}{\numberline {13.1.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {cell}.show}}{\emph {cell}.show}} -- display contents of {\texorpdfstring {\unhbox \voidb@x \hbox {\tt cell}}{cell}}}{164}{subsection.13.1.4}
+\contentsline {section}{\numberline {13.2}Hash tables}{165}{section.13.2}
+\contentsline {subsection}{\numberline {13.2.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt hash}}{hash}} -- Create Hash table}{165}{subsection.13.2.1}
+\contentsline {paragraph}{Multi-thread safe}{166}{section*.102}
+\contentsline {paragraph}{Error exceptions}{166}{section*.103}
+\contentsline {subsection}{\numberline {13.2.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.find}}{\emph {hash}.find}} -- Access elements of table}{167}{subsection.13.2.2}
+\contentsline {paragraph}{Error exceptions}{167}{section*.104}
+\contentsline {subsection}{\numberline {13.2.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.present}}{\emph {hash}.present}} -- Test presence of an element}{167}{subsection.13.2.3}
+\contentsline {subsection}{\numberline {13.2.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.insert}}{\emph {hash}.insert}} -- Add element to table}{168}{subsection.13.2.4}
+\contentsline {paragraph}{Error exceptions}{168}{section*.105}
+\contentsline {subsection}{\numberline {13.2.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.delete}}{\emph {hash}.delete}} -- Remove element from table}{168}{subsection.13.2.5}
+\contentsline {paragraph}{Error exceptions}{168}{section*.106}
+\contentsline {subsection}{\numberline {13.2.6}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.ext}}{\emph {hash}.ext}} -- Return all elements of table}{169}{subsection.13.2.6}
+\contentsline {subsection}{\numberline {13.2.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.keys}}{\emph {hash}.keys}} -- Return all keys of table}{169}{subsection.13.2.7}
+\contentsline {paragraph}{Error exceptions}{169}{section*.107}
+\contentsline {subsection}{\numberline {13.2.8}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {hash}.count}}{\emph {hash}.count}} -- Count of elements in a hash table}{169}{subsection.13.2.8}
+\contentsline {section}{\numberline {13.3}Dynamic knowledge bases}{170}{section.13.3}
+\contentsline {subsection}{\numberline {13.3.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt dynamic}}{dynamic}} -- Creating a dynamic relation}{170}{subsection.13.3.1}
+\contentsline {subsection}{\numberline {13.3.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.mem}}{\emph {dynamic}.mem}} -- Member of a dynamic relation}{172}{subsection.13.3.2}
+\contentsline {subsection}{\numberline {13.3.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.add}}{\emph {dynamic}.add}} -- Adding to a dynamic relation}{172}{subsection.13.3.3}
+\contentsline {subsection}{\numberline {13.3.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.ext}}{\emph {dynamic}.ext}} -- Dynamic relation as a list}{173}{subsection.13.3.4}
+\contentsline {subsection}{\numberline {13.3.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.del}}{\emph {dynamic}.del}} -- Remove element}{173}{subsection.13.3.5}
+\contentsline {subsection}{\numberline {13.3.6}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.delc}}{\emph {dynamic}.delc}} -- Remove element}{174}{subsection.13.3.6}
+\contentsline {subsection}{\numberline {13.3.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.delall}}{\emph {dynamic}.delall}} -- Remove matching elements}{175}{subsection.13.3.7}
+\contentsline {subsection}{\numberline {13.3.8}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.delallc}}{\emph {dynamic}.delallc}} -- Conditional delete elements}{175}{subsection.13.3.8}
+\contentsline {subsection}{\numberline {13.3.9}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \emph {dynamic}.match}}{\emph {dynamic}.match}} -- Return matching elements}{176}{subsection.13.3.9}
+\contentsline {subsection}{\numberline {13.3.10}Sharing a dynamic relation across threads}{176}{subsection.13.3.10}
+\contentsline {chapter}{\numberline {14}I/O and the File System}{179}{chapter.14}
+\contentsline {section}{\numberline {14.1}Files}{179}{section.14.1}
+\contentsline {subsection}{\numberline {14.1.1}Character Encoding}{181}{subsection.14.1.1}
+\contentsline {subsection}{\numberline {14.1.2}Standard file types}{183}{subsection.14.1.2}
+\contentsline {section}{\numberline {14.2}Accessing Files}{184}{section.14.2}
+\contentsline {subsection}{\numberline {14.2.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt ffile}}{ffile}} -- determine the existence of a file}{184}{subsection.14.2.1}
+\contentsline {subsection}{\numberline {14.2.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt ftype}}{ftype}} -- determine the type of a file}{184}{subsection.14.2.2}
+\contentsline {paragraph}{Error exceptions}{185}{section*.108}
+\contentsline {subsection}{\numberline {14.2.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fmodes}}{fmodes}} -- determine permissions of a file}{185}{subsection.14.2.3}
+\contentsline {paragraph}{Error exceptions}{186}{section*.109}
+\contentsline {subsection}{\numberline {14.2.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fsize}}{fsize}} -- determine size of a file}{186}{subsection.14.2.4}
+\contentsline {paragraph}{Error exceptions}{186}{section*.110}
+\contentsline {subsection}{\numberline {14.2.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt frm}}{frm}} -- remove a file}{187}{subsection.14.2.5}
+\contentsline {paragraph}{Error exceptions}{187}{section*.111}
+\contentsline {subsection}{\numberline {14.2.6}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fmv}}{fmv}} -- rename a file}{188}{subsection.14.2.6}
+\contentsline {paragraph}{Error exceptions}{188}{section*.112}
+\contentsline {subsection}{\numberline {14.2.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fcwd}}{fcwd}} -- return current working directory}{188}{subsection.14.2.7}
+\contentsline {subsection}{\numberline {14.2.8}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fcd}}{fcd}} -- set current working directory}{189}{subsection.14.2.8}
+\contentsline {subsection}{\numberline {14.2.9}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt fls}}{fls}} -- list of file names}{189}{subsection.14.2.9}
+\contentsline {subsection}{\numberline {14.2.10}Open a file for reading}{189}{subsection.14.2.10}
+\contentsline {paragraph}{Error exceptions}{190}{section*.113}
+\contentsline {subsection}{\numberline {14.2.11}Access a URL for reading}{190}{subsection.14.2.11}
+\contentsline {paragraph}{Error exceptions}{190}{section*.114}
+\contentsline {subsection}{\numberline {14.2.12}Create a file}{191}{subsection.14.2.12}
+\contentsline {paragraph}{Error exceptions}{191}{section*.115}
+\contentsline {subsection}{\numberline {14.2.13}Open file in append mode}{192}{subsection.14.2.13}
+\contentsline {paragraph}{Error exceptions}{192}{section*.116}
+\contentsline {subsection}{\numberline {14.2.14}Connect to TCP host}{193}{subsection.14.2.14}
+\contentsline {paragraph}{Error exceptions}{193}{section*.117}
+\contentsline {subsection}{\numberline {14.2.15}Spawn a new process and connect to it}{194}{subsection.14.2.15}
+\contentsline {paragraph}{Error exceptions}{195}{section*.118}
+\contentsline {section}{\numberline {14.3}Reading from files}{195}{section.14.3}
+\contentsline {subsection}{\numberline {14.3.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt inCh}}{inCh}} -- read a character}{195}{subsection.14.3.1}
+\contentsline {paragraph}{Error exceptions}{196}{section*.119}
+\contentsline {subsection}{\numberline {14.3.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt inLine}}{inLine}} -- read a line}{196}{subsection.14.3.2}
+\contentsline {paragraph}{Error exceptions}{197}{section*.120}
+\contentsline {subsection}{\numberline {14.3.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt inB}}{inB}} -- read a byte}{197}{subsection.14.3.3}
+\contentsline {paragraph}{Error exceptions}{197}{section*.121}
+\contentsline {subsection}{\numberline {14.3.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt inBytes}}{inBytes}} -- read a sequence of bytes}{198}{subsection.14.3.4}
+\contentsline {paragraph}{Error exceptions}{198}{section*.122}
+\contentsline {subsection}{\numberline {14.3.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt inText}}{inText}} -- read a segment of text}{198}{subsection.14.3.5}
+\contentsline {paragraph}{Error exceptions}{199}{section*.123}
+\contentsline {subsection}{\numberline {14.3.6}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt eof}}{eof}} -- test for end of file}{199}{subsection.14.3.6}
+\contentsline {subsection}{\numberline {14.3.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt close}}{close}} -- close input channel}{200}{subsection.14.3.7}
+\contentsline {section}{\numberline {14.4}Writing to files}{200}{section.14.4}
+\contentsline {subsection}{\numberline {14.4.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt outCh}}{outCh}} -- write a character}{200}{subsection.14.4.1}
+\contentsline {paragraph}{Error exceptions}{200}{section*.124}
+\contentsline {subsection}{\numberline {14.4.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt outStr}}{outStr}} -- write a string}{200}{subsection.14.4.2}
+\contentsline {paragraph}{Error exceptions}{201}{section*.125}
+\contentsline {subsection}{\numberline {14.4.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt outLine}}{outLine}} -- write a line}{201}{subsection.14.4.3}
+\contentsline {paragraph}{Error exceptions}{201}{section*.126}
+\contentsline {subsection}{\numberline {14.4.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt outB}}{outB}} -- write a byte}{201}{subsection.14.4.4}
+\contentsline {paragraph}{Error exceptions}{202}{section*.127}
+\contentsline {subsection}{\numberline {14.4.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt close}}{close}} -- close output channel}{202}{subsection.14.4.5}
+\contentsline {section}{\numberline {14.5}Standard I/O channels}{202}{section.14.5}
+\contentsline {subsection}{\numberline {14.5.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt stdin}}{stdin}} -- standard input}{202}{subsection.14.5.1}
+\contentsline {subsection}{\numberline {14.5.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt stdout}}{stdout}} -- standard output}{203}{subsection.14.5.2}
+\contentsline {subsection}{\numberline {14.5.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt stderr}}{stderr}} -- standard error output}{203}{subsection.14.5.3}
+\contentsline {section}{\numberline {14.6}Establishing a TCP server}{203}{section.14.6}
+\contentsline {subsection}{\numberline {14.6.1}tcpServer}{203}{subsection.14.6.1}
+\contentsline {paragraph}{Error exceptions}{205}{section*.128}
+\contentsline {chapter}{\numberline {15}Communicating processes}{207}{chapter.15}
+\contentsline {section}{\numberline {15.1}Mailboxes and dropboxes}{207}{section.15.1}
+\contentsline {section}{\numberline {15.2}Using a dropbox}{209}{section.15.2}
+\contentsline {subsection}{\numberline {15.2.1}Message send}{209}{subsection.15.2.1}
+\contentsline {section}{\numberline {15.3}Using a mailbox}{209}{section.15.3}
+\contentsline {subsection}{\numberline {15.3.1}Creating a local mailbox}{209}{subsection.15.3.1}
+\contentsline {subsection}{\numberline {15.3.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt nullhandle}}{nullhandle}} -- an empty dropbox}{210}{subsection.15.3.2}
+\contentsline {subsection}{\numberline {15.3.3}Retrieving the {\texorpdfstring {\unhbox \voidb@x \hbox {\tt next}}{next}} message}{210}{subsection.15.3.3}
+\contentsline {subsection}{\numberline {15.3.4}Next matching message}{211}{subsection.15.3.4}
+\contentsline {subsection}{\numberline {15.3.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt nextW}}{nextW}} -- a time limited message receive}{211}{subsection.15.3.5}
+\contentsline {subsection}{\numberline {15.3.6}Wait for matching message}{213}{subsection.15.3.6}
+\contentsline {subsection}{\numberline {15.3.7}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt pending}}{pending}} -- predicate to check for messages}{213}{subsection.15.3.7}
+\contentsline {subsection}{\numberline {15.3.8}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt dropbox}}{dropbox}} -- return the dropbox associated with a mailbox}{214}{subsection.15.3.8}
+\contentsline {chapter}{\numberline {16}Time and dates}{215}{chapter.16}
+\contentsline {section}{\numberline {16.1}Time}{215}{section.16.1}
+\contentsline {subsection}{\numberline {16.1.1}\unhbox \voidb@x \hbox {\tt now} -- return current time}{215}{subsection.16.1.1}
+\contentsline {subsection}{\numberline {16.1.2}\unhbox \voidb@x \hbox {\tt today} -- return time at 12:00am}{215}{subsection.16.1.2}
+\contentsline {subsection}{\numberline {16.1.3}\unhbox \voidb@x \hbox {\tt ticks} -- return CPU time used}{216}{subsection.16.1.3}
+\contentsline {subsection}{\numberline {16.1.4}\unhbox \voidb@x \hbox {\tt delay} -- delay for a period of time}{216}{subsection.16.1.4}
+\contentsline {subsection}{\numberline {16.1.5}\unhbox \voidb@x \hbox {\tt sleep} -- sleep until a given time}{216}{subsection.16.1.5}
+\contentsline {section}{\numberline {16.2}Dates}{217}{section.16.2}
+\contentsline {subsection}{\numberline {16.2.1}The {\texorpdfstring {\unhbox \voidb@x \hbox {\tt date}}{date}} type}{217}{subsection.16.2.1}
+\contentsline {subsection}{\numberline {16.2.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt time2date}}{time2date}} -- convert a time value to a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt date}}{date}}}{220}{subsection.16.2.2}
+\contentsline {subsection}{\numberline {16.2.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt time2utc}}{time2utc}} -- convert a time value to a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt date}}{date}}}{220}{subsection.16.2.3}
+\contentsline {subsection}{\numberline {16.2.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt dateOf}}{dateOf}} -- return a {\texorpdfstring {\unhbox \voidb@x \hbox {\tt date}}{date}}}{221}{subsection.16.2.4}
+\contentsline {subsection}{\numberline {16.2.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt rfc822\_date}}{rfc822\_date}} -- parse a date in RFC822 format}{221}{subsection.16.2.5}
+\contentsline {chapter}{\numberline {17}Miscelleneous}{223}{chapter.17}
+\contentsline {section}{\numberline {17.1}Equality, matching and identicality}{223}{section.17.1}
+\contentsline {subsection}{\numberline {17.1.1}\unhbox \voidb@x \hbox {\tt =} -- unifiability test}{223}{subsection.17.1.1}
+\contentsline {subsection}{\numberline {17.1.2}\unhbox \voidb@x \hbox {\tt .=} -- match test}{224}{subsection.17.1.2}
+\contentsline {subsection}{\numberline {17.1.3}\unhbox \voidb@x \hbox {\tt ==} -- identicality test}{224}{subsection.17.1.3}
+\contentsline {section}{\numberline {17.2}Variables, terms and frozen terms}{224}{section.17.2}
+\contentsline {subsection}{\numberline {17.2.1}\unhbox \voidb@x \hbox {\tt var} -- test for variable}{224}{subsection.17.2.1}
+\contentsline {subsection}{\numberline {17.2.2}\unhbox \voidb@x \hbox {\tt nonvar} -- test for variable}{225}{subsection.17.2.2}
+\contentsline {subsection}{\numberline {17.2.3}\unhbox \voidb@x \hbox {\tt ground} -- test for groundedness}{225}{subsection.17.2.3}
+\contentsline {section}{\numberline {17.3}Internet hosts}{225}{section.17.3}
+\contentsline {subsection}{\numberline {17.3.1}\unhbox \voidb@x \hbox {\tt hosttoip} -- determine IP address}{225}{subsection.17.3.1}
+\contentsline {paragraph}{Error exceptions}{226}{section*.129}
+\contentsline {subsection}{\numberline {17.3.2}\unhbox \voidb@x \hbox {\tt iptohost} -- determine host name}{226}{subsection.17.3.2}
+\contentsline {paragraph}{Error exceptions}{226}{section*.130}
+\contentsline {section}{\numberline {17.4}Environment variables}{226}{section.17.4}
+\contentsline {subsection}{\numberline {17.4.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt getenv}}{getenv}} -- access environment variable}{227}{subsection.17.4.1}
+\contentsline {subsection}{\numberline {17.4.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt setenv}}{setenv}} -- set environment variable}{227}{subsection.17.4.2}
+\contentsline {subsection}{\numberline {17.4.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt envir}}{envir}} -- return all environment variables}{227}{subsection.17.4.3}
+\contentsline {subsection}{\numberline {17.4.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt getlogin}}{getlogin}} -- access login name}{228}{subsection.17.4.4}
+\contentsline {section}{\numberline {17.5}Program and thread management}{228}{section.17.5}
+\contentsline {subsection}{\numberline {17.5.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \_\_command\_line}}{\_\_command\_line}} -- command line arguments}{228}{subsection.17.5.1}
+\contentsline {subsection}{\numberline {17.5.2}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt exit}}{exit}} -- terminate {Go!}\xspace execution}{228}{subsection.17.5.2}
+\contentsline {paragraph}{Error exceptions}{229}{section*.131}
+\contentsline {subsection}{\numberline {17.5.3}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt kill}}{kill}} -- terminate a {Go!}\xspace thread}{229}{subsection.17.5.3}
+\contentsline {paragraph}{Error exceptions}{229}{section*.132}
+\contentsline {subsection}{\numberline {17.5.4}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt process\_state}}{process\_state}} -- access process state}{229}{subsection.17.5.4}
+\contentsline {paragraph}{Error exceptions}{230}{section*.133}
+\contentsline {subsection}{\numberline {17.5.5}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt waitfor}}{waitfor}} -- wait for a thread to terminate}{231}{subsection.17.5.5}
+\contentsline {paragraph}{Error exceptions}{231}{section*.134}
+\contentsline {subsection}{\numberline {17.5.6}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt \_\_shell}}{\_\_shell}} -- execute shell command}{231}{subsection.17.5.6}
+\contentsline {chapter}{\numberline {18}XML processing}{233}{chapter.18}
+\contentsline {section}{\numberline {18.1}{Go!}\xspace 's XML document type}{234}{section.18.1}
+\contentsline {subsection}{\numberline {18.1.1}xmlText}{235}{subsection.18.1.1}
+\contentsline {subsection}{\numberline {18.1.2}xmlPI}{236}{subsection.18.1.2}
+\contentsline {subsection}{\numberline {18.1.3}xmlElement}{236}{subsection.18.1.3}
+\contentsline {subsection}{\numberline {18.1.4}xmlAtt -- attributes}{237}{subsection.18.1.4}
+\contentsline {subsection}{\numberline {18.1.5}Standard entities}{237}{subsection.18.1.5}
+\contentsline {section}{\numberline {18.2}Parsing XML documents}{238}{section.18.2}
+\contentsline {subsection}{\numberline {18.2.1}grabXML}{238}{subsection.18.2.1}
+\contentsline {paragraph}{Error exceptions}{238}{section*.135}
+\contentsline {subsection}{\numberline {18.2.2}xmlParse}{238}{subsection.18.2.2}
+\contentsline {section}{\numberline {18.3}Displaying XML documents}{240}{section.18.3}
+\contentsline {subsection}{\numberline {18.3.1}xmlDisplay - show XML structure}{240}{subsection.18.3.1}
+\contentsline {section}{\numberline {18.4}Miscelleneous functions}{240}{section.18.4}
+\contentsline {subsection}{\numberline {18.4.1}{\texorpdfstring {\unhbox \voidb@x \hbox {\tt hasNameSpace}}{hasNameSpace}} -- Look for a name space}{240}{subsection.18.4.1}
+\contentsline {chapter}{\numberline {19}Lexical parser generator}{243}{chapter.19}
+\contentsline {subsection}{\numberline {19.0.2}The parts of a {\tt Golex}\xspace file}{243}{subsection.19.0.2}
+\contentsline {section}{\numberline {19.1}{\tt Golex}\xspace rules}{245}{section.19.1}
+\contentsline {subsection}{\numberline {19.1.1}Anatomy of a rule}{245}{subsection.19.1.1}
+\contentsline {section}{\numberline {19.2}Regular expressions}{247}{section.19.2}
+\contentsline {section}{\numberline {19.3}Lexer states}{250}{section.19.3}
+\contentsline {section}{\numberline {19.4}Using a {\tt Golex}\xspace lexer}{251}{section.19.4}
+\contentsline {part}{III\hspace {1em}Using {Go!}\xspace }{255}{part.3}
+\contentsline {chapter}{\numberline {20}Running {Go!}\xspace programs}{257}{chapter.20}
+\contentsline {section}{\numberline {20.1}Compiling a {Go!}\xspace program}{257}{section.20.1}
+\contentsline {section}{\numberline {20.2}Running a {Go!}\xspace program}{260}{section.20.2}
+\contentsline {chapter}{\numberline {21}Standard error codes}{265}{chapter.21}
+\contentsline {section}{\numberline {21.1}Error handling}{265}{section.21.1}
+\contentsline {subsection}{\numberline {21.1.1}The standard {\texorpdfstring {\unhbox \voidb@x \hbox {\tt exception}}{exception}} type}{265}{subsection.21.1.1}
+\contentsline {section}{\numberline {21.2}Standard exception code symbols}{266}{section.21.2}
+\contentsline {chapter}{\numberline {A}Installing {Go!}\xspace }{275}{appendix.A}
+\contentsline {section}{\numberline {A.1}Getting {Go!}\xspace }{275}{section.A.1}
+\contentsline {section}{\numberline {A.2}Installation directory}{276}{section.A.2}
+\contentsline {section}{\numberline {A.3}Building the {\texorpdfstring {\unhbox \voidb@x \hbox {\tt ooio}}{ooio}} library}{276}{section.A.3}
+\contentsline {section}{\numberline {A.4}Building {\tt April\xspace }}{277}{section.A.4}
+\contentsline {subsection}{\numberline {A.4.1}Paths}{278}{subsection.A.4.1}
+\contentsline {section}{\numberline {A.5}Building {Go!}\xspace }{278}{section.A.5}
+\contentsline {section}{\numberline {A.6}Setting up EMACS}{279}{section.A.6}
+\contentsline {section}{\numberline {A.7}{Go!}\xspace Reference}{280}{section.A.7}
+\contentsline {chapter}{\numberline {B}{Go!}\xspace Emacs mode}{281}{appendix.B}
+\contentsline {section}{\numberline {B.1}Editing {Go!}\xspace programs}{281}{section.B.1}
+\contentsline {section}{\numberline {B.2}Debugging {Go!}\xspace programs in Emacs}{281}{section.B.2}
+\contentsline {chapter}{\numberline {C}Debugging {Go!}\xspace programs}{283}{appendix.C}
+\contentsline {section}{\numberline {C.1}The default debugger}{283}{section.C.1}
+\contentsline {subsection}{\numberline {C.1.1}Debugging a package}{283}{subsection.C.1.1}
+\contentsline {section}{\numberline {C.2}A debugging strategy}{286}{section.C.2}
+\contentsline {chapter}{\numberline {D}GNU Common Public Licence}{297}{appendix.D}
+\contentsline {chapter}{Index}{311}{section*.139}

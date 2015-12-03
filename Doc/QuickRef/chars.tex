@@ -1,0 +1,440 @@
+\chapter{Character Primitives}
+\label{chars}
+
+\index{character primitives}
+This chapter provides a reference for the standard character primitives of the \go\ language. The standard predicates define a number character classes as well as other attributes on characters.
+
+The standard type for a character is \q{char}, and strings are of type \q{char[]}. \go's characters are based on the Unicode standard.
+
+\section{Basic character class primitives}
+\label{chars:charclass}
+
+\subsection{\function{\_\_isCcChar} -- Other, control character}
+\synopsis{\_\_isCcChar}{[char+]\{\}}
+\label{chars:isCcChar}
+
+\index{\q{\_\_isCcChar} predicate}
+\index{character!Other control category}
+\index{UNICODE!Other control category}
+The \function{\_\_isCcChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Other, Control' general category. This includes the normal ASCII control characters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+\index{error code!\q{eINSUFARG}}
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isCfChar} -- Other, format character}
+\synopsis{\_\_isCfChar}{[char+]\{\}}
+\label{chars:isCfChar}
+
+The \function{\_\_isCfChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Other, format' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isCsChar} -- Other, surrogate character}
+\synopsis{\_\_isCsChar}{[char+]\{\}}
+\label{chars:isCsChar}
+
+The \function{\_\_isCsChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Other, surrogate' general category. Surrogate characters are not complete characters in themselves.\footnote{Explicit use of surrogates is deprecated.}
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isCoChar} -- Other, private character}
+\synopsis{\_\_isCoChar}{[char+]\{\}}
+\label{chars:isCoChar}
+
+The \function{\_\_isCoChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Other, private' general category. Private characters' interpretation is not determined by the Unicode standard.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isCnChar} -- Other, unassigned character}
+\synopsis{\_\_isCnChar}{[char+]\{\}}
+\label{chars:isCnChar}
+
+The \function{\_\_isCnChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Other, unassigned' general category. Unassigned characters are reserved.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLuChar} -- Letter, uppercase character}
+\synopsis{\_\_isLuChar}{[char+]\{\}}
+\label{chars:isLuChar}
+
+The \function{\_\_isLuChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Letter, uppercase' general category. Uppercase letters may be used in identifiers.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLlChar} -- Letter, lowercase character}
+\synopsis{\_\_isLlChar}{[char+]\{\}}
+\label{chars:isLlChar}
+
+The \function{\_\_isLlChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Letter, lowercase' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLtChar} -- Letter, titlecase character}
+\synopsis{\_\_isLtChar}{[char+]\{\}}
+\label{chars:isLtChar}
+
+The \function{\_\_isLtChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Letter, titlecase' general category. Titlecase letters include the German `SS' character.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLmChar} -- Letter, modifier character}
+\synopsis{\_\_isLmChar}{[char+]\{\}}
+\label{chars:isLmChar}
+
+The \function{\_\_isLmChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Letter, modifier' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLoChar} -- Letter, other character}
+\synopsis{\_\_isLoChar}{[char+]\{\}}
+\label{chars:isLoChar}
+
+The \function{\_\_isLoChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Letter, other' general category. This includes many of the CJK (Chinese Japanese Korean) ideographic characters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isMnChar} -- Mark nonspacing character}
+\synopsis{\_\_isMnChar}{[char+]\{\}}
+\label{chars:isMnChar}
+
+The \function{\_\_isMnChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Mark, nonspacing' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isMcChar} -- Mark, spacing combining character}
+\synopsis{\_\_isMcChar}{[char+]\{\}}
+\label{chars:isMcChar}
+
+The \function{\_\_isMcChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Mark, spacing combining' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isMeChar} -- Mark, enclosing character}
+\synopsis{\_\_isMeChar}{[char+]\{\}}
+\label{chars:isMeChar}
+
+The \function{\_\_isMeChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Mark, spacing combining' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isNdChar} -- Number, decimal digit character}
+\synopsis{\_\_isNdChar}{[char+]\{\}}
+\label{chars:isNdChar}
+
+The \function{\_\_isNdChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Number, decimal digit' general category. 
+
+Unicode allows for many different kinds of digit characters; from many different written languages. However, the \go\ \function{\_\_isNdChar} predicate is true only of those digit characters that the Unicode consortium denotes as denoting {\em decimal digits} (of which there are several hundred).
+    
+Note that even though a \go\ language processor is required to  correctly read all the potential digit characters as decimal digits, {\em generating} numeric values using other than the regular ASCII decimal digit characters is not required.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isNlChar} -- Number, letter character}
+\synopsis{\_\_isNlChar}{[char+]\{\}}
+\label{chars:isNlChar}
+
+The \function{\_\_isNlChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Number, letter' general category. These characters are numeric, but are treated in the same way as letters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isNoChar} -- Number, other character}
+\synopsis{\_\_isNoChar}{[char+]\{\}}
+\label{chars:isNoChar}
+
+The \function{\_\_isNoChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Number, other' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isScChar} -- Symbol, currency character}
+\synopsis{\_\_isScChar}{[char+]\{\}}
+\label{chars:isScChar}
+
+The \function{\_\_isScChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Symbol, currency' general category. This includes currency symbols that are not included in the native subset corresponding to the currency.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isSkChar} -- Symbol, modifier character}
+\synopsis{\_\_isSkChar}{[char+]\{\}}
+\label{chars:isSkChar}
+
+The \function{\_\_isSkChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Symbol, modifier' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isSmChar} -- Symbol, math character}
+\synopsis{\_\_isSmChar}{[char+]\{\}}
+\label{chars:isSmChar}
+
+The \function{\_\_isSmChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Symbol, math' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isSoChar} -- Symbol, other character}
+\synopsis{\_\_isSoChar}{[char+]\{\}}
+\label{chars:isSoChar}
+
+The \function{\_\_isSoChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Symbol, other' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPcChar} -- Punctuation, connector character}
+\synopsis{\_\_isPcChar}{[char+]\{\}}
+\label{chars:isPcChar}
+
+The \function{\_\_isPcChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, connector' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPdChar} -- Punctuation, dash character}
+\synopsis{\_\_isPdChar}{[char+]\{\}}
+\label{chars:isPdChar}
+
+The \function{\_\_isPdChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, dash' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPeChar} -- Punctuation, close character}
+\synopsis{\_\_isPeChar}{[char+]\{\}}
+\label{chars:isPeChar}
+
+The \function{\_\_isPeChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, close' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPfChar} -- Punctuation, final quote character}
+\synopsis{\_\_isPfChar}{[char+]\{\}}
+\label{chars:isPfChar}
+
+The \function{\_\_isPfChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, final quote' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPiChar} -- Punctuation, initial quote character}
+\synopsis{\_\_isPiChar}{[char+]\{\}}
+\label{chars:isPiChar}
+
+The \function{\_\_isPiChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, initial quote' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPoChar} -- Punctuation, other character}
+\synopsis{\_\_isPoChar}{[char+]\{\}}
+\label{chars:isPoChar}
+
+The \function{\_\_isPoChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, other' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isPsChar} -- Punctuation, open character}
+\synopsis{\_\_isPsChar}{[char+]\{\}}
+\label{chars:isPsChar}
+
+The \function{\_\_isPsChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Punctuation, open' general category. 
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isZlChar} -- Separator, line character}
+\synopsis{\_\_isZlChar}{[char+]\{\}}
+\label{chars:isZlChar}
+
+The \function{\_\_isZlChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Separator, line' general category; i.e., line separator characters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isZpChar} -- Separator, paragraph character}
+\synopsis{\_\_isZpChar}{[char+]\{\}}
+\label{chars:isZpChar}
+
+The \function{\_\_isZpChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Separator, paragraph' general category; i.e., paragraph separator characters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isZsChar} -- Separator, space character}
+\synopsis{\_\_isZsChar}{[char+]\{\}}
+\label{chars:isZsChar}
+
+The \function{\_\_isZsChar} predicate tests to see if its \type{char} argument represents a character in the Unicode `Separator, space' general category; i.e., space characters.
+        
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_isLetterChar} -- Letter character}
+\synopsis{\_\_isLetterChar}{[char+]\{\}}
+\label{chars:isletterchar}
+
+The \function{\_\_isLetterChar} predicate tests to see if its \type{char} argument represents  a Letter character. This represents the union of the Lu, Ll, Lt, Lm, Lo and Nl character categories.
+    
+\paragraph{Error exceptions}\
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The argument is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_digitCode} -- Decimal value of a digit character}
+\synopsis{\_\_digitCode}{[char]\funarrow{}integer}
+\label{chars:digitcode}
+
+The \function{\_\_digitCode} returns the decimal value associated with a particular digit character.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+At least one of the arguments is uninstantiated.
+\end{description}
+
+\subsection{\function{\_\_charOf} -- Unicode to character}
+\synopsis{\_\_charOf}{[integer]\funarrow{}char}
+\label{chars:charof}
+
+The \function{\_\_charOf} returns the \q{char}acter corresponding to a Unicode value.
+    
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+At least one of the arguments is uninstantiated.
+\item[\constant{'eINVAL'}]
+If the number does not represent a legal Unicode character.
+\end{description}
+
+\subsection{\function{\_\_charCode} -- Character's Unicode value}
+\synopsis{\_\_charCode}{[char]\funarrow{}number}
+\label{chars:charcode}
+
+The \function{\_\_charCode} returns the Unicode code value of a \q{char}acter.
+    
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+At least one of the arguments is uninstantiated.
+\item[\constant{'eINVAL'}]
+If the number does not represent a legal Unicode character.
+\end{description}
+
+\subsection{\q{whiteSpace} -- predicate for whitespace characters}
+\label{stdparse:whitespace}
+\index{whitespace@\q{whiteSpace} predicate}
+\synopsis{whiteSpace}{[char+]\{\}}
+
+The \q{whiteSpace} predicate is satisfied of a \q{char} if it is a standard white space character.
+
+The \q{whiteSpace} predicate is part of the \q{go.stdparse} package.
+

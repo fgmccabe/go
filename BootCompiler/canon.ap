@@ -1,0 +1,326 @@
+#include "go.ah";
+#include "ops.ah";
+
+module
+import{
+  interface "ops.af" and
+  interface "display.af" and
+  interface "types.af" and
+  interface "misc.af" and
+  interface "st-types.af" and
+  interface <stdio.af>
+}
+in
+{
+
+  showCT(E) => showCTerm(E,0,[],[]);
+  showCC(E) => showCCall(E,[],[]);
+  showCP(E) => showCProg(prg("",0),E);
+
+  showCTerm(E,prior,local,defnd) => case E in {
+    idnt(N) => {
+      if N=="_" || idnt(N) in defnd then "\e[32m"++dispName(N)++"\e[0m" else
+        if idnt(N) in local then "\e[33m"++dispName(N)++"\e[0m" else
+      	"\e[31m"++dispName(N)++"\e[0m"
+    }
+  | intgr(N) => N^0
+  | float(N) => N^0
+  | ch(C) => "\`"++strChr(C)
+  | strg(S) => "\""++NameToStr(S)++"\""
+  | symb(N) => "\'"++NameToStr(N)++"\'"
+  | cons(strct(N,0),[])::((N,_,_) in standardTypes) => "\e[34m"++dispName(N)++"\e[0m" -- escape?
+  | cons(strct("go.stdlib#,..",2),[H,T]) => {
+      "[" ++
+      showCTerm(H,999,local,defnd)++ valof{
+        L : T;
+        Str : "";
+        while cons(strct("go.stdlib#,..",_),[HH,TT]).=L do{
+          Str := Str++", "++
+          showCTerm(HH,999,local,defnd);
+          L := TT;
+        };
+        if !cons(strct("go.stdlib#[]",0),[]).=L then {
+          Str:=Str++",.."++
+          showCTerm(L,999,local,defnd);
+        };
+        valis Str
+      } ++"]"
+    }
+  | cons(strct("go.stdlib#[]",0),[]) => "[]"
+  | cons(strct("go.stdlib#,",2),[H,T]) => {
+      "(" ++
+      showCTerm(H,999,local,defnd)++ valof{
+        L : T;
+        Str : "";
+        while cons(strct("go.stdlib#,",_),[HH,TT]).=L do{
+          Str := Str++", "++
+          showCTerm(HH,999,local,defnd);
+          L := TT;
+        };
+	Str:=Str++", "++
+	showCTerm(L,999,local,defnd);
+        valis Str
+      } ++")"
+    }
+
+  | cons(N,[]) => showCTerm(N,0,local,defnd)
+  | cons(N,A) =>  showCTerm(N,0,local,defnd)++showCTermArgs(A,"(",",",")",local,defnd)
+  | mtch(T) => valof {
+      (XL,XP,XR) = infixPr(".=");
+      valis showParen(XP,prior,"(")++"."++showCTerm(T,XR,local,defnd)++showParen(XP,prior,")");
+    }
+  | bild(T) => valof {
+      (XL,XP,XR) = infixPr(".=");
+      valis showParen(XP,prior,"(")++showCTerm(T,XR,local,defnd)++"^"++showParen(XP,prior,")");
+    }
+  | strct(Nm,Ar) => Nm++"/"++Ar^0
+  | prg(Nm,Ar) => Nm++"%"++Ar^0
+  | vdel => "vdel"
+  };
+
+  showCTermArgs(A,Pre,Mid,Pst,local,defnd) => valof{
+    Str : Pre;
+    Sep : "";
+	
+    for El in A do{
+      Str:=Str++Sep++
+      showCTerm(El,1000,local,defnd);
+      Sep := Mid;
+    };
+    valis Str++Pst
+  };
+
+  showCCall(C,local,defnd) => case C in {
+    defn(H,T,_) => valof {
+      (XL,XP,XR) = infixPr("=");
+      valis showCTerm(H,XL,local,defnd)++ " = "++ showCTerm(T,XR,local,defnd)
+    }
+
+  | call(N,A,_) => showCTerm(N,0,local,defnd)++showCTermArgs(A,"(",",",")",local,defnd)
+  | ecall(N,A,_) => N++showCTermArgs(A,"(",",",")",local,defnd)
+  | ocall(A1,A2,A3,_) => {
+      if idnt(N).=A2 && !A2 in defnd then
+      	"\e[31m"++dispName(N)++"\e[0m"
+      else
+	showCTerm(A2,0,local,defnd)}++"."++
+    showCTerm(A1,0,local,defnd)++{if A2!=A3 then "/"++showCTerm(A3,0,local,defnd) else ""}
+  | suspc(V,A,_) => valof{
+      (XL,XP,XR) = infixPr("@");
+      valis showCTerm(V,XL,local,defnd)++" @@ "++showCTerm(A,XR,local,defnd)
+    }
+  | neck(_) => "!"
+  | fail(_) => "fail"
+  | rais(A,Lc) => "raise "++showCTerm(A,0,local,defnd)
+
+  | trpBegin => "<<"
+  | trpEnd => ">>"
+
+--  | errr(Err,_) => " trap"++ showCCalls(Err,"(",",",")",local,defnd)
+  };
+
+  showCCalls(A,Pre,Mid,Pst,local,defnd) => valof{
+    Str : Pre;
+    Sep : "";
+    D : defnd;
+    
+    for El in A do{
+      Str:=Str++Sep++
+      showCCall(El,local,D);
+      D := pickCallVars(El,local,D);
+      Sep := Mid;
+    };
+    valis Str++Pst
+  };
+  
+  showCProg(Nme,Prog) => case Prog in{
+    mdle(Name,Version,Imps,Exported,Entries) => valof{
+      out : Name++":"++Version++"{\n  exported entities:\n";
+
+      for (Nm,Arity,Tp) in Exported do{
+        out := out++Nm++"/"++Arity^0++":"++showType(Tp)++"\n";
+      };
+
+      out := out++"imported packages: ";
+
+      for (Nm,_,V) in Imps do{
+        out := out++Nm++":"++V++" "
+      };
+
+      out := out++"\nDefined programs:\n";
+
+      for (Nm,En) in Entries do{
+        out := out++showCProg(Nm,En)++"\n\n";
+      };
+      valis out++"}\n";
+    }
+
+  | clse(Q,H,[],_) => valof {
+      (XL,XP,XR) = infixPr(":-");
+
+      valis -- showCQuants(Q)++"-"++
+      showCTerm(Nme,0,Q,Q)++showCTermArgs(H,"(",",",")",Q,Q)
+    }
+
+  | clse(Q,H,B,_) => valof {
+      valis -- showCQuants(Q)++"-"++
+      showCTerm(Nme,0,Q,Q)++showCTermArgs(H,"(",",",")",Q,Q)++" :- "++
+      showCCalls(B,"",",\n    ","",Q,pickTrmVarsList(H,Q,[]))
+    }
+
+  | seqn(L) => valof{
+      out : "";
+      sep : "";
+
+      for El in L do{
+        out := out++sep++showCProg(Nme,El);
+        sep := ".\n";
+      };
+      valis out;
+    }
+  };
+
+  showCQuants(Q) => showCTermArgs(Q,"[",",","]-",[],[]);
+
+  showParen(XP,prior,P) => {
+    if XP>prior then
+      P
+    else
+      ""
+  };
+
+  pickTrmVars(E,local,defnd) => case E in {
+    idnt(N) => {
+      if N=="_" || idnt(N) in defnd then defnd
+      else if idnt(N) in local then
+        [E,..defnd]
+      else defnd
+    }
+  | intgr(N) => defnd
+  | float(_) => defnd
+  | ch(C) => defnd
+  | strg(S) => defnd
+  | symb(N) => defnd
+  | cons(_,A) =>  pickTrmVarsList(A,local,defnd)
+  | mtch(T) => pickTrmVars(T,local,defnd)
+  | bild(T) => pickTrmVars(T,local,defnd)
+  | vdel => defnd
+  | _ => exception error("invalid term: "<>E^0,'failed)
+  };
+
+  pickTrmVarsList(A,local,defnd) => valof{
+    D : defnd;
+    for E in A do
+      D := pickTrmVars(E,local,D);
+    valis D
+  };
+
+  pickCallVars(G,local,defnd) => case G in {
+    neck(_) => defnd
+  | fail(_) => defnd
+  | defn(L,R,_) => pickTrmVars(R,local,pickTrmVars(L,local,defnd))
+  | call(_,A,_) => pickTrmVarsList(A,local,defnd)
+  | ecall(_,A,_) => pickTrmVarsList(A,local,defnd)
+  | ocall(A1,A2,A3,_) => pickTrmVarsList([A1,A2,A3],local,defnd)
+  | suspc(V,A,_) => pickTrmVarsList([V,A],local,defnd)
+--  | errr(E,_) => pickCallVarsList(E,local,defnd)
+  | rais(T,_) => pickTrmVars(T,local,defnd)
+  | trpBegin => defnd
+  | trpEnd => defnd
+  };
+
+  pickCallVarsList(A,local,defnd) => valof{
+    D : defnd;
+    for E in A do
+      D := pickCallVars(E,local,D);
+    valis D
+  };
+
+  merge(V1,V2) => collect {
+    for idnt(Nm) in V1 do
+      if !idnt(Nm) in V2 then
+        elemis idnt(Nm)
+  }<>V2;
+
+  iName(idnt(Nm))=>Nm;
+
+  trPackageName(L) => L\\((X,Y)=>X++"."++Y);
+
+  varsInCanon(Term,Q) => case Term in {
+    idnt(N):: (!Term) in Q => Q
+  | idnt(N) => [Term,..Q]
+  | symb(_) => Q
+  | intgr(_) => Q
+  | float(_) => Q
+  | ch(_) => Q
+  | strg(_) => Q
+  | mtch(T) => varsInCanon(T,Q)			  -- match, don't unify
+  | bild(T) => varsInCanon(T,Q)			  -- an output-only mode
+  | cons(_,A) => varsInCanonList(A,Q)
+  | code(_,_,T) => varsInCanonList(T,Q)		  -- chunk of compiled code
+  | vdel => Q
+  };
+
+  varsInCanonList(A,Q) => valof{
+    QQ:Q;
+    for e in A do
+      QQ := varsInCanon(e,QQ);
+    valis QQ
+  };
+
+  varsInCanonCall(Cal,Q) => case Cal in {
+    neck(_) => Q
+  | defn(V,Vl,_) => varsInCanon(V,varsInCanon(Vl,Q))
+  | call(_,A,_) => varsInCanonList(A,Q)
+  | ecall(_,A,_) => varsInCanonList(A,Q)
+  | ocall(O,A,T,_) => varsInCanon(O,varsInCanon(A,varsInCanon(T,Q)))
+  | suspc(O,A,_) => varsInCanon(O,varsInCanon(A,Q))
+--  | errr(A,_) => varsInCanonCallList(A,Q)
+  | rais(O,_) => varsInCanon(O,Q)
+  | fail(_) => Q
+  | trpBegin => Q
+  | trpEnd => Q
+  };
+
+  varsInCanonCallList(A,Q) => valof{
+    QQ:Q;
+    for e in A do
+      QQ := varsInCanonCall(e,QQ);
+    valis QQ
+  };
+
+  vIota(N) => collect{
+    for i in 1..N do{
+      elemis idnt(genNew("_$i"));
+    }
+  };
+
+  listToCanon(L) => valof{
+    O : cons(strct("go.stdlib#[]",0),[]);
+    for e in rev(L) do
+      O := cons(strct("go.stdlib#,..",2),[e,O]);
+    valis O;
+  };
+
+  __debug_display__(X) =>  { try { case X in {
+        any(T) => showType(T)
+      | any(LT) => showType(tplType(LT))
+      | any(E) => showEnvD(E,5)
+      | any(T) => show(T)
+      | any(L) => sequence(L,"{",", ","}",show)
+      | any(L) => sequence(L,"{","\n","}",((.(string?_,_,N).)=>showTerm(N)))
+      | any(C) => showCT(C)
+      | any(C) => showCC(C)
+      | any(Lc) => showLocation(Lc)
+      | any(Z) => Z^0
+      }
+    }
+    onerror{
+      error(_,_) => X^0
+    }
+  };
+
+
+} export(__debug_display__,
+	 showCT, showCC, showCCalls, showCCall, showCP, showCProg,showCQuants,merge,
+	 iName,trPackageName,varsInCanon,varsInCanonCall,vIota,listToCanon)
+

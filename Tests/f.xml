@@ -1,0 +1,10 @@
+<? xml version="1.0" ?>
+<! DOCTYPE module
+  [
+   <!ENTITY foo "bar">
+   ]>
+<module>
+  &foo;
+  &foo;
+  &amp;
+</module>

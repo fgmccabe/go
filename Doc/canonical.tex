@@ -1,0 +1,150 @@
+\chapter{Canonical \go}
+\label{canonical}
+
+\index{canonical form}
+In a mirror image of the syntactic aspects of \go programs, the meaning of a \go program is broken down into several phases. In the first phase we map arbitrary \go programs into a much simpler \firstterm{canonical form}. Most of the \go language features -- such as equations, theta expressions and actions -- are eliminated from the canonical form of a program.\footnote{The \go compiler is even more aggressive in its mapping to a canonical form; in order to facilitate translation into simple machine instructions the compiler must ensure that the maximum `depth' of terms in a canonical program is no more that 1 -- i.e., it is not permissable to nest constructor terms. However, for the purposes of this discussion, such aggression is not required.} The second phase of giving a meaning to \go\ programs in canonical form.
+
+Note that we present the canonicalization of \go programs for explanatory purposes only. Although based on \go, a canonical \go program is not typically a legal \go program; our purpose here is to define the \emph{operational meaning} of a \go program more precisely.
+
+\section{Canonical \go programs}
+\label{canonical:canonical}
+
+Canonical \go programs have a much reduced form compared to normal \go programs: they are untyped, have no functions or functional expressions, no grammar rules, action rule or theta expressions. However, unlike in regular \go, \firstterm{types} may be represented explicitly in a canonical program.
+
+The major program constructor in canonical \go is the clause:
+\begin{alltt}
+[V\sub1,\ldots,V\subn]-Term :- G\sub1,\ldots,G\sub{k}
+\end{alltt}
+We require an additional form of clause to adequately `capture' many of the committed choice forms of rules:
+\begin{alltt}
+[V\sub1,\ldots,V\subn]-Term::Cond :-- G\sub1,\ldots,G\sub{k}
+\end{alltt}
+which means that if the \q{Term} matches a goal \emph{G}, and \q{Cond} holds, then the goal \emph{G} is reduced to \emph{G\sub1,\ldots,G\subn}.
+
+The fact that all \go programs can be mapped to such a simple form is part of our justification that \go's semantics may be grounded in a first order theory. However, we do leave one important logical feature `unexplained' in our transformation: recursive programs are represented in canonical \go as `circular terms'. This is for convenience only; it is certainly possible to eliminate these also.
+
+Canonical \go clauses may be unioned together into a disjunction:
+\begin{alltt}
+\emph{Cl\sub1} | \ldots | \emph{Cl\subn}
+\end{alltt}
+and a \go \emph{canonical closure} is pair consisting of a union of canonical clauses and a list of pairs of variable names and terms -- these corresponding to the free variables and their values in the body of the union of clauses. We denote a canonical closure:
+\begin{alltt}
+< \emph{clause-union}, [ (fV\sub1,\emph{val\sub1}),\ldots,(fV\subn,\emph{val\subn})]>
+\end{alltt}
+where \q{'fv\subi'} are the free variables and \q{val\subi} are their corresponding values.
+
+\index{free variables!in canonical form}
+Note that, although the free variables' names are shown explicitly in the closure, in compiled code free variables are not identified in this way -- references to free variables become, as do references to local variables, offsets into a vector of the values of the free variables.
+
+Calls in the body of a canonical clause take the form:
+\begin{alltt}
+\emph{Prog}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+where \emph{Prog} is either an identifier denoting a variable -- either local to the clause or a free variable in the innermost canonical closure -- or a literal union of clauses. In the latter case, the clauses in the literal union are assumed to share the same free variables as the canonical clause itself.
+
+Canonical \go has a limited reportoire of data values: symbols, numbers, variables, lists, constructor terms and attribute sets. We will use normal \go notation to represent symbols, numbers, variables, lists and attribute sets; we use the normal function notation to represent a constructor term:
+\begin{alltt}
+\emph{F}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+
+One special type of term that is present in canonical \go clauses is the \emph{match pattern} which is written
+\begin{alltt}
+.\emph{Term}
+\end{alltt}
+The match pattern has the same `value' as the term that is embedded within it; except that semantically when unifying against a match pattern the `input term' is not permitted to be further instantiated. Any variables present in \emph{Term} may be bound, however.
+
+In the following sections we show how all the major features of \go programs are mapped into canonical \go. Note that much of this chapter takes the form of \emph{definitions}; we are simply defining the meaning of \go programs in terms of canonical \go. This does not itself define \go's \emph{operational semantics} completely -- that requires giving a semantics to canonical \go itself; however, canonical \go is much simpler that `full \go'; and so it is easier to give an account of the declarative and operational semantics of canonical \go than `full \go'.
+
+\section{Terms in canonical form}
+\label{canonical:term}
+
+\index{canonical form!of terms}
+
+\subsection{Expressions}
+\label{canonical:expressions}
+
+\index{canonical form!expressions}
+\index{expression!canonical form of}
+The principal case in `expression handling' is the functional expression -- the application of a function to some arguments. 
+
+Equations are mapped to canonical iff clauses with an additional argument; for example the function:
+\begin{alltt}
+app([],X) => X.
+app([E,..X],Y) => [E,..app(X,Y)]
+\end{alltt}
+is mapped to the canonical clauses:
+\begin{alltt}
+( [X]-(.[],.X,X):--true
+| [E,X,Y,\$1]-(.[E,..X],.Y,[E,..\$1]) :-- app(X,Y,\$1)
+)
+\end{alltt}
+In general, a functional expression is mapped to a new variable and one or more new goals. The new variable represents the value computed by the function and the new goals represent calls to the canonicalized function itself.
+
+The new goals must be inserted into the body of the canonical rule that arises from the canonicalization of the rule  containing the functional expression. The rules for the precise position of the new goal affects the `order of evaluation' rules of the functional expression itself:
+
+\begin{itemize}
+\item
+If the functional expression occurs in a goal condition, then the new goal is placed before the canonicalized goal condition -- wherever it is eventually placed. It is placed \emph{after} any goal conditions that arise from canonicalizing the \emph{arguments} of the functional expression.
+
+For example, a goal condition containing a functional  expression such as:
+\begin{alltt}
+\ldots,P(\ldots{}sort(app(A,B))\ldots),\ldots
+\end{alltt}
+is mapped to:
+\begin{alltt}
+\ldots,app(A,B,\$1),sort(\$1,\$2),\ldots,P(\ldots\$2\ldots),\ldots
+\end{alltt}
+The effect of this ordering rule is to impose a left-right depth-first evaluation of expressions; otherwise known as strict evaluation.
+
+\item
+If the functional expression occurs in an action or grammar rule body, then the rules are similar to those for goal conditions.
+
+\item
+If the functional expression occurs in the head of a clause, then the new goals are added to the end of the guard for that clause. (We shall see below, how guards are canonicalized).
+
+For example, a clause such as:
+\begin{alltt}
+parent(X,parOf(X))
+\end{alltt}
+occurring within a theta environment is mapped to the clause:
+\begin{alltt}
+[X,\$1]-((X,\$1)::parOf(X,\$1):-true)
+\end{alltt}
+Functional expressions occurring within the heads of action rules and grammar rules are treated in a similar fashion.
+\end{itemize}
+
+\subsection{Patterns}
+\label{canonical:pattern}
+
+\index{canonical form!patterns}
+\index{pattern!canonical form of}
+Patterns occur in the heads of certain kinds of rules, in particular in the heads of equations, action rules, message receive clauses. In addition, the standard \go predicate \q{.=} has a pattern on the left hand side.
+
+Patterns are different to terms in that it is not permitted to bind a variable `on the other side' of a pattern. In the case of patterns occurring in the heads of equations etc. this means that it is not permitted to bind a variable occurring in the function call (or procedure call or input message). In the case of the \q{.=} predicate, it is not permitted to bind variables occurring in the right hand side.
+
+In addition, patterns have other restrictions -- evaluable expressions are not permitted in patterns. Patterns are restricted to variables, symbols, list patterns and constructor term patterns. On the other hand, \q{::} guarded patterns \emph{are} allowed. Furthermore, \go permits guard conditions in a guarded pattern to bind variables that would not otherwise be allowed.\footnote{This is, in part, due to the impossibility of checking against this.} 
+
+\subsection{Attribute sets}
+\label{canonical:attributes}
+
+\index{canonical form!attribute sets}
+\index{attribute sets!canonical form of}
+On the whole the treatment of attribute sets is very similar to constructors: they are effectively left alone by canonicalization. 
+
+A dot expression occurring in the head of a rule is treated as though it were a function call -- i.e., it is `broken out' into a separate goal. Other occurrences of dot expressions are left untouched.
+
+\section{Goals}
+\label{canonical:goals}
+
+\section{Actions}
+\label{canonical:actions}
+
+\section{Grammars}
+\label{canonical:grammars}
+
+\section{Types}
+\label{canonical:types}
+
+\section{Theta environments}
+\label{canonical:theta}
+

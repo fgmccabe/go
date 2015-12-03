@@ -1,0 +1,48 @@
+-- Tokenizer for a simple programming language
+
+#include "token.ah";
+
+%%
+
+-- keyword rules
+
+"if" => { IF }
+"then" => { THEN }
+"else" => { ELSE }
+"while" => { WHILE }
+"do" => { DO }
+
+-- identifier rule
+
+[a-zA-Z_][a-zA-Z_0-9]* => { ID(string%%yyTok) }
+
+-- number rules
+
+"-"?[0-9]+ => { INT(tok2Num(yyTok)) }
+
+"-"?[0-9]+"."[0-9]+([eE][-+]?[0-9]+)? => { REAL(tok2Num(yyTok)) }
+
+-- punctuation rules
+
+"(" => { LPAREN }
+")" => { RPAREN }
+"," => { COMMA }
+";" => { SEMI }
+
+-- White space and comments
+[ \n\t\b\r]+ => skip     	-- ignore white space
+
+"--"[^\n]*"\n"		       	-- line comment
+
+"/*" => <comment>        	-- continuous comment
+
+<comment> "*/" => <initial>
+<comment> .	         	-- implies a skip
+
+%%
+
+-- The postamble
+
+tok2Num(token) => number%%(string%%token);
+
+

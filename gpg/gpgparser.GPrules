@@ -1,0 +1,33 @@
+/*
+ * The parser for gpg, written in gpg itself.
+ */
+
+%%
+
+  gpg: preamble MARK rules MARK { $$=GPGRULESET($1,$3)} ;
+
+  preamble: definition { $$=$1}
+       | preamble definition { $$ = SEQ($1,$2) }
+       ;
+
+  definition : operatordef
+       | startdef
+       | includedef
+       | importdef
+       | expectdef
+       ;
+
+  operatordef : TOKEN tokenspecs { $$=TOKENSPEC($2) }
+       | LEFT tokenspecs { $$ = OPERATORSPEC($2,leftA) }
+       | RIGHT tokenspecs { $$ = OPERATORSPEC($2,rightA) }
+       | NONASSOC tokenspecs { $$ = OPERATORSPEC($2,nonA) }
+       ;
+
+  tokenspecs: tokenspec
+       | tokenspecs tokenspec { $$=SEQ($1,$2) }
+       ;
+
+  tokenspec: ID { $$ = N($1) } ;
+
+  includedef : CENTBRACE { $$=$1 };
+  

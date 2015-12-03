@@ -1,0 +1,63 @@
+/*
+ * Hash function for the Go! compiler
+ */
+
+module
+{
+  hashOne(H,N) => abs(H*.37+.N);        -- uses integer-only arithmetic
+
+  hashfun(char[]?S) => valof {
+    H : 0;
+    for C in S do{
+      H := hashOne(H,charCode(C));
+   };
+    valis H
+  };
+
+  strhash(string?S) => valof {
+    H : 0;
+    for C in number[]%%S do{
+      H := hashOne(H,C)
+    };
+    valis H
+  };
+
+  nextPrime(From) => valof{
+    L : [2];
+    PCount : 1;
+    M = sqrt(From);			-- only need to check up to sqrts
+    Pr : 3;
+
+    while Pr<=From do{
+      L := [Pr,..L];
+      i : 1;
+      PCount +:= 1;
+
+      Pr+:=2;				-- look at next candidate
+
+      while i<=PCount do{
+	if Pr rem L#i==0 then{		-- we dont have a prime
+	  Pr+:=2;
+	  i := 1;
+	}
+	else
+	  i +:= 1;			-- look at next potential divisor
+      }
+    };
+    valis Pr
+  };
+
+  nextPower2(F) => valof{
+    X : 2*F;
+    C : 1;
+    while X!=0 do{
+      C := C*2;
+      X := bright(X,1);
+    };
+    valis C
+  }
+    
+
+} export (hashOne,strhash,hashfun,nextPrime,nextPower2)
+
+

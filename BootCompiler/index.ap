@@ -1,0 +1,389 @@
+/*
+ * Module to help generate indexable versions of a Go! program
+ */
+#include "go.ah";			-- standard header for the compiler
+#include "instr.ah";			-- pick up the instruction definition
+
+module
+import {
+  interface "misc.af" and
+  interface "canon.af" and
+  interface "hash.af" and
+  interface "errors.af" and
+  interface "display.af" and
+  interface "ground.af" and
+  interface "codegen.af" and
+  interface "compvar.af" and
+  interface <stdio.af>
+} in
+{
+					-- And/Or tree
+  aoTr ::= eTree			-- empty tree
+  | aXN(aoTr[])				-- and node (for tuples)
+  | oXN((canonTerm,(number,symbol)[],aoTr)[]);	-- or node (guard, clause nos, subTree)
+
+  genTree(T,n) => { 
+    case T in {
+      idnt(_) => oXN([(T,n,eTree)])
+    | symb(_) => oXN([(T,n,eTree)])
+    | intgr(_) => oXN([(T,n,eTree)])
+    | float(_) => oXN([(T,n,eTree)])
+    | ch(_) => oXN([(T,n,eTree)])
+    | strg(_) => oXN([(T,n,eTree)])
+    | cons(_,L) => oXN([(T,n,aXN(genTreeList(L,n)))])
+    | mtch(El) => genTree(El,n)
+    | bild(El) => genTree(El,n)
+    }
+  };
+  
+  genTreeList(L,n) => collect{
+    for X in L do
+      elemis genTree(X,n)
+  };
+
+  sameSymb(S1,S2) => {
+    if symb(A).=S1 && symb(B).=S2 then 
+      A==B
+    else
+      false
+  };
+
+  sameChar(S1,S2) => {
+    if ch(A).=S1 && ch(B).=S2 then 
+      A==B
+    else
+      false
+  };
+
+  sameNumb(N1,N2) => {
+    if intgr(A).=N1 && intgr(B).=N2 then
+      A==B
+    else if float(A).=N1 && float(B).=N2 then
+      A==B
+    else
+      false
+  };
+
+  isVarNodes(N1,N2) => {
+    if idnt(A).=N1 && idnt(B).=N2 then
+      true
+    else
+      false
+  };
+
+  sameCons(S1,S2) => {
+    if cons(A,L1).=S1 && cons(B,L2).=S2 then 
+      A==B && listlen(L1)==listlen(L2)
+    else
+      false
+  };
+
+  addInTriple(Tr,C,N,S) => {
+    case Tr in {
+      [] => [(C,N,S)]
+    | [(A::sameSymb(A,C),n,s),..L] =>
+	[(C,N\/n,S),..L]
+    | [(A::sameNumb(A,C),n,s),..L] =>
+	[(C,N\/n,S),..L]
+    | [(A::sameChar(A,C),n,s),..L] =>
+	[(C,N\/n,S),..L]
+    | [(A::isVarNodes(A,C),n,s),..L] =>
+	[(C,N\/n,S),..L]
+    | [(A::sameCons(A,C),n,s),..L] =>
+	[(A,N\/n,mergeTree(s,S)),..L]
+    | [X,..L] => [X,..addInTriple(L,C,N,S)]
+    }
+  };
+
+  mergeTree(t,p) => {
+    case (p,t) in {
+      (eTree,_) => t
+    | (_,eTree) => p
+    | (oXN([(C,N,S)]),oXN(Triples)) => 
+	oXN(addInTriple(Triples,C,N,S))
+    | (oXN(Triples),oXN([(C,N,S)])) => 
+	oXN(addInTriple(Triples,C,N,S))
+    | (aXN(T1),aXN(T2)) => 
+	aXN(addTrList(T1,T2))
+    }
+  };
+
+  addTrList(L1,L2) => { 
+    case (L1,L2) in {
+      ([],_) => L2
+    | (_,[]) => L1
+    | ([E1,..l1],[E2,..l2]) => [mergeTree(E1,E2),..addTrList(l1,l2)]
+    }
+  };
+
+  genMergedTree(L) => valof{
+    T : eTree;
+    for (n,El) in L do{
+      T := mergeTree(aXN(genTreeList(El,n)),T);
+    };
+    valis T;
+  };
+
+  firstTree(Tree) =>
+    case Tree in {
+    aXN([oXN(S),.._]) => oXN(S)
+  | _ => Tree
+  };
+
+  bestCol(Tree) => {
+    case Tree in {
+      aXN(List) => valof{
+	Btree : eTree;
+	Tcount : -1000000;
+	Vcount : -1000000;
+	Bcol : -1;
+	i:0;
+	for oXN(sub) in List do{
+	  i+:=1;
+
+	  C : 0; V:0;
+	  for (El,_,_) in sub do{
+	    case El in {
+	      idnt(_) -> 
+		V+:=1
+	    | symb(_) ->
+		C+:=1
+	    | intgr(_) ->
+		C+:=1
+	    | float(_) ->
+		C+:=1
+	    | cons(_,_) ->
+		C+:=1
+	    | ch(_) ->
+		C+:=1
+	    | _ -> V+:=1
+	    }
+	  };
+	
+	  if C>Tcount then{
+	    Tcount:=C;
+	    Vcount:=V;
+	    Bcol:=i;
+	    Btree := oXN(sub);
+	  }
+	};
+	
+	valis (Btree,Bcol)
+      }
+    | _ => (Tree,1)
+    }
+  };
+
+  showTree(Pre,Tree) => { case Tree in {
+      eTree => "{}"
+    | aXN(L) => "("++(L//+(X=>showTree(Pre,X)++","))++")"
+    | oXN(L) => "{\n"++(L//+((.(T,ns,St).)=>showCT(T)++":"++ns^0++Pre++
+			    showTree(Pre++"  ",St)++"\n"))++Pre++"}"
+    }
+  };
+
+  genIndex(Tree,Col,Deflt,Arity,Clauses,Opts) => valof{
+    if oXN(L).=Tree then{
+      ConList : [];			-- the three different kinds of indices
+      IntList : [];
+      FltList : [];
+      SymList : [];
+      ChrList : [];
+      NilList : [];
+      LstList : [];
+      VarList : [];			-- non-indexable cases
+
+      for (El,cl,_) in L do{
+	case El in {
+	  idnt(_) -> 
+	    VarList := VarList\/cl
+	| intgr(Nm) -> 
+	    IntList := [(Nm,cl),..IntList]
+	| float(Nm) -> 
+	    FltList := [(Nm,cl),..FltList]
+	| symb(Sy) -> 
+	    SymList := [(Sy,cl),..SymList]
+	| ch(Ch) ->
+	    ChrList := [(Ch,cl),..ChrList]
+	| strg([]) ->
+	    NilList := cl\/NilList
+	| strg([_,.._]) ->
+	    LstList := cl\/LstList
+	| cons(strct("go.stdlib#[]",_),[]) ->
+	    NilList := cl\/NilList
+	| cons(strct("go.stdlib#,..",2),_) ->
+	    LstList := cl\/LstList
+	| cons(strct(Sy,_),_) ->
+	    ConList := [(Sy,cl),..ConList]
+	| _ -> exception error("cant index "++showCT(El),'fail)
+	}
+      };
+
+      vCode = valof{
+	if VarList==[] then
+	  valis []
+	else
+	  valis genSequence(sort(VarList,(((H1,_),(H2,_))=>H1<H2)), Arity,true)
+      };
+
+      if listlen(VarList)<=2 then {
+	if IntList!=[] then{
+	  valis genHashSequence(IntList,Deflt,VarList,Arity,
+				(X=>abs(X)),
+				((A,M)=>[indexn(A,M)]),Col)
+	}
+	else if FltList!=[] then{
+	  valis genHashSequence(FltList,Deflt,VarList,Arity,
+				(X=>abs(X)),
+				((A,M)=>[indexn(A,M)]),Col)
+	}
+	else if SymList!=[] then{
+	  valis genHashSequence(SymList,Deflt,VarList,Arity,hashfun,
+				((A,M)=>[indexs(A,M)]),Col)
+	}
+	else if ChrList!=[] then{
+	  valis genHashSequence(ChrList,Deflt,VarList,Arity,(X=>charCode(X)),
+				((A,M)=>[indexc(A,M)]),Col)
+	}
+	else if (LstList!=[]||NilList!=[]) && ConList==[] then{
+	  NilSequence = genSequence(sort(NilList\/VarList, (((H1,_),(H2,_))=>H1<H2)), Arity,true);
+	  LstSequence = genSequence(sort(LstList\/VarList,(((H1,_),(H2,_))=>H1<H2)),
+				    Arity,true);
+
+	  if dbgComp in Opts then{
+	    "Nil sequence = "++NilSequence^0++"\n">>stdout;
+	  };
+
+	  (NilJump,NilCode) = valof{
+	    if [go_to(Lb)].=NilSequence then 
+	      valis (NilSequence,[])
+	    else {
+	      Lb = newLabel();
+	      valis ([go_to(Lb)],[lbl(Lb),..NilSequence])
+	    }
+	  };
+
+	  (LsJump,LsCode) = valof{
+	    if [go_to(Lb)].=LstSequence then 
+	      valis (LstSequence,[])
+	    else {
+	      Lb = newLabel();
+	      valis ([go_to(Lb)],[lbl(Lb),..LstSequence])
+	    }
+	  };
+
+	  valis [indexl(Col),go_to(Deflt)]<>NilJump<>LsJump<>NilCode<>LsCode
+	}
+	else if ConList!=[] then{
+	  valis genHashSequence(ConList\/[("go.stdlib#,..",LstList),
+					  ("go.stdlib#[]",NilList)],Deflt,VarList,Arity,hashfun,
+				((A,M)=>[indexx(A,M)]),Col);
+	}
+	else
+	  valis []
+      }
+      else
+	valis []
+    }
+    else
+      valis []
+  };
+
+  genHashSequence(hList,Deflt,vList,Arity,hfun,ifun,Col) => valof{
+    if listlen(hList)>1 then {
+      Max = nextPrime(listlen(hList)+1);
+      
+      IxT : sort(collect{
+		   for (Nm,cl) in hList do{
+--		     "Hash of "++Nm^0++" is "++hfun(Nm)^0++"-->"++(hfun(Nm) rem Max)^0++"\n">>stdout;
+		     elemis (hfun(Nm) rem Max,cl)
+		   }
+		 },(((H1,_),(H2,_))=>H1<H2));
+
+--      "Indextable is "++IxT^0++"\n">>stdout;
+--      "Max is "++Max^0<>"\n">>stdout;
+
+      Aux : [];
+      HashTable = collect{
+	for I in 0..Max-1 do{
+	  Ls : vList;
+	  while (!I,cles) in IxT do{
+	    Ls := Ls<>cles;
+	    IxT := IxT^\ (I,cles);
+	  };
+	  if Ls==[] then
+	    elemis fayl
+	  else if [(_,Lbl)].=Ls then
+	    elemis go_to(Lbl)
+	  else{
+	    Ix = newLabel();
+	    elemis go_to(Ix);
+	    Aux := Aux<>[lbl(Ix),..
+			 genSequence(sort(Ls,
+					  (((H1,_),(H2,_))=>H1<H2)),
+				     Arity,true)];
+	  }
+	}
+      };
+
+--      "Hash table is "<>HashTable^0<>"\n">>stdout;
+      valis ifun(Col,Max)<>[go_to(Deflt),..HashTable]<>Aux;
+    }
+    else if listlen(hList)>0 then{	-- we have to merge all the clauses
+      Ls = collect{
+	for X in vList do
+	  elemis X;
+	for (_,cl) in hList do
+	  for X in cl do
+	  elemis X;
+      };
+
+      if listlen(Ls)>1 then{
+	valis genSequence(sort(Ls,(((H1,_),(H2,_))=>H1<H2)),Arity,true)
+      }
+      else{
+	(_,xLbl)=head(Ls);
+	valis []
+      }
+    }
+    else if listlen(vList)>0 then
+      valis []
+    else
+      valis []
+  };
+
+  genSequence(Ls,Arity,F) => {
+    case Ls in {
+      [(_,Lb)]::F => [go_to(Lb)]
+    | [(_,Lb)]:: !F => [trust(Lb)]
+    | [(_,Lb),..R]::F => [trycl(Lb),..genSequence(R,Arity,false)]
+    | [(_,Lb),..R]:: !F => [retry(Lb),..genSequence(R,Arity,false)]
+    | [] => [fayl]
+    }
+  };
+      
+
+  genIx(LClauses,Deflt,Arity,Opts) => valof{
+    Mrked = collect{
+      I : 1;
+      for (Lb,H) in LClauses do{
+	elemis ([(I,Lb)],H);
+	I +:= 1;
+      }
+    };
+
+    Tree = genMergedTree(Mrked);
+
+    if dbgComp in Opts then{
+      "A/O tree = "++showTree("",Tree)++"\n">>stdout;
+    };
+    
+--    (BestTree,Col) = bestCol(Tree);
+
+    valis genIndex(firstTree(Tree),1,Deflt,Arity,Mrked,Opts);
+  };
+
+  __debug_display__(any(X)) => X^0;
+
+} export genIx;
+

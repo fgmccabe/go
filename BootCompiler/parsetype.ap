@@ -1,0 +1,312 @@
+#include "go.ah";
+
+module
+ import {
+  interface "abstract.af" and
+  interface "types.af" and
+  interface "subtype.af" and
+  interface "errors.af" and
+  interface "misc.af" and
+  interface "findvars.af" and
+  interface <stdio.af>
+}
+in {
+  parseType(T,Pkg,Env,Bound) => case T in {
+    IDEN(_,"_") => newVar()
+  | IDEN(_,"number") => uType("go.stdlib","number",[])
+  | IDEN(_,"symbol") => uType("go.stdlib","symbol",[])
+  | IDEN(_,"char") => uType("go.stdlib","char",[])
+  | IDEN(_,"string") => uType("go.stdlib","list",[uType("go.stdlib","char",[])])
+  | IDEN(_,"logical") => uType("go.stdlib","logical",[])
+  | IDEN(_,"top") => topType
+  | IDEN(_,"opaque") => uType("go.stdlib","opaque",[])
+  | IDEN(_,"void") => voidType
+  | IDEN(_,"{}") => faceType([])                  -- the empty interface
+  | IDEN(Lc,Nm) => valof{
+      if (Nm,tvarBind,Tp) in Bound then
+        valis Tp
+      else if (Nm,typeBind,Tp) in Bound then{
+        typeDef(A,_).=stripForAlls(Tp);
+        if typeArity(A)!=0 then
+          reportError(Nm<>" is a type with arity "<>typeArity(A)^0,Lc);
+        valis A
+      }
+      else if (Nm,tvarBind,Tp) in Env then
+        valis Tp
+      else if (Nm,typeBind,Tp) in Env then{
+        typeDef(A,_).=stripForAlls(Tp);
+        if typeArity(A)!=0 then
+          reportError(Nm<>" is a type with arity "<>typeArity(A)^0,Lc);
+        valis A
+      }
+      else
+        valis uType(Pkg,Nm,[])
+    }
+
+  | APPLY(_,IDEN(_,"$="),[IDEN(_,"[]"),R]) => enuType(parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"$="),[TPL(_,[]),R]) => enuType(parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"$="),[L,R]) => conType(parseArgTypes(L,Pkg,Env,Bound,inpMode)//((.(aT,_).)=>aT),parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"@="),[IDEN(_,"[]"),R]) => enuType(parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"@="),[TPL(_,[]),R]) => enuType(parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"@="),[L,R]) => conType(parseArgTypes(L,Pkg,Env,Bound,inpMode)//((.(aT,_).)=>aT),parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"@>"),[L,R]) => sconType(parseArgTypes(L,Pkg,Env,Bound,inpMode),
+					  parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"=>"),[L,R]) => funType(parseArgTypes(L,Pkg,Env,Bound,inpMode),
+                                         parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"-->"),[L,R]) => grType(parseArgTypes(L,Pkg,Env,Bound,biMode),
+                                         parseType(R,Pkg,Env,Bound))
+      
+  | APPLY(_,IDEN(_,"*"),[L]) => actType(parseArgTypes(L,Pkg,Env,Bound,inpMode))
+
+  | APPLY(Lc,IDEN(_,"<~"),[L,R]) => valof{
+      rT = parseType(R,Pkg,Env,Bound);
+      lT = parseType(L,Pkg,Env,Bound);
+
+      if varType(_,_,_,_,_,sAbv,_,_).=deRef(lT) then
+        sAbv(rT)
+      else
+        reportError("cannot constrain "<>showType(lT)<>" with "<>showType(rT),Lc);
+
+      valis lT
+    }
+
+  | APPLY(Lc,IDEN(_,"{}"),L) => 
+      faceType(collect{
+		 for mTp in L do {
+		   if APPLY(_,IDEN(_,":"),[IDEN(_,M),mT]).=mTp then{
+		     rmTp = parseType(mT,Pkg,Env,Bound);
+		     if !isProgramType(rmTp) then
+		       reportError("invalid type: "<>showType(rmTp)<>
+				   ", only program types allowed in type interfaces",Lc)
+		     else
+		       elemis (M,varBind,rmTp)
+		   }
+		   else
+		     reportError("cant understand field: "<>display(mTp),Context(mTp))
+		 }
+	       })
+
+  | BRACE(_,L,[]) => predType(parseArgTypes(L,Pkg,Env,Bound,biMode))
+
+  | APPLY(Lc,IDEN(_,"-"),[Q,TP]) => valof {
+      QQ : collect{
+        Q0 : Q;
+        while APPLY(_,IDEN(_,",.."),[qH,qT]).=Q0 do{
+          case qH in {
+            IDEN(_,N) ->
+              elemis (N,tvarBind,bound(N))
+          | APPLY(_,IDEN(_,"<~"),[IDEN(_,N),Tmpl]) ->
+              elemis (N,tvarBind,bound(N))
+          | _ -> reportError("invalid quantifier "<>display(qH)<>
+                             " in quantified type expression: "++display(Q),Lc)
+          };
+          Q0 := qT;
+          
+        };
+        case Q0 in {
+          IDEN(_,"[]") -> {}
+        | IDEN(_,N) ->
+            elemis (N,tvarBind,bound(N))
+        | APPLY(_,IDEN(_,"<~"),[IDEN(_,N),_]) ->
+            elemis (N,tvarBind,bound(N))
+        | _ -> reportError("invalid quantifier "<>display(Q0)<>
+                           " in quantified type expression: "++display(Q),Lc)
+        }
+      };
+
+      pTp : parseType(TP,Pkg,Env,Bound<>QQ);
+
+      Q0 : Q;
+      while APPLY(_,IDEN(Lc0,",.."),[qH,qT]).=Q0 do{
+        case qH in {
+          IDEN(_,N) ->{
+            if (N,tvarBind,_) in QQ then{
+              pTp := allType(N,topType,pTp)
+            }
+            else
+              exception error("problem in parsetype",'fail)
+          }
+        | APPLY(_,IDEN(_,"<~"),[IDEN(_,N),L]) -> {
+            if (N,tvarBind,_) in QQ then
+              pTp := allType(N,parseType(L,Pkg,Env,Bound<>QQ),pTp)
+            else
+              exception error("problem in parsetype",'fail);
+          }
+        | _ -> {}
+        };
+        Q0 := qT;
+      };
+
+      valis pTp
+    }
+
+  | APPLY(_,IDEN(Lc,","),A) => uType("go.stdlib",",",parseTypeList(A,Pkg,Env,Bound))
+
+  | TPL(_,L) => tplType(parseTypeList(L,Pkg,Env,Bound))
+
+  | APPLY(Lc,IDEN(_,"#"),[P,SQUARE(_,IDEN(_,Nm),R)]) => valof{
+      tA = parseTypeList(R,Pkg,Env,Bound);
+      pkgName = packageReference(P);
+
+      (_,_,pTp) .= lookupType(pkgName,(M=>M==pkgBind),Env);
+      (_,iTp) .= freshen(pTp);
+      Imps = fieldsOf(iTp);
+
+      try{
+	if (Nm,typeBind,aTp) in Imps then{
+	  typeDef(uType(Pk,_,uA),_).=stripForAlls(aTp);
+
+	  if listlen(uA)!=listlen(tA) then
+	    reportError("Type: "<>Nm<>" is a "<>listlen(uA)^0<>" degree polymorphic type"
+			" not "<>listlen(tA)^0,Lc);
+	  valis uType(pkgName,Nm,tA)
+	}
+	else{
+	  reportError("Type: "<>Nm<>" not exported from package "<>pkgName,Lc);
+	  valis voidType
+	}
+	  
+      }
+      onerror{
+        error(Bec,'fail) -> {
+          reportError("cannot parse type expression: "++display(T)<>"\nbecause "<>Bec,
+                      Context(T));
+          valis uType(Pkg,Nm,tA)
+        }
+      | error(_,'notdef) -> {
+          valis uType(Pkg,Nm,tA)
+        }
+      }
+    }
+
+  | APPLY(_,IDEN(Lc,"#"),[P,IDEN(Lc0,Nm)]) => valof{
+      pkgName = packageReference(P);
+
+      (_,_,pTp) .= lookupType(pkgName,(M=>M==pkgBind),Env);
+      (_,iTp) .= freshen(pTp);
+      Imps = fieldsOf(iTp);
+
+      try{
+	if (Nm,typeBind,aTp) in Imps then{
+	  typeDef(uType(Pk,_,uA),_).=stripForAlls(aTp);
+
+	  if listlen(uA)!=0 then
+	    reportError("Type: "<>Nm<>" is a "<>listlen(uA)^0<>
+			" degree polymorphic type",Lc);
+	  valis uType(pkgName,Nm,[])
+	}
+	else{
+	  reportError("Type: "<>Nm<>" not exported from package "<>pkgName,Lc);
+	  valis voidType
+	}
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("cannot parse type expression: "++display(T)<>
+		      "\nbecause "<>Bec,Context(T));
+          valis uType(Pkg,Nm,[])
+        }
+      | error(_,'notdef) -> {
+          valis uType(Pkg,Nm,[])
+        }
+      }
+    }
+
+  | SQUARE(Lc,IDEN(_,Nm),R) => valof{
+      tA = parseTypeList(R,Pkg,Env,Bound);
+      try{
+        (_,typeBind,aTp) = lookupType(Nm,((M)=>M==typeBind),Env);
+
+	typeDef(uType(Pk,_,uA),_).=stripForAlls(aTp);
+
+	if listlen(uA)!=listlen(tA) then
+	  reportError("Type: "<>Nm<>" is a "<>listlen(uA)^0<>" degree polymorphic type"
+		      " not "<>listlen(tA)^0,Lc);
+	valis uType(Pk,Nm,tA)
+      }
+      onerror{
+        error(Bec,'fail) -> {
+          reportError("cannot parse type expression: "++display(T)<>"\nbecause "<>Bec,
+                      Context(T));
+          valis uType(Pkg,Nm,tA)
+        }
+      | error(_,'notdef) -> {
+          valis uType(Pkg,Nm,tA)
+        }
+      }
+    }
+
+  | _ => valof{
+      reportError("Invalid type expression: "++display(T),Context(T));
+      valis voidType
+    }
+  };
+
+  parseTypeList(A,Pkg,Env,Bound) => collect{
+    for Ag in A do
+      elemis parseType(Ag,Pkg,Env,Bound);
+  };
+  
+  parseArgTypes(A,Pkg,Env,Bound,Deflt) => case A in {
+    TPL(_,L) => collect{
+      for T in L do{
+        case T in {
+          APPLY(_,IDEN(_,"+"),[tA]) -> elemis (parseType(tA,Pkg,Env,Bound),inpMode)
+        | APPLY(_,IDEN(_,"-"),[tA]) -> elemis (parseType(tA,Pkg,Env,Bound),outMode)
+        | APPLY(_,IDEN(_,"-+"),[tA]) -> elemis (parseType(tA,Pkg,Env,Bound),biMode)
+        | APPLY(_,IDEN(_,"++"),[tA]) -> elemis (parseType(tA,Pkg,Env,Bound),superMode)
+        | _ -> elemis (parseType(T,Pkg,Env,Bound),Deflt)
+        }
+      }
+    }
+  | APPLY(_,IDEN(_,","),[L,R]) =>          -- this is what a tuple type looks like
+      parseArgTypes(L,Pkg,Env,Bound,Deflt)<>parseArgTypes(R,Pkg,Env,Bound,Deflt)
+  | IDEN(_,"()") => []
+  | IDEN(_,"[]") => []
+  | APPLY(_,IDEN(_,"+"),[L]) => [(parseType(L,Pkg,Env,Bound),inpMode)]
+  | APPLY(_,IDEN(_,"-"),[L]) => [(parseType(L,Pkg,Env,Bound),outMode)]
+  | APPLY(_,IDEN(_,"-+"),[L]) => [(parseType(L,Pkg,Env,Bound),biMode)]
+  | APPLY(_,IDEN(_,"++"),[L]) => [(parseType(L,Pkg,Env,Bound),superMode)]
+  | _ =>[(parseType(A,Pkg,Env,Bound),Deflt)]
+  };
+
+  realType(T,Pkg,Env) => valof{
+    nQ = findVarsInType(T,Env);
+
+    valis (parseType(T,Pkg,Env,nQ),nQ);
+  };
+
+  foldupType(Q,Tp) => valof{
+    nQ = collect{
+      for (Nm,tvarBind,V) in Q do{
+        if varType(_,_,_,_,_,_,vN,_).=deRef(V) then
+          elemis (vN,tvarBind,bound(Nm))
+      }
+    };
+
+    T : substituteType(Tp,nQ,[]);
+
+    for (Nm,tvarBind,V) in Q do
+      T := allType(Nm,substituteType(upper(deRef(V)),nQ,[]),T);
+
+--    "Generalized "<>showType(Tp)<>" is "<>showType(T)<>"\n">>stdout;
+    valis T
+  };
+
+  packageReference(Obj) => case Obj in {
+    IDEN(_,Nm) => Nm
+  | APPLY(_,IDEN(_,"."),[L,IDEN(_,Fld)]) =>
+      packageReference(L)<>"."<>Fld               -- 
+  | _ => exception error("",'fail)
+  };
+
+} export (realType,parseType,foldupType)
+

@@ -1,0 +1,413 @@
+% Automatically generated, do not edit 
+\setlongtables
+\begin{longtable}{|ll|}
+\caption{\go escapes summary}\label{howitworks:esc}\\ 
+\hline
+Escape:type&Summary\\
+\hline
+\endfirsthead
+\multicolumn{2}{c}{
+{Table \ref{howitworks:esc} \go escapes summary (cont.)}}\\
+\hline
+Escape:type&Summary\\
+\hline
+\endhead
+\hline\multicolumn{2}{r}{\small\emph{continued\ldots}}\
+\endfoot
+\hline
+\endlastfoot
+\parbox{3.25in}{\tt\small exit:[integer+]*}&\parbox{1.75in}{\small{}terminate go engine\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_command\_line:[]=>list[string]}&\parbox{1.75in}{\small{}command line arguments\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_command\_opts:[]=>list[(char,symbol)]}&\parbox{1.75in}{\small{}command line options\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small =:[t\sub{0}]-([t\sub{0}-+,t\sub{0}-+]\{\})}&\parbox{1.75in}{\small{}unification\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small ==:[t\sub{0}]-([t\sub{0}+,t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}test for identicality\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small .=:[t\sub{0}]-([t\sub{0}+,t\sub{0}-+]\{\})}&\parbox{1.75in}{\small{}matching\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small var:[t\sub{1}]-([t\sub{1}+]\{\})}&\parbox{1.75in}{\small{}test for variable\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small nonvar:[t\sub{1}]-([t\sub{1}+]\{\})}&\parbox{1.75in}{\small{}test for non-variable\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_errorcode:[symbol+]=>string}&\parbox{1.75in}{\small{}decode error symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_call:[symbol+,symbol+,integer+,list[string]+]*}&\parbox{1.75in}{\small{}dynamic call\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_defined:[symbol+,symbol+,integer+]\{\}}&\parbox{1.75in}{\small{}test for defined name\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small +:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}add two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small -:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}subtract two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small *:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}multiply two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small /:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}divide two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small iplus:[integer+,integer+,integer+]=>integer}&\parbox{1.75in}{\small{}modulo addition\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small iminus:[integer+,integer+,integer+]=>integer}&\parbox{1.75in}{\small{}modulo subtraction\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small itimes:[integer+,integer+,integer+]=>integer}&\parbox{1.75in}{\small{}modulo multiplication\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small idiv:[integer+,integer+,integer+]=>integer}&\parbox{1.75in}{\small{}modulo division\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small imod:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}modulo remainder\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small quot:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>integer)}&\parbox{1.75in}{\small{}integer quotient\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small rem:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}remainder\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small abs:[t\sub{1}]-([t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}absolute value\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small **:[t\sub{1}]-([t\sub{1}+,t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}raise X to the power Y\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small sqrt:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}square root\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small exp:[t\sub{1}]-([t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}exponential\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small log:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}logarithm\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small log10:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}10-based logarithm\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small pi:[]=>float}&\parbox{1.75in}{\small{}return PI\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small sin:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}sine\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small cos:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}cosine\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small tan:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}tangent\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small asin:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}arc sine\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small acos:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}arc cosine\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small atan:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}arc tangent\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small srand:[t\sub{49}]-([t\sub{1}+]*)}&\parbox{1.75in}{\small{}set random seed\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small rand:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}random \# generator\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small irand:[integer+]=>integer}&\parbox{1.75in}{\small{}generate random integer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small ldexp:[number+,number+]=>float}&\parbox{1.75in}{\small{}raise x to 2**y\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small frexp:[float+,float-,integer-]\{\}}&\parbox{1.75in}{\small{}split x into mant and exp\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small modf:[float+,float-,float-]\{\}}&\parbox{1.75in}{\small{}split x into int and frac\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small band:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}bitwise and two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small bor:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}bitwise or two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small bxor:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}bitwise xor two numbers\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small bleft:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}bitwise left shift\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small bright:[integer+,integer+]=>integer}&\parbox{1.75in}{\small{}bitwise right shift\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small bnot:[integer+]=>integer}&\parbox{1.75in}{\small{}bitwise negate number\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small trunc:[t\sub{1}]-([t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}truncate to nearest integer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small floor:[t\sub{1}]-([t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}truncate to lower integer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small ceil:[number+]=>integer}&\parbox{1.75in}{\small{}truncate to next integer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small itrunc:[number+]=>integer}&\parbox{1.75in}{\small{}truncate to 64 bit integer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small integral:[number+]\{\}}&\parbox{1.75in}{\small{}test if number is integral\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small n2float:[t\sub{1}]-([t\sub{1}+]=>float)}&\parbox{1.75in}{\small{}float a number\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small <:[t\sub{0}]-([t\sub{0}+,t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}compare terms\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small =<:[t\sub{0}]-([t\sub{0}+,t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}compare terms\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small >:[t\sub{0}]-([t\sub{0}+,t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}compare terms\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small >=:[t\sub{0}]-([t\sub{0}+,t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}compare terms\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small ground:[t\sub{0}]-([t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}test for grounded\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_suspend:[t\sub{1},t\sub{2}]-([t\sub{1}+,t\sub{2}+]\{\})}&\parbox{1.75in}{\small{}suspend if variable not bound\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_assert:[t\sub{1}]-([symbol+,t\sub{1}+]*)}&\parbox{1.75in}{\small{}assert a term\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_retract:[symbol+]*}&\parbox{1.75in}{\small{}remove assertion\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_term:[t\sub{1}]-([t\sub{1}+]=>symbol)}&\parbox{1.75in}{\small{}define an assertion\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_is:[t\sub{1}]-([symbol+,t\sub{1}+]\{\})}&\parbox{1.75in}{\small{}invoke an assertion\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_remove:[symbol+]*}&\parbox{1.75in}{\small{}retract a definition\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_newObject:[t\sub{1}]-([t\sub{1}+]=>t\sub{1})}&\parbox{1.75in}{\small{}create a new object\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_setProp:[t\sub{1}]-([thing+,symbol+,t\sub{1}+]\{\})}&\parbox{1.75in}{\small{}set a property on a symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_getProp:[t\sub{1}]-([thing+,symbol+,t\sub{1}-]\{\})}&\parbox{1.75in}{\small{}get a symbol property\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_delProp:[t\sub{1}]-([thing+,symbol+]\{\})}&\parbox{1.75in}{\small{}delete a property from a symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_univ:[t\sub{1},t\sub{2}]-([symbol+,list[t\sub{1}]+]=>t\sub{2})}&\parbox{1.75in}{\small{}weird function to construct terms\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_acquireLock:[t\sub{0}]-([t\sub{0}+,number+]\{\})}&\parbox{1.75in}{\small{}acquire lock\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_waitLock:[t\sub{0}]-([t\sub{0}+,number+]\{\})}&\parbox{1.75in}{\small{}release and wait on a lock\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_releaseLock:[t\sub{0}]-([t\sub{0}+]\{\})}&\parbox{1.75in}{\small{}release a lock\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_newhash:[integer+]=>opaque}&\parbox{1.75in}{\small{}create a new hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashsearch:[t\sub{2},t\sub{3}]-([opaque+,t\sub{2}+,t\sub{3}-]\{\})}&\parbox{1.75in}{\small{}search a hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashinsert:[t\sub{2},t\sub{3}]-([opaque+,t\sub{2}+,t\sub{3}+]=>opaque)}&\parbox{1.75in}{\small{}add to hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashcount:[opaque+]=>integer}&\parbox{1.75in}{\small{}count elements of hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashdelete:[t\sub{1}]-([opaque+,t\sub{1}+]*)}&\parbox{1.75in}{\small{}delete element from hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashcontents:[t\sub{1}]-([opaque+]=>list[t\sub{1}])}&\parbox{1.75in}{\small{}entire contents of hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashkeys:[t\sub{1}]-([opaque+]=>list[t\sub{1}])}&\parbox{1.75in}{\small{}list of all keys in hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashvalues:[t\sub{1}]-([opaque+]=>list[t\sub{1}])}&\parbox{1.75in}{\small{}entire contents of hash table\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_hashterm:[t\sub{1}]-([t\sub{1}+,integer-]\{\})}&\parbox{1.75in}{\small{}compute hash of term\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_sha1:[list[integer]+]=>list[integer]}&\parbox{1.75in}{\small{}compute hash of a byte string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_openURL:[string+,string+,string+,integer+]=>opaque}&\parbox{1.75in}{\small{}open a URL\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_openInFile:[string+,integer+]=>opaque}&\parbox{1.75in}{\small{}open input file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_openOutFile:[string+,integer+]=>opaque}&\parbox{1.75in}{\small{}open output file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_openAppendFile:[string+,integer+]=>opaque}&\parbox{1.75in}{\small{}open output file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_openIOAppFile:[string+,integer+]=>opaque}&\parbox{1.75in}{\small{}open output file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_checkRoot:[string+,string+]\{\}}&\parbox{1.75in}{\small{}check url against root URL\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_mergeURL:[string+,string+]=>string}&\parbox{1.75in}{\small{}merge URLs\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_createURL:[string+,string+,string+,integer+]=>opaque}&\parbox{1.75in}{\small{}create a URL\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_popen:[string+,list[string]+,list[(symbol,string)]+,opaque+,opaque+,opaque+,integer+]*}&\parbox{1.75in}{\small{}open a pipe\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_close:[opaque+]*}&\parbox{1.75in}{\small{}close file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_eof:[opaque+]\{\}}&\parbox{1.75in}{\small{}end of file test\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_ready:[opaque+]\{\}}&\parbox{1.75in}{\small{}file ready test\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_inchars:[opaque+,integer+]=>string}&\parbox{1.75in}{\small{}read block string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_inbytes:[opaque+,integer+]=>list[integer]}&\parbox{1.75in}{\small{}read block of bytes\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_inchar:[opaque+]=>char}&\parbox{1.75in}{\small{}read single character\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_inbyte:[opaque+]=>integer}&\parbox{1.75in}{\small{}read single byte\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_inline:[opaque+,string+]=>string}&\parbox{1.75in}{\small{}read a line\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_intext:[opaque+,string+]=>string}&\parbox{1.75in}{\small{}read until matching character\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_outch:[opaque+,char+]*}&\parbox{1.75in}{\small{}write a single character\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_outbyte:[opaque+,integer+]*}&\parbox{1.75in}{\small{}write a single byte\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_outtext:[opaque+,string+]*}&\parbox{1.75in}{\small{}write a string as a block\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_outsym:[opaque+,symbol+]*}&\parbox{1.75in}{\small{}write a symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_stdfile:[integer+]=>opaque}&\parbox{1.75in}{\small{}standard file descriptor\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_fposition:[opaque+]=>integer}&\parbox{1.75in}{\small{}report current file position\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_fseek:[opaque+,integer+]*}&\parbox{1.75in}{\small{}seek to new file position\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_flush:[opaque+]*}&\parbox{1.75in}{\small{}flush the I/O buffer\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_flushall:[]*}&\parbox{1.75in}{\small{}flush all files\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_setfileencoding:[opaque+,integer+]*}&\parbox{1.75in}{\small{}set file encoding on file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_ensure\_loaded:[string+,symbol+,symbol+,list[symbol]-]*}&\parbox{1.75in}{\small{}load class file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_logmsg:[string+]\{\}}&\parbox{1.75in}{\small{}log a message in logfile\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_connect:[string+,integer+,integer+,opaque-,opaque-]*}&\parbox{1.75in}{\small{}connect to remote host\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_listen:[integer+,opaque-]*}&\parbox{1.75in}{\small{}listen on a port\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_accept:[opaque+,opaque-,opaque-,string-,string-,integer-,integer+]*}&\parbox{1.75in}{\small{}accept connection\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small hosttoip:[string+]=>list[string]}&\parbox{1.75in}{\small{}IP address of host\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small iptohost:[string+]=>string}&\parbox{1.75in}{\small{}host name from IP\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_cwd:[]=>string}&\parbox{1.75in}{\small{}return current working directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_cd:[string+]*}&\parbox{1.75in}{\small{}change current working directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_rm:[string+]*}&\parbox{1.75in}{\small{}remove file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_mv:[string+,string+]*}&\parbox{1.75in}{\small{}rename file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_mkdir:[string+,integer+]*}&\parbox{1.75in}{\small{}create directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_rmdir:[string+]*}&\parbox{1.75in}{\small{}delete directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_chmod:[string+,integer+]*}&\parbox{1.75in}{\small{}change mode of a file or directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_ls:[string+]=>list[(string,fileType)]}&\parbox{1.75in}{\small{}report on contents of a directory\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_file\_present:[string+]\{\}}&\parbox{1.75in}{\small{}test for file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_file\_mode:[string+]=>integer}&\parbox{1.75in}{\small{}report modes of a file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_file\_type:[string+]=>fileType}&\parbox{1.75in}{\small{}report on the type of a file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_file\_size:[string+]=>integer}&\parbox{1.75in}{\small{}report on the size of a file\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_file\_date:[string+,float-,float-,float-]*}&\parbox{1.75in}{\small{}report on file access time and modification times\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small delay:[number+]*}&\parbox{1.75in}{\small{}delay for period of time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small sleep:[number+]*}&\parbox{1.75in}{\small{}sleep until a definite time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small now:[]=>float}&\parbox{1.75in}{\small{}current time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small today:[]=>integer}&\parbox{1.75in}{\small{}time at midnight\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small ticks:[]=>float}&\parbox{1.75in}{\small{}used CPU time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_time2date:[number+,integer-,integer-,integer-,integer-,integer-,integer-,float-,float-,string-]\{\}}&\parbox{1.75in}{\small{}convert a time to a date\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_time2utc:[number+,integer-,integer-,integer-,integer-,integer-,integer-,float-,float-,string-]\{\}}&\parbox{1.75in}{\small{}convert a time to UTC date\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_date2time:[integer+,integer+,integer+,integer+,integer+,number+,number+]=>float}&\parbox{1.75in}{\small{}convert a date to a time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_utc2time:[number+,number+,number+,number+,number+,number+,number+,number+]=>float}&\parbox{1.75in}{\small{}convert a UTC date to a time\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isCcChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Other, control char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isCfChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Other, format char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isCnChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Other, unassigned char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isCoChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Other, private char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isCsChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Other, surrogate char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLlChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Letter, lowercase char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLmChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Letter, modifier char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLoChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Letter, other char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLtChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Letter, title char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLuChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Letter, uppercase char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isMcChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Mark, spacing char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isMeChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Mark, enclosing char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isMnChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Mark, nonspacing char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isNdChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Number, decimal digit\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isNlChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Number, letter char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isNoChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Number, other char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPcChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, connector\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPdChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, dash char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPeChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, close char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPfChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, final quote\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPiChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, initial quote\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPoChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, other char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isPsChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Punctuation, open char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isScChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Symbol, currency char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isSkChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Symbol, modifier char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isSmChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Symbol, math char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isSoChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Symbol, other char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isZlChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Separator, line char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isZpChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Separator, para char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isZsChar:[char+]\{\}}&\parbox{1.75in}{\small{}is Separator, space char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_isLetterChar:[char+]\{\}}&\parbox{1.75in}{\small{}is letter char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_digitCode:[char+]=>integer}&\parbox{1.75in}{\small{}convert char to num\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_charOf:[integer+]=>char}&\parbox{1.75in}{\small{}convert num to char\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_charCode:[char+]=>integer}&\parbox{1.75in}{\small{}convert char to code\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_succChar:[char+,integer+]=>char}&\parbox{1.75in}{\small{}next character along\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small int2str:[integer+,number+,number+,char+]=>string}&\parbox{1.75in}{\small{}format an integer as a string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small num2str:[number+,number+,number+,logical+,logical+]=>string}&\parbox{1.75in}{\small{}format a number as a string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_stringOf:[t\sub{0}]-([t\sub{0}+,integer+,integer+]=>string)}&\parbox{1.75in}{\small{}convert value to a string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_trim:[string+,integer+]=>string}&\parbox{1.75in}{\small{}trim a string to a width\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small explode:[symbol+]=>string}&\parbox{1.75in}{\small{}convert symbol to string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small implode:[string+]=>symbol}&\parbox{1.75in}{\small{}convert string to symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small gensym:[string+]=>symbol}&\parbox{1.75in}{\small{}generate a new symbol\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_str2utf8:[string+]=>list[integer]}&\parbox{1.75in}{\small{}encode a string as a list of utf8 bytes\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_utf82str:[list[integer]+]=>string}&\parbox{1.75in}{\small{}decode a list of utf8 bytes into a string\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small getenv:[symbol+,string+]=>string}&\parbox{1.75in}{\small{}get an environment variable\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small setenv:[symbol+,string+]\{\}}&\parbox{1.75in}{\small{}set an environment variable\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small envir:[]=>list[(symbol,string)]}&\parbox{1.75in}{\small{}return entire environment\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small getlogin:[]=>string}&\parbox{1.75in}{\small{}return user's login\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_fork:[thread+]*}&\parbox{1.75in}{\small{}fork new process\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_thread:[]=>thread}&\parbox{1.75in}{\small{}report thread of current process\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small kill:[thread+]*}&\parbox{1.75in}{\small{}kill off a process\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small thread\_state:[thread+]=>processState}&\parbox{1.75in}{\small{}state of process\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small waitfor:[thread+]*}&\parbox{1.75in}{\small{}wait for other thread to terminate\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_assoc:[t\sub{0}]-([t\sub{0}+,[]*+]\{\})}&\parbox{1.75in}{\small{}associate a goal with a var\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_shell:[string+,list[string]+,list[(symbol,string)]+,integer-]*}&\parbox{1.75in}{\small{}Run a shell cmd\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_ins\_debug:[]*}&\parbox{1.75in}{\small{}set instruction-level\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_stackTrace:[]*}&\parbox{1.75in}{\small{}Print a stack trace\hfil}\\
+\hline
+\parbox{3.25in}{\tt\small \_\_nop:[]*}&\parbox{1.75in}{\small{}Do nothing\hfil}\\
+\hline
+\end{longtable}

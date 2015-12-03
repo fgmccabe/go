@@ -1,0 +1,1296 @@
+/* Automatically generated lexer from "golex.alx" by Alex*/
+/*
+ * Lexical rules for the Go! parser
+ */
+
+#include "go_tok.ah";
+
+module
+{
+failedMatch(yyTok,yyPos,yyLPos,yyLine)=>
+    exception error("lexing failed at line "++yyLine^0++"/"++yyPos^0,
+                    'failed);
+yyNextToken(input,ipos,iline,yyFile) => valof {
+  yyState : 0; yyString : input; 
+  yyPos:ipos; yyIPos:ipos; yyLPos:ipos; yyLine:iline; yyLLine:iline;
+  yyNext : -1; yyFinal : failedMatch; 
+  yyRest : input; yyLast : []; yyTk : [];
+  while true do {
+    case yyState in {
+      -1 -> {
+              if yyNext!= -1 then {
+                yyState := yyNext; yyTk := [];
+                yyIPos := yyLPos; yyLine := yyLLine;
+                yyNext := -1; yyString := yyRest;
+              }
+              else {
+                env = {
+                  S : yyRest;
+                  getBuf() => S;
+                  setBuf(newS) { S := newS; };
+                  getCh() => valof {
+                    if S == [] then
+                       valis ''\+ffff
+                    else {
+                       [C,..R] = S;
+                       S := R;
+                       valis C;
+                    }
+                  };
+                  putCh(C) {
+                    S : [C,..S];
+                  };
+                };
+                tok = yyFinal(yyRev(yyLast),yyIPos,yyLPos,yyLine);                valis ((yyRest,yyLPos,yyLLine,yyFile),tok)
+		   }
+            }
+    | 107 -> {
+	yyState := 0;		-- restart in initial state
+	yyTk := []; yyIPos := yyPos;
+      }
+    | 106 -> {
+	try {
+	  yyNext := 104;		-- go to comment state
+	  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine;
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(0,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 105 -> {
+	yyState := 104;		-- restart in comment state
+	yyTk := []; yyIPos := yyPos;
+      }
+    | 104 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(1,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 103 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(2,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 102 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ FT(tok2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(2,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 101 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(3,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 100 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(4,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 99 -> {
+	yyState := 0;		-- restart in initial state
+	yyTk := []; yyIPos := yyPos;
+      }
+    | 98 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(5,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 97 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(6,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 96 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(7,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 95 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(8,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 94 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(9,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 93 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ CONS },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 92 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 91 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 90 -> {
+	yyState := 0;		-- restart in initial state
+	yyTk := []; yyIPos := yyPos;
+      }
+    | 89 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(10,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 88 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 87 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(11,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 86 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(12,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 85 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ FT(tok2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(13,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 84 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ IN(tok2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(14,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 83 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(15,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 82 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ IN(char2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 81 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={STR(tok2Str(yyTok))},yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 80 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(16,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 79 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 78 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 77 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 76 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 75 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 74 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 73 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 72 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 71 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 70 -> {
+	yyState := 104;		-- restart in comment state
+	yyTk := []; yyIPos := yyPos;
+      }
+    | 69 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ TERM },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(17,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 68 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 67 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 66 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ TERM },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 65 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(18,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 64 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(19,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 63 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 62 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(20,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 61 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ QKET },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 60 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 59 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 58 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 57 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 56 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 55 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 54 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 53 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(21,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 52 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 51 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 50 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ QBRA },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 49 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 48 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 47 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 46 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 45 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 44 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 43 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 42 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(22,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 41 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ CH(tok2Chr(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 40 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(23,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 39 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={QUOTE(tok2Sym(yyTok))},yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 38 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(24,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 37 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(14,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 36 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(25,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 35 -> {
+	try {
+	  yyNext := 0;		-- go to initial state
+	  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine;
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(26,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 34 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(27,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 33 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(28,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 32 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(29,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 31 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 30 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(30,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 29 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(31,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 28 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(32,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 27 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(33,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 26 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ COMMA },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(34,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 25 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(35,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 24 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 23 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ RBRCE },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 22 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ LBRCE},yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 21 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ RBRA },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(36,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 20 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ LBRA },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 19 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(37,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 18 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(38,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 17 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(39,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 16 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ RPAR },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 15 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ LPAR },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 14 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(40,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 13 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 12 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(41,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 11 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(42,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 10 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 9 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(43,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 8 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(44,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 7 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 6 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(45,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 5 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(46,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 4 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ IN(tok2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(47,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 3 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ IN(tok2Num(yyTok)) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(48,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 2 -> {
+	try {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ ID(yyTok) },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(49,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    | 1 -> {
+	  yyLast := yyTk; yyLPos := yyPos;  yyFinal := {(yyTok,yyPos,yyLPos,_)=>{(yyTok={ TERM },yyLine=yyLine,yyPos=yyPos,yyLPos=yyLPos)}};
+  yyRest := yyString; yyLPos := yyPos; yyLLine := yyLine; yyNext := -1;        yyState := -1
+      }
+    | 0 -> {
+	try {
+	  [yyChar,..yyStr] .= { if yyString==[] then [''\+ffff] else yyString};
+	  yyString := yyStr;
+	  yyLLine := yyLine;   -- keep in case we have to reset
+	  if yyChar == ''\n then { yyLine := yyLine+1; /*yyPos :=0*/};
+	  yyState := yyTrans(50,yyChar);
+	  yyPos +:= 1; yyTk := [yyChar,..yyTk]
+	}
+	onerror
+	 _ -> yyState := -1
+      }
+    }
+  }
+};
+yyChInRange(X, From, To) => X != ''\+ffff && From <= X && X <= To;
+yyTrans = {
+  (50,yyChar) => (case yyChar in {
+	    ''\b => 35
+	|   ''\t => 35
+	|   ''\n => 35
+	|   ''\r => 35
+	|   ''  => 35
+	|   ''! => 8
+	|   ''\" => 34
+	|   ''# => 10
+	|   ''$ => 11
+	|   ''% => 12
+	|   ''' => 5
+	|   ''( => 15
+	|   '') => 16
+	|   ''* => 14
+	|   ''+ => 19
+	|   '', => 26
+	|   ''- => 17
+	|   ''. => 27
+	|   ''/ => 28
+	|   ''0 => 3
+	|   X::yyChInRange(X,''1,''9) => 4
+	|   '': => 25
+	|   ''; => 24
+	|   ''< => 29
+	|   ''= => 18
+	|   ''> => 30
+	|   ''? => 31
+	|   ''@ => 9
+	|   X::yyChInRange(X,''A,''Z) => 2
+	|   ''_ => 2
+	|   X::yyChInRange(X,''a,''z) => 2
+	|   ''[ => 20
+	|   ''\\ => 32
+	|   ''] => 21
+	|   ''^ => 13
+	|   ''` => 6
+	|   ''{ => 22
+	|   ''| => 33
+	|   ''} => 23
+	|   ''~ => 7
+	|   ''\+ffff => 1
+	})
+| (49,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 2
+	|   X::yyChInRange(X,''A,''Z) => 2
+	|   ''_ => 2
+	|   X::yyChInRange(X,''a,''z) => 2
+	})
+| (48,yyChar) => (case yyChar in {
+	    ''. => 38
+	|   X::yyChInRange(X,''0,''9) => 4
+	|   ''c => 36
+	|   ''x => 37
+	})
+| (47,yyChar) => (case yyChar in {
+	    ''. => 38
+	|   X::yyChInRange(X,''0,''9) => 4
+	})
+| (46,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 5
+	|   ''\e => 5
+	|   X::yyChInRange(X,'' ,''&) => 5
+	|   X::yyChInRange(X,''(,''[) => 5
+	|   X::yyChInRange(X,''],''\d) => 5
+	|   ''' => 39
+	|   ''\\ => 40
+	})
+| (45,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 41
+	|   ''\e => 41
+	|   X::yyChInRange(X,'' ,''[) => 41
+	|   X::yyChInRange(X,''],''\d) => 41
+	|   ''\\ => 42
+	})
+| (44,yyChar) => (case yyChar in {
+	    ''= => 43
+	})
+| (43,yyChar) => (case yyChar in {
+	    ''= => 45
+	|   ''> => 46
+	|   ''@ => 44
+	})
+| (42,yyChar) => (case yyChar in {
+	    ''= => 47
+	})
+| (41,yyChar) => (case yyChar in {
+	    ''% => 48
+	|   ''= => 49
+	|   ''[ => 50
+	})
+| (40,yyChar) => (case yyChar in {
+	    ''* => 51
+	|   ''> => 52
+	})
+| (39,yyChar) => (case yyChar in {
+	    ''+ => 54
+	|   ''- => 53
+	|   ''> => 55
+	})
+| (38,yyChar) => (case yyChar in {
+	    ''. => 57
+	|   ''< => 58
+	|   ''= => 56
+	|   ''> => 59
+	})
+| (37,yyChar) => (case yyChar in {
+	    ''+ => 60
+	})
+| (36,yyChar) => (case yyChar in {
+	    ''% => 61
+	})
+| (35,yyChar) => (case yyChar in {
+	    ''- => 62
+	|   '': => 64
+	|   ''= => 63
+	})
+| (34,yyChar) => (case yyChar in {
+	    ''. => 65
+	})
+| (33,yyChar) => (case yyChar in {
+	    ''\b => 69
+	|   ''\t => 69
+	|   ''\n => 69
+	|   ''\r => 69
+	|   ''  => 69
+	|   ''. => 68
+	|   ''= => 67
+	|   ''\+ffff => 66
+	})
+| (32,yyChar) => (case yyChar in {
+	    ''* => 70
+	|   ''\\ => 71
+	})
+| (31,yyChar) => (case yyChar in {
+	    ''= => 73
+	|   ''> => 74
+	|   ''~ => 72
+	})
+| (30,yyChar) => (case yyChar in {
+	    ''= => 75
+	})
+| (29,yyChar) => (case yyChar in {
+	    ''+ => 77
+	|   ''/ => 78
+	|   ''= => 76
+	})
+| (28,yyChar) => (case yyChar in {
+	    ''| => 79
+	})
+| (27,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 34
+	|   ''\e => 34
+	|   ''  => 34
+	|   ''! => 34
+	|   X::yyChInRange(X,''#,''[) => 34
+	|   X::yyChInRange(X,''],''\d) => 34
+	|   ''\" => 81
+	|   ''\\ => 80
+	})
+| (26,yyChar) => (case yyChar in {
+	    ''\b => 35
+	|   ''\t => 35
+	|   ''\n => 35
+	|   ''\r => 35
+	|   ''  => 35
+	})
+| (25,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 82
+	|   ''\e => 82
+	|   ''  => 82
+	|   ''! => 82
+	|   X::yyChInRange(X,''#,''[) => 82
+	|   X::yyChInRange(X,''],''\d) => 82
+	|   ''\\ => 83
+	})
+| (24,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 85
+	})
+| (23,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 5
+	|   ''\e => 5
+	|   X::yyChInRange(X,'' ,''*) => 5
+	|   X::yyChInRange(X,'',,''\d) => 5
+	|   ''+ => 86
+	})
+| (22,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 41
+	|   ''\e => 41
+	|   X::yyChInRange(X,'' ,''*) => 41
+	|   X::yyChInRange(X,'',,''\d) => 41
+	|   ''+ => 87
+	})
+| (21,yyChar) => (case yyChar in {
+	    ''\t => 89
+	|   ''  => 89
+	|   ''\n => 90
+	|   ''\r => 90
+	|   ''> => 88
+	})
+| (20,yyChar) => (case yyChar in {
+	    ''- => 91
+	})
+| (19,yyChar) => (case yyChar in {
+	    ''= => 92
+	})
+| (18,yyChar) => (case yyChar in {
+	    ''. => 93
+	})
+| (17,yyChar) => (case yyChar in {
+	    ''\b => 69
+	|   ''\t => 69
+	|   ''\n => 69
+	|   ''\r => 69
+	|   ''  => 69
+	})
+| (16,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 34
+	|   ''\e => 34
+	|   X::yyChInRange(X,'' ,''*) => 34
+	|   X::yyChInRange(X,'',,''\d) => 34
+	|   ''+ => 94
+	})
+| (15,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 82
+	|   ''\e => 82
+	|   X::yyChInRange(X,'' ,''*) => 82
+	|   X::yyChInRange(X,'',,''\d) => 82
+	|   ''+ => 95
+	})
+| (14,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 84
+	|   X::yyChInRange(X,''A,''F) => 84
+	|   X::yyChInRange(X,''a,''f) => 84
+	})
+| (13,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 85
+	|   ''E => 96
+	|   ''e => 96
+	})
+| (12,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 97
+	|   X::yyChInRange(X,''A,''F) => 97
+	|   X::yyChInRange(X,''a,''f) => 97
+	})
+| (11,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 98
+	|   X::yyChInRange(X,''A,''F) => 98
+	|   X::yyChInRange(X,''a,''f) => 98
+	})
+| (10,yyChar) => (case yyChar in {
+	    ''\a => 89
+	|   ''\b => 89
+	|   ''\t => 89
+	|   ''\v => 89
+	|   ''\f => 89
+	|   ''\e => 89
+	|   X::yyChInRange(X,'' ,''\d) => 89
+	|   ''\n => 99
+	|   ''\r => 99
+	})
+| (9,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 100
+	|   X::yyChInRange(X,''A,''F) => 100
+	|   X::yyChInRange(X,''a,''f) => 100
+	})
+| (8,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 101
+	|   X::yyChInRange(X,''A,''F) => 101
+	|   X::yyChInRange(X,''a,''f) => 101
+	})
+| (7,yyChar) => (case yyChar in {
+	    ''+ => 103
+	|   ''- => 103
+	|   X::yyChInRange(X,''0,''9) => 102
+	})
+| (6,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 97
+	|   X::yyChInRange(X,''A,''F) => 97
+	|   X::yyChInRange(X,''a,''f) => 97
+	|   ''; => 5
+	})
+| (5,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 98
+	|   X::yyChInRange(X,''A,''F) => 98
+	|   X::yyChInRange(X,''a,''f) => 98
+	|   ''; => 41
+	})
+| (4,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 100
+	|   X::yyChInRange(X,''A,''F) => 100
+	|   X::yyChInRange(X,''a,''f) => 100
+	|   ''; => 34
+	})
+| (3,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 101
+	|   X::yyChInRange(X,''A,''F) => 101
+	|   X::yyChInRange(X,''a,''f) => 101
+	|   ''; => 82
+	})
+| (2,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''0,''9) => 102
+	})
+| (1,yyChar) => (case yyChar in {
+	    X::yyChInRange(X,''\a,''\r) => 105
+	|   ''\e => 105
+	|   X::yyChInRange(X,'' ,'')) => 105
+	|   X::yyChInRange(X,''+,''\d) => 105
+	|   ''* => 106
+	})
+| (0,yyChar) => (case yyChar in {
+	    ''/ => 107
+	})
+};
+
+yyRev(L) => valof {  -- non-recursive reverse
+  R : []; LL : L;
+  while [E,..EE].=LL do {
+    R := [E,..R];
+    LL := EE;
+  };
+  valis R
+};
+
+tok2Num(token) => number%%token;
+
+char2Num([''0,''c,C]) => charCode(C);
+
+dequoteStr = {
+  [] => []
+| [''\\,''a,..L] => [''\a,..dequoteStr(L)]
+| [''\\,''b,..L] => [''\b,..dequoteStr(L)]
+| [''\\,''d,..L] => [''\d,..dequoteStr(L)]
+| [''\\,''e,..L] => [''\e,..dequoteStr(L)]
+| [''\\,''f,..L] => [''\f,..dequoteStr(L)]
+| [''\\,''n,..L] => [''\n,..dequoteStr(L)]
+| [''\\,''r,..L] => [''\r,..dequoteStr(L)]
+| [''\\,''t,..L] => [''\t,..dequoteStr(L)]
+| [''\\,''v,..L] => [''\v,..dequoteStr(L)]
+| [''\\,''+,..L] => valof{
+    (U,rL) = extractUnicode(L);
+    valis [charOf(number%%([''0,''x,..U])),..dequoteStr(rL)]
+  }
+| [''\\,C,..L] => [C,..dequoteStr(L)]
+| [C,..L] => [C,..dequoteStr(L)]
+};
+ 
+extractUnicode={
+  ['';,..L]=>([],L)
+| [] => ([],[])
+| [C,..L] => valof{
+    (U,rL) = extractUnicode(L);
+    valis ([C,..U],rL)
+  }
+};
+ 
+tok2Str([''\",..X]) => dequoteStr(front(X,listlen(X)-1));
+tok2Sym([_,..X]) => dequoteStr(front(X,listlen(X)-1));
+tok2Chr([_,..X]) => head(dequoteStr(X));
+} export yyNextToken;

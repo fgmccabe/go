@@ -1,0 +1,69 @@
+#include "terms.ah";
+
+module
+{
+  isKeyword(Nm) => case Nm in {
+    "|" => true
+  | "||" => true
+  | ";" => true
+  | ":" => true
+  | "::" => true
+  | "," => true
+  | ".." => true
+  | ",.." => true
+  | "?" => true
+  | "!" => true
+  | "^" => true
+  | "^^" => true
+  | "~" => true
+  | "`" => true
+  | "=" => true
+  | "==" => true
+  | ".=" => true
+  | ":=" => true
+  | "=>" => true
+  | "->" => true
+  | ":-" => true
+  | ":--" => true
+  | "-->" => true
+  | "::=" => true
+  | "<=" => true
+  | "<~" => true
+  | "-" => true
+  | "*" => true
+  | "/" => true
+  | "+" => true
+  | "$" => true
+  | "*>" => true
+  | "{}" => true
+  | "[]" => true
+  | "\\+" => true
+  | "\\=" => true
+  | "!=" => true
+  | "." => true
+  | "%" => true
+  | "%%" => true
+  | "@" => true
+  | "@@" => true
+  | "in" => true
+  | "case" => true
+  | "valof" => true
+  | "valis" => true
+  | "istrue" => true
+  | "true" => true
+  | "false" => true
+  | "fail" => true
+  | "action" => true
+  | "spawn" => true
+  | "onerror" => true
+  | "sync" => true
+  | "raise" => true
+  | "timeout" => true
+  | "import" => true
+  | "opaque" => true
+  | "$meta" => true
+  | "#" => true
+  | _ => false
+  };
+
+} export (isKeyword);

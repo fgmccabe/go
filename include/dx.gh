@@ -1,0 +1,19 @@
+  /* Listener interface to the dx */
+  
+--  dxListener ~> { response/((xmlDOM,string)*) }.
+  
+  dxMsg[T] ::= dxOk
+    | dxError(string)
+    | dxClicked(list[T])
+    | dxClosed(list[T])
+    | dxUpdated(list[T])
+    | dxUpdated(list[T])
+    | dxChanged(list[T])
+    | dxActivated(list[T])
+    | dxSelected(list[T])
+    | dxDeselected(list[T])
+    | dxClosed(list[T])
+    | dxDeleted(list[T])
+    | dxInserted(list[T])
+    | dxMoved(list[T])
+    | dxOther(xmlDOM).

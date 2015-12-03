@@ -1,0 +1,822 @@
+/*
+ * Module to manage the environment during type checking
+ */
+
+#include "go.ah";
+
+module
+ import {
+  interface "ops.af" and
+  interface "abstract.af" and
+  interface "errors.af" and
+  interface "misc.af" and
+  interface <stdio.af>
+}
+in {
+  ndType(node(_,Tp,_))=>Tp;
+  ndEl(node(El,_,_))=>El;
+  ndContext(node(_,_,Lc)) => Lc;
+
+  newVar() => newVr(topType,genNew("_"),false);
+
+  fieldsOf(faceType(M)) => M;
+
+  Resets:[];
+  RestCounter : 0;
+
+  AddReset(P){
+    RestCounter := RestCounter+1;
+    Resets := [(P,RestCounter),..Resets];
+  };
+
+  doReset(Counter){
+    while [(P,C),..R].=Resets && C>Counter do{
+      P();
+      Resets := R;
+    };
+    RestCounter := Counter;
+  };
+
+  currReset()=>RestCounter;
+
+  occIn(Ky,Outer,Tp) => case deRef(Tp) in {
+    bound(_) => false
+  | voidType => false
+  | topType => false
+  | typeType => false
+  | tplType(L) => valof{
+      for E in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | enuType(R) => 
+      occIn(Ky,Outer,R)
+  | conType(L,R) => valof{
+      for E in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis occIn(Ky,Outer,R);
+    }
+  | sconType(L,R) => valof{
+      for (E,_) in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis occIn(Ky,Outer,R);
+    }
+  | funType(L,R) => valof{
+      for (E,_) in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis occIn(Ky,Outer,R);
+    }
+  | predType(L) => valof{
+      for (E,_) in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | grType(L,R) => valof{
+      for (E,_) in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis occIn(Ky,Outer,R);
+    }
+  | actType(L) => valof{
+      for (E,_) in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | faceType(M) => valof{
+      for (_,_,E) in M do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | allType(V,G,T) => valof{
+      nOuter = [V,..Outer];
+      valis occIn(Ky,nOuter,G) || occIn(Ky,nOuter,T)
+    }
+  | uType(_,_,L) => valof{
+      for E in L do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | typeDef(L,R) => valof{
+      if occIn(Ky,Outer,L) then
+	valis true;
+
+      for E in R do{
+        if occIn(Ky,Outer,E) then
+          valis true
+      };
+      valis false
+    }
+  | varType(Lx,_,Ex,_,Ux,_,Nm,Kk) => valof{
+      if Nm in Outer then
+        valis false
+      else if Kk==Ky then
+        valis true
+      else 
+        valis occIn(Ky,Outer,Lx()) || occIn(Ky,Outer,Ux())
+    }
+  };
+
+  isReadOnly(Tp) => case deRef(Tp) in {
+    varType(_,_,_,sEq,_,_,_,_) => valof{
+      R = currReset();
+      try{
+	sEq(typeType);
+	
+	doReset(R);
+	valis false;
+      }
+      onerror{
+	error(_,'fail) -> {
+	  doReset(R);
+	  valis true
+	}
+      }
+    }
+  | _ => false
+  };
+
+  newVr(Gov,Nm,RO) => {
+    lx:voidType;                        -- We are greater than or equal to this
+    ux:Gov;                                     -- We are equal to or less than
+    key = gensym2(Nm);
+    eq:varType(Lx,setLx,Eq,setEq,Ux,setUx,Nm,key);
+
+    Eq() => valof{
+      if varType(_,_,E,_,_,_,_,Ky).=eq then{
+        if Ky==key then
+          valis eq
+        else
+          valis E();
+      }
+      else
+        valis eq;
+    };
+
+    stE(T){
+      eq:=T;
+    };
+
+    setEq(TTp){
+      Tp = deRef(TTp);
+
+      if !varType(_,_,_,_,_,_,_,!key).=Tp then{   -- do not bind to yourself
+	if RO then
+	  exception error("not permitted to bind polymorphic variable: "<>Nm,'fail);
+
+        if occIn(key,[],Tp) then
+          exception error("occurs check",'fail);
+
+        oldeq = eq;
+        AddReset((()->{stE(oldeq)}));
+        
+        eq := Tp;
+      }
+    };
+    
+    Lx() => lx;
+    Ux() => ux;
+
+    stUx(Tp){
+      ux:=Tp;
+    };
+    
+    setUx(Tp){
+      if !varType(_,_,_,_,_,_,_,!key).=Tp then {
+	if RO then
+	  exception error("not permitted to bind polymorphic variable: "<>Nm,'fail);
+
+        if occIn(key,[],Tp) then
+          exception error("occurs check",'fail);
+        
+        if varType(_,_,_,_,_,_,_,_).=Tp  then 
+          exception error("var not allowed in upper",'internal)
+        else{
+          oldux = ux;
+          AddReset((()->{stUx(oldux)}));
+        
+          ux := Tp;
+        }
+      }
+    };
+
+    stLx(Tp){
+      lx := Tp;
+    };
+
+    setLx(TTp){
+      Tp = deRef(TTp);
+      if !varType(_,_,_,_,_,_,_,!key).=Tp then {
+	if RO then
+	  exception error("not permitted to bind polymorphic variable: "<>Nm,'fail);
+
+        if occIn(key,[],Tp) then
+          exception error("occurs check",'fail);
+        
+        if varType(_,_,_,_,_,_,_,_).=Tp  then 
+          exception error("var not allowed in upper",'internal)
+        else{
+          oldlx=lx;
+          AddReset((()->{stLx(oldlx)}));
+          lx := Tp;
+        }
+      }
+    };
+
+  }.eq;
+
+  deRef(Tp) => if varType(_,_,Eq,_,_,_,_,_).=Tp then
+    Eq()
+  else
+    Tp;
+
+  isUnbound(Tp) => case deRef(Tp) in {
+    varType(_,_,_,_,_,_,_,_) => true
+  | bound(_) => true
+  | _ => false
+  };
+
+  inLower(Tp,Ky) => valof{
+    T : deRef(Tp);
+
+    loop : [];
+    while varType(B,_,_,_,_,_,_,bK).=T && !bK in loop do{
+      if bK==Ky then
+        valis true
+      else{
+        T := deRef(B());
+        loop := [bK,..loop]
+      }
+    };
+    valis false
+  };
+
+  inUpper(Tp,Ky) => valof{
+    T : deRef(Tp);
+
+    loop : [];
+    while varType(_,_,_,_,A,_,_,bK).=T && !bK in loop do{
+      if bK==Ky then
+        valis true
+      else{
+        T := deRef(A());
+        loop := [bK,..loop]
+      }
+    };
+    valis false
+  };
+
+  lookupType(Nm,Chck,Env) => valof{
+    if (!Nm,Mode::Chck(Mode),Tp) in Env then
+      valis (Nm,Mode,Tp)
+    else
+      exception error(Nm<>" not defined",'notdef)
+  };
+
+  freshen(T) => case deRef(T) in {
+    allType(bV,G,bT) => valof{
+      Q : [(bV,tvarBind,newVr(G,bV,false))];
+      rT : bT;
+      while allType(v,vG,t).=rT do{
+        Q := [(v,tvarBind,newVr(vG,v,false)),..Q];
+        rT := t;
+      };
+
+      valis (Q,substituteType(rT,Q,[]));
+    }
+  | Tp => ([],Tp)
+  };
+
+  substituteType(Tp,Env,Outer) => case deRef(Tp) in {
+    bound(Nm) :: ((!Nm,tvarBind,xTp) in Env  && ! (!Nm,_) in Outer) => xTp
+  | bound(_) => Tp
+  | varType(_,_,_,_,_,_,Nm,_) :: ((!Nm,tvarBind,xTp) in Env  && ! (!Nm,_) in Outer) => xTp
+  | varType(_,_,_,_,_,_,_,_) => Tp
+  | topType => Tp
+  | voidType => Tp
+  | typeType => Tp
+  | tplType(L) => tplType(substituteTypeList(L,Env,Outer))
+  | enuType(R) => enuType(substituteType(R,Env,Outer))
+  | conType(A,R) => conType(substituteTypeList(A,Env,Outer),substituteType(R,Env,Outer))
+  | sconType(A,R) => sconType(substituteArgTypeList(A,Env,Outer),substituteType(R,Env,Outer))
+  | funType(A,R) => funType(substituteArgTypeList(A,Env,Outer),substituteType(R,Env,Outer))
+  | predType(A) => predType(substituteArgTypeList(A,Env,Outer))
+  | grType(A,R) => grType(substituteArgTypeList(A,Env,Outer),substituteType(R,Env,Outer))
+  | actType(A) => actType(substituteArgTypeList(A,Env,Outer))
+  | faceType(R) => faceType(substituteMethods(R,Env,Outer))
+  | allType(Nm,G,Tp) => valof{
+      nOuter = [(Nm,G),..Outer];
+      valis allType(Nm,substituteType(G,Env,nOuter),substituteType(Tp,Env,nOuter))
+    }
+  | uType(Pk,Nm,Args) => uType(Pk,Nm,substituteTypeList(Args,Env,Outer))
+  | typeDef(L,R) => typeDef(substituteType(L,Env,Outer),substituteTypeList(R,Env,Outer))
+  };
+
+  substituteTypeList(L,Env,Outer) => collect{
+    for E in L do
+      elemis substituteType(E,Env,Outer)
+  };
+
+  substituteArgTypeList(L,Env,Outer) => collect{
+    for (E,M) in L do
+      elemis (substituteType(E,Env,Outer),M)
+  };
+
+  substituteMethods(L,Env,Outer) => collect{
+    for (Fld,M,T) in L do
+      elemis (Fld,M,substituteType(T,Env,Outer))
+  };
+     
+  stripForAlls = {
+    allType(_,_,T) => stripForAlls(T)
+  | T => T
+  };
+
+  isFunctionType(Type) => case deRef(Type) in {
+    funType(_,_) => true
+  | allType(_,_,T) => isFunctionType(T)
+  | _ => false
+  };
+
+  isGrammarType(Type) => case deRef(Type) in {
+    grType(_,_) => true
+  | allType(_,_,T) => isGrammarType(T)
+  | _ => false
+  };
+
+  isPredType(Type) => case deRef(Type) in {
+    predType(_) => true
+  | allType(_,_,T) => isPredType(T)
+  | _ => false
+  };
+
+  isActionType(Type) => case deRef(Type) in {
+    actType(_) => true
+  | allType(_,_,T) => isActionType(T)
+  | _ => false
+  };
+
+  isProgramType(Type) => case deRef(Type) in {
+    predType(_) => true
+  | funType(_,_) => true
+  | grType(_,_) => true
+  | actType(_) => true
+  | allType(_,_,T) => isProgramType(T)
+  | conType(_,_) => true
+  | sconType(_,_) => true
+  | enuType(_) => true
+  | _ => false
+  };
+
+  isReferenced(Pkg,Kys,Outer,Tp) => case deRef(Tp) in {
+    bound(_) => false
+  | voidType => false
+  | topType => false
+  | typeType => false
+  | tplType(L) => valof{
+      for E in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | enuType(R) => isReferenced(Pkg,Kys,Outer,R)
+  | conType(L,R) => valof{
+      for E in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis isReferenced(Pkg,Kys,Outer,R);
+    }
+  | sconType(L,R) => valof{
+      for (E,_) in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis isReferenced(Pkg,Kys,Outer,R);
+    }
+  | funType(L,R) => valof{
+      for (E,_) in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis isReferenced(Pkg,Kys,Outer,R);
+    }
+  | predType(L) => valof{
+      for (E,_) in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | grType(L,R) => valof{
+      for (E,_) in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis isReferenced(Pkg,Kys,Outer,R);
+    }
+  | actType(L) => valof{
+      for (E,_) in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | faceType(M) => valof{
+      for (_,_,E) in M do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | allType(V,G,T) => valof{
+      nOuter = [V,..Outer];
+      valis isReferenced(Pkg,Kys,nOuter,G) || isReferenced(Pkg,Kys,nOuter,T)
+    }
+  | uType(!Pkg,!Kys,_) => true
+  | uType(_,_,L) => valof{
+      for E in L do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false;
+    }
+  | typeDef(L,R) => valof{
+      if isReferenced(Pkg,Kys,Outer,L) then
+	valis true;
+
+      for E in R do{
+        if isReferenced(Pkg,Kys,Outer,E) then
+          valis true
+      };
+      valis false
+    }
+  | varType(Lx,_,Ex,_,Ux,_,Nm,Kk) => valof{
+      if Nm in Outer then
+        valis false
+      else 
+        valis isReferenced(Pkg,Kys,Outer,Lx()) || isReferenced(Pkg,Kys,Outer,Ux())
+    }
+  };
+
+  showType(T) => dispType(T,999,5,[]);
+
+  dispType(Tp,prior,depth,Env) => case deRef(Tp) in {
+    bound(Nm) =>                                  -- A bound variable
+      if (Nm,tvarBind,Tv) in Env then
+        dispType(Tv,prior,depth,Env)
+      else
+        Nm
+  | voidType => "void"                           -- bottom of the type hierarchy
+  | topType => "top"                              -- top of the type hierarchy
+  | typeType => "type"
+  | tplType(L) => dispTypeList(L,"(",",",")",999,depth,Env) -- tuple type
+  | enuType(R) => valof{                            -- enumerated symbol type
+      (XL,XP,XR) = infixPr("$=");
+      valis shPar(XP,prior,"(")++
+      " $: "++dispType(R,XR,depth,Env)++
+      shPar(XP,prior,")")
+    }
+  | conType(A,R) => valof{                            -- statefree constructor type
+      (XL,XP,XR) = infixPr("@=");
+      valis shPar(XP,prior,"(")++
+      dispTypeList(A,"[",",","]",999,depth,Env)++" @= "++dispType(R,XR,depth,Env)++
+      shPar(XP,prior,")")
+    }
+  | sconType(A,R) => valof{                            -- stateful constructor type
+      (XL,XP,XR) = infixPr("@>");
+      valis shPar(XP,prior,"(")++
+      dispTypeArgs(A,"[",",","]",999,depth,Env,inpMode)++" @> "++dispType(R,XR,depth,Env)++
+      shPar(XP,prior,")")
+    }
+  | funType(A,R) => valof{                            -- function type
+      (XL,XP,XR) = infixPr("=>");
+      valis shPar(XP,prior,"(")++
+      dispTypeArgs(A,"[",",","]",999,depth,Env,inpMode)++" => "++dispType(R,XR,depth,Env)++
+      shPar(XP,prior,")")
+    }
+  | predType(A) => dispTypeArgs(A,"[",",","]",999,depth,Env,biMode)++"{}" -- predicate type
+  | grType(A,R) => valof{                                    -- grammar type
+      (XL,XP,XR) = infixPr("-->");
+      valis shPar(XP,prior,"(")++
+      dispTypeArgs(A,"[",",","]",999,depth,Env,biMode)++" --> "++dispType(R,XR,depth,Env)++
+      shPar(XP,prior,")")
+    }
+  | actType(A) => valof{                                    -- action type
+      (XL,XP) = postfixPr("*");
+      valis shPar(XP,prior,"(")++
+      dispTypeArgs(A,"[",",","]",999,depth,Env,inpMode)++"*"++ shPar(XP,prior,")")
+    }
+  | faceType(M) => "{"++valof{                    -- type interface
+      (XL,XP,XR) = infixPr(":");
+      sep : "";
+      out : "";
+      for (Fld,Mode,Tp) in M do{
+        out := out++sep++Fld++showBind(Mode)++dispType(Tp,XR,depth,Env);
+        sep := ". ";
+      };
+      valis out++"}"
+    }
+  | allType(_,_,_) => valof{    -- bound variable, governing type, type
+      (XL,XP,XR) = infixPr("-");
+      (gL,gP,gR) = infixPr("<~");
+      
+      TTp : Tp; Q : shPar(XP,prior,"(")++"["; sep : "";
+      while allType(N,I,T).=TTp do{
+	Q := Q++sep++string%%N;
+        if I!=topType then
+          Q := Q<>"<~"<>dispType(I,gR,depth,Env);
+
+	TTp := T; sep := ",";
+      };
+      valis Q++"]-"++dispType(TTp,XR,depth,Env)++shPar(XP,prior,")")
+    }
+--  | uType("*",Nm,[]) => Nm                            -- non-polymorphic type
+  | uType("go.stdlib",",",[L,R]) => valof{
+      (cL,cP,cR)=infixPr(",");
+
+      valis shPar(cP,prior,"(")++dispType(L,cL,depth,Env)++","++dispType(R,cR,depth,Env)++shPar(cP,prior,")")
+    }
+  | uType("go.stdlib","list",[uType("go.stdlib","char",[])]) => "string"
+  | uType("go.stdlib",Nm,[]) => Nm
+  | uType(Pkg,Nm,[]) => Pkg<>"#"<>Nm		  -- non-polymorphic type
+  | uType("go.stdlib",Nm,A) => Nm++dispTypeList(A,"[",",","]",999,depth,Env)
+  | uType(Pkg,Nm,A) => Pkg<>"#"<>Nm++dispTypeList(A,"[",",","]",999,depth,Env) -- defined type
+  | varType(Blw,_,_,_,Abv,_,Nm,Ky) => valof{               -- type variable
+      (gL,gP,gR) = infixPr("<~");
+
+      up = valof{
+        A : deRef(Abv());
+
+        if A !=topType then{
+          if depth>0 then
+            valis " <~ "<>dispType(A,gR,depth-1,Env)
+          else
+            valis " <~ ..."
+        }
+        else
+          valis ""
+      };
+
+      down = valof{
+        A : deRef(Blw());
+
+        if A!=voidType then{
+          if depth>0 then
+            valis dispType(A,gL,depth-1,Env)<>" <~ "
+          else
+            valis "... <~ "
+        }
+        else
+          valis ""
+      };
+
+      sentinel = { if up=="" && down=="" then "" else "|"};
+
+      valis sentinel++down++explode(Ky)++up++sentinel
+    }
+  | typeDef(Lhs,Rhs) => valof{
+      (XL,XP,XR) = infixPr("::=");
+      valis dispType(Lhs,XL,depth,Env)++" ::= "++dispTypeList(Rhs,"[",",","]",XR,depth,Env)
+    }
+  };
+
+  upper(TTp) => valof{
+    Tp = deRef(TTp);
+
+    if varType(_,_,_,_,A,_,_,Ky).=TTp then{
+      T : A();
+
+      while varType(_,_,_,_,AA,_,_,aKy).=T && aKy!=Ky do{
+        T := AA();
+      };
+      valis T;
+    }
+    else
+      valis Tp
+  };
+
+  showTypeDef(Name,Tp) => case freshen(Tp) in {
+    (_,typeDef(Lhs,Rhs)) => valof{
+      out:"";
+      sep : "";
+      LL = showType(Lhs);
+      for T in Rhs do{
+        case T in {
+          uType(_,_,_) ->
+            out := out++sep++LL++"<~"++showType(T)
+        | faceType([])::listlen(Rhs)!=1 -> {}
+        | faceType(M) ->{
+            o : "{";
+            s : "";
+            for (Fld,Mode,fT) in M do{
+              o := o++s++Fld++showBind(Mode)++showType(fT);
+              s := ". ";
+            };
+            out := out++sep++LL++"<~ "++o++"}"
+          }
+        | _ ->
+            exception error("bad type in typedef: "<>showType(T),'internal)
+        };
+        sep := "\n";
+      };
+      valis out
+    }
+  | _ => showType(Tp)
+  };
+
+  showBind(Mode) => case Mode in{
+    varBind => ":"
+  | tvarBind => "%"
+  | typeBind => "::="
+  | pkgBind => "%%="
+  };
+
+  dispTypeList(L,pre,mid,pst,prior,depth,Env) => valof{
+    S : pre;
+    sep : "";
+
+    for T in L do{
+      S := S<>sep<>dispType(T,prior,depth,Env);
+      sep := mid;
+    };
+    valis S<>pst
+  };
+
+  typeMode(M) => case M in {
+    inpMode => "+"
+  | superMode => "++"
+  | outMode => "-"
+  | biMode => "-+"
+  };
+
+  dispTypeArgs(L,pre,mid,pst,prior,depth,Env,Deflt) => valof{
+    S : pre;
+    sep : "";
+
+    for (T,M) in L do{
+      S := S<>sep<>dispType(T,prior,depth,Env)<>
+      {if M!=Deflt then typeMode(M) else ""};
+      sep := mid;
+    };
+    valis S<>pst
+  };
+
+  shPar(XP,prior,P) => {
+    if XP>prior then
+      P
+    else
+      ""
+  };
+
+  showEnv(Env)=>showEnvD(Env,listlen(Env));
+
+  showEnvD(Env,D) => valof{
+    Depth : D;
+    str : "";
+    sep : "";
+    XX :: {
+      for (Nm,Mode,Val) in Env do{
+	Depth := Depth-1;
+	if Depth<0 then{
+	  str := str++"...";
+	  leave XX;
+        };
+        if Mode==typeBind then
+          str := str++sep++showTypeDef(Nm,Val) 
+        else
+          str := str++sep++string%%Nm++showBind(Mode)++showType(Val);
+        sep := ", ";
+      }
+    };
+    valis str;
+  };
+
+  typeArity(uType(_,_,A))=>listlen(A);
+
+  checkForReferences(Tp,Refs,PkgList) => case deRef(Tp) in {
+    bound(_) => Refs
+  | voidType => Refs
+  | topType => Refs
+  | typeType => Refs
+  | tplType(L) => valof{
+      RR : Refs;
+      for E in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis RR;
+    }
+  | enuType(R) => checkForReferences(R,Refs,PkgList)
+
+  | conType(L,R) => valof{
+      RR : Refs;
+      for E in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis checkForReferences(R,RR,PkgList);
+    }
+  | sconType(L,R) => valof{
+      RR : Refs;
+      for (E,_) in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis checkForReferences(R,RR,PkgList);
+    }
+  | funType(L,R) => valof{
+      RR : Refs;
+      for (E,_) in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis checkForReferences(R,RR,PkgList);
+    }
+  | predType(L) => valof{
+      RR : Refs;
+      for (E,_) in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis RR;
+    }
+  | grType(L,R) => valof{
+      RR : Refs;
+      for (E,_) in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis checkForReferences(R,RR,PkgList);
+    }
+  | actType(L) => valof{
+      RR : Refs;
+      for (E,_) in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis RR;
+    }
+  | faceType(M) => valof{
+      RR : Refs;
+      for (_,_,E) in M do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis RR;
+    }
+  | allType(V,G,T) => 
+      checkForReferences(G,checkForReferences(T,Refs,PkgList),PkgList)
+
+  | uType(Pkg,Nm,L) => valof{
+      RR : Refs;
+      for E in L do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      if Pkg!="go.stdlib" && (Pkg,pkTps,_) in PkgList then{
+	if (Nm,typeBind,uT) in pkTps && !(Pkg,Nm,_,_) in RR then
+	  RR := checkForReferences(uT,[(Pkg,Nm,typeBind,uT),..RR],PkgList);
+      };
+
+      valis RR;
+    }
+  | typeDef(L,R) => valof{
+      RR : Refs;
+      for E in R do{
+        RR := checkForReferences(E,RR,PkgList);
+      };
+      valis checkForReferences(L,RR,PkgList)
+    }
+  | varType(Lx,_,Ex,_,Ux,_,Nm,Kk) => 
+      checkForReferences(Ux(),checkForReferences(Lx(),Refs,PkgList),PkgList)
+  };
+
+  reexportTypes(Exported,Imps) => collect{
+    ReX : [];
+    for (Nm,_,Tp) in Exported do
+      ReX := checkForReferences(Tp,ReX,Imps);
+
+    for (_,Nm,M,Tp) in ReX do{
+      if !(Nm,_,_) in Exported then
+	elemis (Nm,M,Tp)
+    };
+  };
+      
+} export (lookupType, freshen, fieldsOf,
+          stripForAlls,substituteType,substituteTypeList,
+          ndType,ndEl,ndContext,newVr,newVar,upper,deRef,inUpper,inLower,isUnbound,
+          showType,showTypeDef,typeArity,
+          isProgramType,isFunctionType,isPredType,isGrammarType,isActionType,
+          doReset,currReset,isReferenced,reexportTypes,isReadOnly,
+          showEnv,showEnvD)
+
+

@@ -1,0 +1,368 @@
+autoscan: warning: missing AC_CHECK_FUNCS([atexit]) wanted by: 
+	Engine/main.c:480
+	IoLib/file.c:879
+	IoLib/io.c:106
+autoscan: warning: missing AC_CHECK_FUNCS([dup2]) wanted by: 
+	IoLib/pipe.c:190
+	IoLib/pipe.c:190
+	IoLib/pipe.c:191
+	IoLib/pipe.c:191
+autoscan: warning: missing AC_CHECK_FUNCS([floor]) wanted by: 
+	Engine/arith.c:1132
+	Engine/date.c:63
+	Engine/date.c:137
+	Engine/Headers/floats.h:121
+autoscan: warning: missing AC_CHECK_FUNCS([getcwd]) wanted by: 
+	Engine/dir.c:564
+	Engine/main.c:417
+	IoLib/url.c:206
+autoscan: warning: missing AC_CHECK_FUNCS([gethostbyaddr]) wanted by: 
+	IoLib/hosts.c:159
+	IoLib/hosts.c:235
+autoscan: warning: missing AC_CHECK_FUNCS([gethostbyname]) wanted by: 
+	IoLib/hosts.c:173
+	IoLib/hosts.c:201
+autoscan: warning: missing AC_CHECK_FUNCS([inet_ntoa]) wanted by: 
+	IoLib/hosts.c:189
+	IoLib/hosts.c:229
+	IoLib/hosts.c:320
+	IoLib/hosts.c:353
+	IoLib/hosts.c:372
+	IoLib/sock.c:360
+	IoLib/sock.c:398
+	IoLib/ssl.c:145
+	IoLib/ssl.c:197
+	IoLib/udp.c:18
+autoscan: warning: missing AC_CHECK_FUNCS([memset]) wanted by: 
+	Engine/encoded.c:83
+	Engine/encoded.c:84
+	Engine/gc.c:306
+	Engine/gc.c:954
+	IoLib/sock.c:309
+	IoLib/sock.c:336
+	IoLib/sock.c:445
+	IoLib/ssl.c:96
+	IoLib/ssl.c:125
+	IoLib/ssl.c:247
+	IoLib/udp.c:54
+	IoLib/udp.c:115
+autoscan: warning: missing AC_CHECK_FUNCS([mkdir]) wanted by: 
+	Engine/dir.c:234
+autoscan: warning: missing AC_CHECK_FUNCS([modf]) wanted by: 
+	Engine/arith.c:1575
+	Engine/date.c:72
+	Engine/date.c:146
+	Engine/date.c:254
+	Engine/date.c:324
+	Engine/encoded.c:737
+	IoLib/formout.c:219
+autoscan: warning: missing AC_CHECK_FUNCS([pow]) wanted by: 
+	Engine/arith.c:861
+	IoLib/formin.c:113
+	IoLib/formin.c:115
+autoscan: warning: missing AC_CHECK_FUNCS([putenv]) wanted by: 
+	Engine/setenv.c:43
+	IoLib/setenv.c:76
+autoscan: warning: missing AC_CHECK_FUNCS([rmdir]) wanted by: 
+	Engine/dir.c:269
+autoscan: warning: missing AC_CHECK_FUNCS([setlocale]) wanted by: 
+	Engine/main.c:405
+autoscan: warning: missing AC_CHECK_FUNCS([sqrt]) wanted by: 
+	Engine/arith.c:889
+autoscan: warning: missing AC_CHECK_FUNCS([strchr]) wanted by: 
+	Engine/envir.c:111
+	Engine/main.c:103
+	Engine/main.c:123
+	Engine/main.c:315
+	IoLib/formout.c:584
+	IoLib/formout.c:610
+	IoLib/parseUni.c:100
+	IoLib/parseUni.c:101
+	IoLib/parseUni.c:102
+	IoLib/url.c:268
+autoscan: warning: missing AC_CHECK_FUNCS([strdup]) wanted by: 
+	Engine/escapes.c:161
+	Engine/exec.c:195
+	Engine/exec.c:217
+	Engine/fileio.c:684
+	Engine/fileio.c:701
+	IoLib/setenv.c:66
+autoscan: warning: missing AC_CHECK_FUNCS([strtol]) wanted by: 
+	Engine/debug.c:38
+	Engine/debug.c:49
+	IoLib/hosts.c:118
+autoscan: warning: missing AC_CHECK_FUNCS([strtoul]) wanted by: 
+	IoLib/parseUni.c:79
+autoscan: warning: missing AC_CHECK_HEADERS([arpa/inet.h]) wanted by: 
+	IoLib/hosts.c:32
+	IoLib/sock.c:38
+	IoLib/ssl.c:37
+autoscan: warning: missing AC_CHECK_HEADERS([float.h]) wanted by: 
+	IoLib/formout.c:28
+autoscan: warning: missing AC_CHECK_HEADERS([libintl.h]) wanted by: 
+	Headers/local.h:123
+autoscan: warning: missing AC_CHECK_HEADERS([locale.h]) wanted by: 
+	Engine/main.c:34
+autoscan: warning: missing AC_CHECK_HEADERS([netdb.h]) wanted by: 
+	ext/ssl/common.c:17
+	IoLib/hosts.c:33
+	IoLib/sock.c:37
+	IoLib/ssl.c:36
+autoscan: warning: missing AC_CHECK_HEADERS([netinet/in.h]) wanted by: 
+	ext/ssl/common.c:15
+	IoLib/hosts.c:31
+	IoLib/sock.c:35
+	IoLib/ssl.c:34
+autoscan: warning: missing AC_CHECK_HEADERS([sys/param.h]) wanted by: 
+	IoLib/hosts.c:39
+autoscan: warning: missing AC_CHECK_HEADERS([sys/socket.h]) wanted by: 
+	ext/ssl/common.c:14
+	IoLib/hosts.c:30
+	IoLib/sock.c:34
+	IoLib/ssl.c:33
+autoscan: warning: missing AC_C_INLINE wanted by: 
+	Engine/clock.c:92
+	Engine/debug.c:323
+	Engine/encoded.c:525
+	Engine/encoded.c:530
+	Engine/eval.c:124
+	Engine/eval.c:202
+	Engine/eval.c:214
+	Engine/eval.c:223
+	Engine/eval.c:234
+	Engine/eval.c:244
+	Engine/gc.c:131
+	Engine/gc.c:145
+	Engine/list.c:36
+	Engine/list.c:41
+	Engine/list.c:52
+	Engine/process.c:498
+	Engine/process.c:503
+	Engine/Headers/atts.h:41
+	Engine/Headers/atts.h:46
+	Engine/Headers/atts.h:52
+	Engine/Headers/atts.h:59
+	Engine/Headers/atts.h:66
+	Engine/Headers/atts.h:71
+	Engine/Headers/atts.h:78
+	Engine/Headers/atts.h:85
+	Engine/Headers/atts.h:92
+	Engine/Headers/atts.h:124
+	Engine/Headers/atts.h:138
+	Engine/Headers/atts.h:158
+	Engine/Headers/char.h:32
+	Engine/Headers/char.h:37
+	Engine/Headers/char.h:43
+	Engine/Headers/char.h:52
+	Engine/Headers/code.h:41
+	Engine/Headers/code.h:46
+	Engine/Headers/code.h:51
+	Engine/Headers/code.h:59
+	Engine/Headers/code.h:66
+	Engine/Headers/code.h:71
+	Engine/Headers/code.h:77
+	Engine/Headers/code.h:83
+	Engine/Headers/code.h:94
+	Engine/Headers/code.h:100
+	Engine/Headers/cons.h:38
+	Engine/Headers/cons.h:43
+	Engine/Headers/cons.h:48
+	Engine/Headers/cons.h:54
+	Engine/Headers/cons.h:59
+	Engine/Headers/cons.h:64
+	Engine/Headers/cons.h:69
+	Engine/Headers/cons.h:76
+	Engine/Headers/cons.h:83
+	Engine/Headers/cons.h:90
+	Engine/Headers/cons.h:100
+	Engine/Headers/cons.h:107
+	Engine/Headers/cons.h:125
+	Engine/Headers/cons.h:144
+	Engine/Headers/cons.h:167
+	Engine/Headers/cons.h:186
+	Engine/Headers/cons.h:204
+	Engine/Headers/cons.h:211
+	Engine/Headers/cons.h:219
+	Engine/Headers/eval.h:53
+	Engine/Headers/eval.h:66
+	Engine/Headers/eval.h:71
+	Engine/Headers/eval.h:82
+	Engine/Headers/floats.h:42
+	Engine/Headers/floats.h:62
+	Engine/Headers/floats.h:67
+	Engine/Headers/floats.h:74
+	Engine/Headers/floats.h:87
+	Engine/Headers/floats.h:92
+	Engine/Headers/floats.h:98
+	Engine/Headers/floats.h:105
+	Engine/Headers/floats.h:110
+	Engine/Headers/floats.h:118
+	Engine/Headers/floats.h:134
+	Engine/Headers/floats.h:156
+	Engine/Headers/handle.h:12
+	Engine/Headers/handle.h:24
+	Engine/Headers/heap.h:43
+	Engine/Headers/heap.h:48
+	Engine/Headers/heap.h:61
+	Engine/Headers/heap.h:70
+	Engine/Headers/heap.h:75
+	Engine/Headers/heap.h:80
+	Engine/Headers/heap.h:96
+	Engine/Headers/list.h:41
+	Engine/Headers/list.h:46
+	Engine/Headers/list.h:54
+	Engine/Headers/list.h:61
+	Engine/Headers/list.h:68
+	Engine/Headers/list.h:83
+	Engine/Headers/list.h:89
+	Engine/Headers/list.h:97
+	Engine/Headers/list.h:108
+	Engine/Headers/list.h:127
+	Engine/Headers/list.h:132
+	Engine/Headers/list.h:137
+	Engine/Headers/opaque.h:52
+	Engine/Headers/opaque.h:57
+	Engine/Headers/opaque.h:63
+	Engine/Headers/opaque.h:70
+	Engine/Headers/symbols.h:76
+	Engine/Headers/symbols.h:81
+	Engine/Headers/symbols.h:89
+	Engine/Headers/symbols.h:96
+	Engine/Headers/symbols.h:110
+	Engine/Headers/symbols.h:121
+	Engine/Headers/symbols.h:136
+	Engine/Headers/symbols.h:149
+	Engine/Headers/vars.h:33
+	Engine/Headers/vars.h:38
+	Engine/Headers/vars.h:45
+	Engine/Headers/vars.h:55
+	Engine/Headers/vars.h:66
+	Engine/Headers/word.h:112
+	Engine/Headers/word.h:123
+	Engine/Headers/word.h:134
+	Engine/Headers/word.h:139
+	Engine/Headers/word.h:144
+	Engine/Headers/word.h:149
+	Engine/Headers/word.h:205
+	Headers/opcodes.h:63
+	Headers/opcodes.h:68
+	Headers/opcodes.h:73
+	Headers/opcodes.h:78
+	Headers/opcodes.h:83
+	Headers/opcodes.h:88
+	Headers/opcodes.h:93
+	Headers/opcodes.h:98
+	Headers/opcodes.h:103
+	Headers/opcodes.h:108
+	IoHeaders/ioP.h:88
+	IoHeaders/linked.h:39
+	IoHeaders/linked.h:44
+	IoLib/formout.c:54
+	IoLib/pool.c:65
+	IoLib/url.c:34
+autoscan: warning: missing AC_FUNC_CLOSEDIR_VOID wanted by: 
+	Engine/dir.c:647
+autoscan: warning: missing AC_FUNC_FORK wanted by: 
+	Engine/exec.c:223
+	IoLib/file.c:869
+	IoLib/pipe.c:165
+autoscan: warning: missing AC_FUNC_GETGROUPS wanted by: 
+	Engine/fileio.c:167
+	Engine/fileio.c:173
+autoscan: warning: missing AC_FUNC_MALLOC wanted by: 
+	Engine/encoded.c:65
+	Engine/encoded.c:74
+	Engine/encoded.c:262
+	Engine/encoded.c:265
+	Engine/encoded.c:304
+	Engine/encoded.c:627
+	Engine/encoded.c:637
+	Engine/encoded.c:1091
+	Engine/encoded.c:1366
+	Engine/encoded.c:1369
+	Engine/encoded.c:1417
+	Engine/fileio.c:1373
+	Engine/fileio.c:1716
+	Engine/gc.c:79
+	Engine/gc.c:121
+	Engine/gc.c:207
+	Engine/gc.c:221
+	Engine/gc.c:418
+	Engine/gc.c:512
+	Engine/heap.c:58
+	Engine/heap.c:116
+	Engine/main.c:118
+	Engine/main.c:130
+	Engine/process.c:174
+	Engine/process.c:545
+	Engine/setenv.c:37
+	Engine/string.c:593
+	Engine/string.c:595
+	Engine/string.c:626
+	Engine/string.c:628
+	Engine/verify.c:382
+	Engine/verify.c:591
+	Engine/verify.c:604
+	IoLib/hash.c:64
+	IoLib/hash.c:73
+	IoLib/pool.c:80
+	IoLib/setenv.c:53
+	IoLib/setenv.c:65
+	IoLib/strio.c:309
+	IoLib/unicode.c:196
+	IoLib/unicode.c:211
+autoscan: warning: missing AC_FUNC_MKTIME wanted by: 
+	Engine/clock.c:80
+	Engine/date.c:268
+autoscan: warning: missing AC_FUNC_REALLOC wanted by: 
+	Engine/encoded.c:139
+	Engine/encoded.c:449
+	Engine/encoded.c:481
+	Engine/encoded.c:692
+	Engine/encoded.c:912
+	Engine/gc.c:76
+	Engine/gc.c:231
+	Engine/gc.c:509
+	Engine/heap.c:121
+	Engine/verify.c:589
+	IoLib/strio.c:189
+autoscan: warning: missing AC_FUNC_SELECT_ARGTYPES wanted by: 
+	Engine/schedule.c:75
+	Engine/schedule.c:115
+	IoLib/file.c:360
+	IoLib/file.c:390
+	IoLib/file.c:846
+autoscan: warning: missing AC_FUNC_STAT wanted by: 
+	Engine/dir.c:346
+	Engine/dir.c:389
+	Engine/dir.c:467
+	Engine/dir.c:510
+	Engine/dir.c:611
+	Engine/fileio.c:139
+	Engine/fileio.c:158
+	IoLib/file.c:635
+autoscan: warning: missing AC_HEADER_DIRENT wanted by: 
+	Engine/class.c:31
+	Engine/dir.c:40
+	Engine/fileio.c:37
+	Engine/loader.c:31
+	Engine/tcp.c:34
+	Engine/Headers/unix.h:16
+	IoLib/parseUni.c:28
+	IoLib/url.c:31
+autoscan: warning: missing AC_HEADER_STDBOOL wanted by: 
+	Engine/main.c:53
+	Engine/wxml.c:227
+	Engine/wxml.c:234
+	Engine/wxml.c:269
+autoscan: warning: missing AC_PROG_RANLIB wanted by: 
+	ltmain.sh:4949
+autoscan: warning: missing AC_STRUCT_TIMEZONE wanted by: 
+	Engine/date.c:118
+	Engine/date.c:194
+autoscan: warning: missing AC_TYPE_UID_T wanted by: 
+	Engine/fileio.c:154
+	Engine/fileio.c:170
+	Engine/fileio.c:170
+	Engine/fileio.c:170
+	Engine/fileio.c:153

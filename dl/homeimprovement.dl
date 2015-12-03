@@ -1,0 +1,31 @@
+homeimprovement{
+
+  -- A Sample ontology in the DL language
+
+  Action == $instrument=Instrument && $agent=Agent && $target=Feature &&
+  	    $location=Location && $reason=Reason && $display=Word.
+
+  Agent == $canPerform=Action && $display=Word .
+
+  Instrument <= thing.
+
+  Feature <= thing.
+
+  Location <= Feature.
+
+  Word <= #en .
+
+  Reason == { iWantTo, aFire, anEarthquake, aFlood, aFreeze }.
+
+  Pipework == Feature && location=home.
+
+  FixPlumbing == Action && $target=Pipework.
+
+  ThawPipes == FixPlumbing && reason=aFreeze.
+
+  CleanDrains == FixPlumbing && target=drains.
+
+  Bedroom <= Location.
+
+  drains{ Pipework && display=wordDrains }.
+}

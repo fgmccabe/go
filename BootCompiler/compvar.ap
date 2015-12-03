@@ -1,0 +1,222 @@
+/*
+* Handle variable-level compilation; i.e., variable-variable unification etc.
+ */
+#include "go.ah";			-- standard header for the compiler
+#include "instr.ah";			-- pick up the instruction definition
+
+module
+import {
+  interface "misc.af" and
+  interface "display.af" and
+  interface "errors.af" and
+  interface "dict.af" and
+  interface <stdio.af>
+} in
+{
+  uVar(Dst,Src,Opts,Refs,Used,last) => {
+    case Dst in {
+      voidVar => ([],Refs,Used)
+    | aReg(Reg) => {
+	case Src in {
+	  aReg(!Reg) => ([],Refs,Used)
+	| aReg(Rg) => ([uAA(Reg,Rg)],Refs,Used)
+	| yReg(Lc,_) => ([uAY(Reg,Lc)],Refs,Used)
+	| sReg => ([uAS(Reg)],Refs,Used)
+	| _ => exception error("invalid source (uA)"++Src^0,'fail)
+	}
+      }
+    | yReg(Loc,Safe)  => {
+	case Src in {
+	  aReg(Reg) => ([uAY(Reg,Loc)],Refs,Used)
+	| yReg(!Loc,_) => ([],Refs,Used)
+	| yReg(Lc,_)::Loc<255 && Lc<255 => ([uYY(Loc,Lc)],Refs,Used)
+	| yReg(Lc,_) => ([mAY(0,Loc),uAY(0,Lc)],Refs,Used)
+	| sReg => ([uYS(Loc)],Refs,Used)
+	| _ => exception error("invalid source (uY)"++Src^0,'fail)
+	}
+      }
+    | sReg => {
+	case Src in {
+	  aReg(Reg) => ([uAS(Reg)],Refs,Used)
+	| yReg(Lc,_) => ([uYS(Lc)],Refs,Used)
+	| _ => exception error("invalid source (uS)"++Src^0,'fail)
+	}
+      }
+
+    | _ => exception error("invalid destination (u)"++Dst^0,'fail)
+    }
+  };
+
+  mVar(Dst,Src,Opts,Refs,Used,last) => {
+    case Dst in {
+      voidVar => ([],Refs,Used)
+    | aReg(Reg) => {
+	case Src in {
+	  aReg(!Reg) => ([],Refs,regUsed(Used,Reg))
+	| aReg(Rg) => ([mAA(Reg,Rg)],Refs,regUsed(Used,Reg))
+	| yReg(Lc,safe)::safe || !last =>([mAY(Reg,Lc)],Refs,regUsed(Used,Reg))
+	| yReg(Lc,_) => ([muAY(Reg,Lc)],Refs,regUsed(lclGc(Used,2),Reg))
+	| sReg => ([mAS(Reg)],Refs,regUsed(Used,Reg))
+	| _ => exception error("invalid source (mA)"++Src^0++"->"++Dst^0,'fail)
+	}
+      }
+    | yReg(Loc,Safe)  => {
+	case Src in {
+	  aReg(Reg) => ([mYA(Loc,Reg)],Refs,locUsed(Used,Loc))
+	| yReg(!Loc,_) => ([],Refs,Used)
+	| yReg(Lc,_) :: Lc<255 && Loc<255 => ([mYY(Loc,Lc)],Refs,locUsed(Used,Loc))
+	| yReg(Lc,_) => ([mAY(0,Lc),mYA(Loc,0)],Refs,locUsed(Used,Loc))
+	| sReg => ([mYS(Loc)],Refs,locUsed(Used,Loc))
+	| _ => exception error("invalid source (mY)"++Src^0,'fail)
+	}
+      }
+
+    | sReg => {
+	case Src in {
+	  aReg(Reg) => ([mSA(Reg)],Refs,Used)
+	| yReg(Lc,_) => ([mSY(Lc)],Refs,Used)
+	| _ => exception error("invalid source (mS)"++Src^0,'fail)
+	}
+      }
+
+    | _ => exception error("invalid destination (m)"++Dst^0,'fail)
+    }
+  };
+
+  oVar(Dst,Src,Opts,Refs,Used,last) => {
+    case Dst in {
+      voidVar => ([],Refs,Used)
+    | aReg(Reg) => {
+	case Src in {
+	  aReg(!Reg) => ([],Refs,regUsed(Used,Reg))
+	| aReg(Rg) => ([mAA(Reg,Rg)],Refs,regUsed(Used,Reg))
+	| yReg(Lc,safe)::safe || !last =>([mAY(Reg,Lc)],Refs,regUsed(Used,Reg))
+	| yReg(Lc,_) => ([muAY(Reg,Lc)],Refs,regUsed(lclGc(Used,2),Reg))
+	| sReg => ([mAS(Reg)],Refs,regUsed(Used,Reg))
+	| _ => exception error("invalid source (oA)"++Src^0++"->"++Dst^0,'fail)
+	}
+      }
+    | yReg(Loc,Safe)  => {
+	case Src in {
+	  aReg(Reg) => ([oYA(Loc,Reg)],Refs,locUsed(Used,Loc))
+	| yReg(!Loc,_) => ([],Refs,Used)
+	| yReg(Lc,_) => ([mAY(0,Lc),oYA(Loc,0)],Refs,locUsed(Used,Loc))
+	| sReg => ([mYS(Loc)],Refs,locUsed(Used,Loc))
+	| _ => exception error("invalid source (oY)"++Src^0,'fail)
+	}
+      }
+
+    | _ => exception error("invalid destination (o)"++Dst^0,'fail)
+    }
+  };
+
+  mtVar(Dst,Src,Opts,Refs,Used,last) => {
+    case Dst in {
+      voidVar => ([],Refs,Used)
+    | aReg(Reg) => {
+	case Src in {
+	  aReg(!Reg) => ([],Refs,Used)
+	| aReg(Rg) => ([nvrA(Reg),cAA(Reg,Rg)],Refs,Used)
+	| yReg(Lc,_) => ([nvrA(Reg),cAY(Reg,Lc)],Refs,Used)
+	| sReg => ([nvrA(Reg),cAS(Reg)],Refs,Used)
+	| _ => exception error("invalid source (mtA)"++Src^0,'fail)
+	}
+      }
+    | yReg(Lc,_) => {
+	case Src in {
+	  aReg(Rg) => ([nvrY(Lc),cYA(Lc,Rg)],Refs,Used)
+	| yReg(!Lc,_) => ([],Refs,Used)
+	| yReg(Lcl,_) => ([nvrY(Lc),mAY(0,Lc),cAY(0,Lcl)],Refs,Used)
+	| sReg => ([nvrY(Lc),cYS(Lc)],Refs,Used)
+	| _ => exception error("invalid source (mtA)"++Src^0,'fail)
+	}
+      }
+    | sReg => {
+	case Src in {
+	  aReg(Reg) => ([cSA(Reg)],Refs,Used)
+	| yReg(Lc,_) => ([cSY(Lc)],Refs,Used)
+	| _ => exception error("invalid source (mtS)"++Src^0,'fail)
+	}
+      }
+    | _ => exception error("invalid destination (mtVar)"++Dst^0,'fail)
+    }
+  };
+
+  clVar(Dst,Opts,Refs,Used,last) => {
+    case Dst in {
+      voidVar => ([],Refs,Used)
+    | aReg(Reg) => ([clA(Reg)],Refs,regUsed(lclGc(Used,2),Reg))
+    | yReg(Loc,Safe)  => ([clY(Loc)],Refs,locUsed(Used,Loc))
+    | sReg => ([clS],Refs,Used)
+    | _ => exception error("invalid destination (c)"++Dst^0,'fail)
+    }
+  };
+
+ /* First use of a variable -- clear source and destination */
+  cVar(Dst,Src,Opts,Refs,Used,last) => {
+    case Src in {
+      voidVar => clVar(Dst,Opts,Refs,Used,last)
+    | aReg(Reg) => {
+	case Dst in {
+	  voidVar => clVar(Src,Opts,Refs,Used,last)
+	| sReg => ([clSA(Reg)],Refs,regUsed(Used,Reg))
+	| aReg(!Reg) => ([clA(Reg)],Refs,regUsed(lclGc(Used,2),Reg))
+	| aReg(Rg) => ([clAA(Reg,Rg)],Refs,regUsed(regUsed(lclGc(Used,2),Rg),Reg))
+	| yReg(Lc,_) => ([clAY(Reg,Lc)],Refs,locUsed(regUsed(Used,Reg),Lc))
+	| _ => exception error("invalid destination (clA) "++Dst^0,'fail)
+	}
+      }
+
+    | yReg(Loc,_) => {
+	case Dst in {
+	  voidVar => clVar(Src,Opts,Refs,Used,last)
+	| sReg => ([clSY(Loc)],Refs,locUsed(Used,Loc))
+	| aReg(Rg) => ([clAY(Rg,Loc)],Refs,locUsed(regUsed(Used,Rg),Loc))
+	| yReg(!Loc,_) => ([clY(Loc)],Refs,locUsed(Used,Loc))
+	| yReg(Lc,_) => ([clY(Lc),mAY(0,Lc),mYA(Loc,0)],Refs,locUsed(Used,Lc))
+	| _ => exception error("Cant clear variable",'fail)
+	}
+      }
+    | _ => exception error(Src^0++" should be initialized",'fail)
+    }
+  };
+      
+  largest(S) => valof{
+    Mx : 0;
+    for E in S do{
+      if E>Mx then
+	Mx := E;
+    };
+    valis Mx;
+  };
+
+  map2num(S) => valof{
+    I : 0;
+    for E in S do
+      I := bor(I,bleft(1,E));
+    valis I;
+  };
+
+  gcMap(usdRgs(Reg,Locs,frReg,EnvSize,lclG),Arity) => valof{
+    Esize : 0;
+    Pre = collect{
+      if Locs!=[] then {
+        for l in Locs do{
+          if l>Esize then
+            Esize := l;
+        };
+	for i in 1..Esize do{
+	  if ! i in Locs then
+	    elemis clY(i)
+	}
+      };
+      for i in 1..Arity do{
+        if !i in Reg then
+          elemis vdA(i)
+      }
+    };
+
+    valis (Pre,gcmap(Arity,Esize))
+  };
+
+} export (uVar, mVar, oVar, mtVar, clVar, cVar, gcMap, map2num,largest);

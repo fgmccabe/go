@@ -1,0 +1,139 @@
+\chapter{Installing \go}
+\label{install}
+
+This appendix gives instructions on installing \go and \april on a Unix-based system. It is possible to install and use both on a Windows system, under Cygwin; however this is beyond the scope of this chapter to explain how.
+
+\emph{Warning:}
+\begin{quote}
+The information in this appendix is subject to change and may be different in your situation.
+\end{quote}
+
+\section{Getting \go}
+The installation of \go requires the installation of three packages: \q{ooio}, \april and \go proper. For a number of reasons, \go is currently only distributed as source.
+
+The \q{ooio} library is a basic library that supports many functions of the other two packages.
+
+The \april language system is a full programming language. It is used only to compile \go programs, however.
+
+The \go language system is the complete engine, compiler and documentation.
+
+A good place to get the source tarballs for these packages is
+\begin{alltt}
+http://homepage.mac.com/frankmccabe
+\end{alltt}
+
+Assuming that you have the files \q{ooio-\em{date}.tgz}, \q{april-\em{date}.tgz} and \q{go-\em{date}.tgz} then the process involves first of all compiling and installing \q{ooio}, then \april, and then doing a similar job for \go.
+
+\section{Installation directory}
+The systems \q{ooio}, \april and \go are designed to be installed by default in the directories \q{/opt/ooio}, \q{/opt/april} and \q{/opt/go} respectively. It is possible to set up both to install in different locations; for example in your home directory. However, we \emph{do not} recommend installing either in the `standard' installation directories \q{/usr/bin} and/or \q{/usr/local/bin}. However, it is certainly possible to install \emph{links} to the \april/\go compilers and run-time systems in those locations.
+
+The installation directory is important as it includes a number of files that are important for the smooth running of both \april and \go.
+
+You can make the appropriate directories in the default locations using:
+\begin{alltt}
+\% mkdir /opt/nar /opt/april /opt/go
+\% chown <yourUserName> /opt/nar /opt/april /opt/go
+\end{alltt}
+
+\section{Building the \q{ooio} library}
+Unpack the \q{ooio-\em{date}.tgz} file and enter the \q{ooio} top-level directory. The \q{ooio} library is set up to use the \q{configure} script -- which was automatically generated using a combination of \q{automake} and \q{autoconf}. 
+
+To configure \q{ooio} run the \q{autogen.sh} script:
+\begin{alltt}
+ooio \% ./configure [--prefix=\emph{dir}]
+\ldots
+\end{alltt}
+It is only necessary to supply the \q{--prefix} argument if \q{/opt/ooio} is not the preferred installation directory.
+
+Once configured, compile the library using the \q{make} command:
+\begin{alltt}
+ooio \% make all
+\end{alltt}
+
+If you own the target directory, then you can simply:
+\begin{alltt}
+ooio \% make install
+\end{alltt}
+to install it; otherwise, try:
+\begin{alltt}
+ooio \% sudo make install
+\end{alltt}
+remembering, of course, that the password the system will ask for is your's, not that of root.
+
+\section{Building \april}
+The process to build and install \april is similar to that for the \q{ooio} library; with the additional wrinkle of dealing with a non-standard location for the \q{ooio} library.
+
+Unpack the \q{april.tgz} tarball and enter the \q{april5} directory. 
+
+To configure \april run the \q{configure} script:
+\begin{alltt}
+april5 \% ./configure [--prefix=\emph{dir}] [--with-ooio=\emph{ooioDir}]
+\ldots
+\end{alltt}
+It is only necessary to supply the \q{--prefix} argument if \q{/opt/april} is not the preferred installation directory, and the \q{--with-ooio} argument is only needed if you installed \q{ooio} in a non-standard place.
+
+Once configured, compile \april and install it using the \q{make} command:
+\begin{alltt}
+april5 \% make all install
+\end{alltt}
+
+\subsection{Paths}
+Since \april (and \go) are designed to install in their own directories, it is useful to extend the \q{path} environment to include them. You can do this in your \q{.bash\_login} file in your home directory\note{The process for doing this if you use a different shell will be similar.}:
+\begin{alltt}
+export PATH=\$PATH:/opt/april/bin:/opt/go/bin
+\end{alltt}
+
+\section{Building \go}
+The process for setting up \go is exactly analogous to that for \april; excepting that if you have installed \april in a non-standard directory, you need to inform \go's configuration script:
+\begin{alltt}
+go \% ./configure[--with-april=\emph{dir}] [--with-ooio=\emph{ooioDir}]
+\end{alltt}
+
+Making \go is also similar:
+\begin{alltt}
+go \% make
+\end{alltt}
+There is one additional step in building \go: checking that everything is running Ok. The command:
+\begin{alltt}
+go \% make check
+\end{alltt}
+will check out quite a few of the features of \go. If this test does not terminate normally then is there is likely a problem that needs to be sorted out.
+
+Assuming that the test works out, install \go:
+\begin{alltt}
+go \% make install
+\end{alltt}
+
+\section{Setting up EMACS}
+\label{install:emacs}
+The \go (and \april) systems come with special modes for the GNU EMACS editor.\note{Editor does not do justice to EMACS, it is more like a language/editor/operating system; if a little old-fashioned.}
+
+To access the EMACS modes for \go and \april, you will need to modify your \q{.emacs} file. Just edit that file (in EMACS of course), and make sure that the following lines:
+\begin{alltt}
+(add-to-list 'load-path "/opt/go/share/emacs/site-lisp")
+(add-to-list 'load-path "/opt/april/share/emacs/site-lisp")
+
+;;; April mode
+(autoload 'april-mode "april")
+(setq auto-mode-alist 
+  (cons '("\bsl\bsl.ap\bsl\bsl{}|.ah\$" . april-mode) auto-mode-alist))
+(add-hook 'april-mode-hook 'turn-on-font-lock)
+
+;;; Go! mode
+(autoload 'go-mode "go")
+(setq auto-mode-alist 
+  (cons '("\bsl\bsl.\bsl\bsl(go\bsl\bsl|gof\bsl\bsl|gh\bsl\bsl)\$" . go-mode) 
+    auto-mode-alist))
+(add-hook 'go-mode-hook 'turn-on-font-lock)
+\end{alltt}
+alltt in there somewhere.
+
+With \go mode turned on, EMACS knows how to indent \go programs according to the informal style formatting rules (very similar to those used in this book).
+
+\section{\go Reference}
+The \go reference manual will be located in the file:
+\begin{alltt}
+/opt/go/Doc/go-ref.pdf
+\end{alltt}
+
+

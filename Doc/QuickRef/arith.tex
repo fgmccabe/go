@@ -1,0 +1,301 @@
+\chapter{Arithmetic Primitives}
+
+\go has two fundamental numeric types -- \q{integer} and \q{float}. These types are not in a sub-type relationship to each other; however, they are both sub types of the \q{number} type. I.e., the type lattice is defined by:
+\begin{alltt}
+integer\impl{}number.
+float\impl{}number.
+\end{alltt}
+Most arithmetic functions are polymorphic where the arguments are a sub-type of \q{number}. For example, the \q{+} function is polymorphic, where both arguments must be either \q{integer} or \q{float} and returns a corresponding type.
+
+Because there is no sub-type relationship between \q{float} and \q{integer} -- i.e., neither is a sub-type of the other -- it may be necessary to explicitly convert a value from one type to another. This conversion is not done automatically. The standard \q{n2float} function (see Section~\vref{arith:n2float}) can be used to convert from an \q{integer} to a \q{float} and the \q{itrunc} function (see Section~\vref{arith:itrunc}) converts -- with potential loss of precision -- from \q{float}ing point to \q{integer}.
+
+
+Any exceptions raised by arithmetic primitives take the form:
+\begin{alltt}
+error(\emph{FunctionName},\emph{code})
+\end{alltt}
+where \q{\emph{code}} gives some indication of the kind of exception being raised. See Appendix~\vref{errorcodes} for a complete list of standard error codes.
+
+\section{Basic arithmetic primitives}
+\label{arith:basic}
+
+\subsection{\function{+} -- Numeric addition}
+\synopsis{+}{[T\impl{}number,T]\funarrow{}T}
+\index{numeric addition}
+\index{\q{+} operator}
+\index{arithmetic!addition}
+\index{operator!\q{+}}     
+The \function{+} function expects two numeric arguments and returns their sum. 
+
+\q{+} is a polymorphic function -- defined over any kind of \q{number} value. However, the type of each argument should be the \emph{same} and the type of the result is also the same. Thus, \q{+} might be thought of as being several functions rolled into one: an integer-only addition and a floating point addition function.
+
+\subsection{\function{-} -- Numeric subtraction}
+\synopsis{-}{[T\impl{}number,T]\funarrow{}T}
+The \function{-} function expects two numeric arguments and returns the result of subtracting \param{Y} from \param{X}.
+
+Note that unary arithmetic negation is equivalent to subtracting the negated expression from 0 (or 0.0 depending on the type of the negated expression).
+
+Like \q{+}, \q{-} is actually a polymorphic function, separately handling \q{integer} and \q{float}ing point arithmetic.
+
+\subsection{\function{*} -- Numeric product}
+\synopsis{*}{[T\impl{}number,T]\funarrow{}T}
+The \function{*} function expects two numeric arguments and returns their product.
+
+\subsection{\function{/} -- Numeric division}
+\synopsis{/}{[T\impl{}number,T]\funarrow{}T}
+The \function{/} function expects two numeric arguments and returns the result of dividing \param{X} by \param{Y}.
+
+\subsection{\function{quot} -- Integer quotient}
+\synopsis{quot}{[T\impl{}number,T]\funarrow{}integer}
+The \function{quot} function expects two numeric arguments and returns the integer quotient of dividing \param{X} by \param{Y}.
+    
+\q{quot} always returns an \q{integer} result.
+
+\subsection{\function{rem} -- Remainder}
+\synopsis{rem}{[T\impl{}number,T]\funarrow{}float}
+The \function{rem} function expects two numeric arguments and returns the remainder of the integer quotient of dividing \param{X} by \param{Y}. Note that \function{rem} will always return a \q{float}.
+
+\subsection{\function{abs} -- Absolute value}
+\synopsis{abs}{[T\impl{}number]\funarrow{}T}
+The \function{abs} function expects a numeric argument and returns the absolute value of \param{X}. The type of the returned value is the same as the argument: the absolute value of an \q{integer} is an \q{integer} and likewise for a \q{float}.
+
+\subsection{\function{**} -- Exponentiation}
+\synopsis{**}{[T\impl{}number,T]\funarrow{}T}
+The \function{**} function expects two numeric arguments and returns the result of raising \param{X} to the power \param{Y}; i.e., $\param{X}^\param{Y}$.
+
+\subsection{\function{integral} -- Integer predicate}
+\synopsis{integral}{[T\impl{}number]\{\}}
+The \function{integral} predicate succeeds if its parameter is an integer; fails if it is a fractional value, or an integer that cannot be represented as a integer. This last point is important for large values; a number such as $1\times10^{200}$ is integral from a mathematical point of view, but it cannot be represented as a 64 bit integer and so would \emph{fail} the \function{integral} test.
+
+This predicate will accept either \q{integer} or \q{float} values. However, it is clearly trivial for \q{integer} arguments.
+
+\subsection{\function{trunc} -- Extract integral part}
+\synopsis{trunc}{[T\impl{}number]\funarrow{}T}
+The \function{trunc} returns the nearest integer value to its input. It works for all number values (including very large numbers) representable by \go. Note that not all integral values are representable as \q{integer}s -- especially very large values, with an absolute value larger than $2^{63}$. Such large values must still be represented as \q{float}ing point numbers.
+
+\subsection{\function{itrunc} -- Extract integral part}
+\label{arith:itrunc}
+\synopsis{itrunc}{[T\impl{}number]\funarrow{}integer}
+The \function{trunc} returns the nearest integer value to its input. The value returned is an \q{integer}.
+
+\subsection{\function{floor} -- Largest integer that is smaller}
+\synopsis{floor}{[T\impl{}number]\funarrow{}T}
+The \function{floor} returns the nearest integer value that is the same or smaller than its input.
+
+\subsection{\function{ceil} -- Smallest integer that is larger}
+\synopsis{ceil}{[T\impl{}number]\funarrow{}T}
+The \function{ceil} returns the smallest integer value that is the same or larger than its input.
+
+\subsection{\function{n2float} -- Convert to float}
+\label{arith:n2float}
+\synopsis{n2float}{[T\impl{}number]\funarrow{}float}
+The \function{n2float} `converts' a number (either an \q{integer} or a \q{float}) into a \q{float}ing point equivalent.
+
+\section{Modulo arithmetic}
+\label{arith:modulo}
+
+The modulo arithmetic primitives perform their arithmetic in a modulo range. This means that their arguments must be integer and the results are always constrained to be integers in the range $0..M-1$ where $M$ is the modulus. If the modulus argument is 0 then the arithmetic is assumed to be at the precision of the machine (typically 64 bits)
+
+\subsection{\function{iplus} -- modulo addition}
+\synopsis{iplus}{[integer,integer,integer]\funarrow{}integer}
+The \function{iplus} function expects three \q{integer} arguments and returns the sum of the first two modulo the third; i.e., \q{iplus(X,Y,M)} evaluates to $(X+Y)|_M$.
+
+\subsection{\function{iminus} -- modulo subtraction}
+\synopsis{iminus}{[integer,integer,integer]\funarrow{}integer}
+The \function{iminus} function expects three \q{integer} arguments and returns the result of subtracting the second from the first, modulo the third; i.e., the value of \q{iminus(X,Y,M)} is $(X-Y)|_M$.
+
+\subsection{\function{itimes} -- modulo multiplication}
+\synopsis{itimes}{[integer,integer,integer]\funarrow{}integer}
+The \function{itimes} function expects three \q{integer} arguments and returns the result of multiplying the first two arguments, modulo the third; i.e., the value of \q{itimes(X,Y,M)} is $(X*Y)|_M$.
+
+\subsection{\function{idiv} -- modulo division}
+\synopsis{idiv}{[integer,integer,integer]\funarrow{}integer}
+The \function{idiv} function expects three \q{integer} arguments and returns the result of dividing the first two arguments, modulo the third; i.e., the value of \q{idiv(X,Y,M)} is $(X/Y)|_M$.
+The integer quotient of the division is returned.
+
+\subsection{\function{imod} -- modulus }
+\synopsis{imod}{[integer,integer]\funarrow{}integer}
+The \function{imod} function expects two \q{integer} arguments and returns modulo result of the frist argument; i.e., \q{imod(X,M)} evaluates to $X|_M$.
+
+\section{Bit Oriented Arithmetic Primitives}
+All the bit oriented functions take \q{integer} arguments, and return \q{integer} results.
+
+\subsection{\function{band} -- Bitwise and function}
+\label{arith:band}
+\synopsis{band}{[integer,integer]\funarrow{}integer}
+The \function{band} function expects two integer arguments and returns their binary bitwise intersection.
+
+\subsection{\function{bor} -- Bitwise or function}
+\synopsis{bor}{[integer,integer]\funarrow{}integer}
+The \function{bor} function takes two integer arguments and returns their binary bitwise union.
+
+\subsection{\function{bnot} -- Binary negation}
+\synopsis{bnot}{[integer]\funarrow{}integer}
+The \function{bnot} function expects an integer argument and returns its binary bitwise 1's complement.
+              
+\subsection{\function{bxor} -- Bitwise exclusive or function}
+\synopsis{bxor}{[integer,integer]\funarrow{}integer}
+The \function{band} function expects two integer arguments and returns their binary bitwise exclusive or.
+      
+\subsection{\function{bleft} -- Bitwise left shift function}
+\synopsis{bleft}{[integer,integer]\funarrow{}integer}
+The \function{bleft} function expects two integer arguments and returns result of leftshifting the first argument; i.e., \q{bleft(X,Y)} evaluates to $X*2^{Y}$. The number is right-filled with zero.
+      
+\subsection{\function{bright} -- Bitwise right shift function}
+\synopsis{bright}{[integer,integer]\funarrow{}integer}
+The \function{bright} function expects two integer arguments and returns result of rightshifting the first argument by the second; i.e., \q{bright(X,Y)} evaluates to $X/2^{Y}$. The result is sign-extended -- if the original number is negative then the result is also negative.
+
+\section{Arithmetic inequalities}
+\label{arith:ineq}
+
+Basic inequality predicates such as \function{<}.
+  
+\subsection{\function{<} -- Less than predicate}
+\synopsis{<}{[T\impl{}number,T]\{\}}
+The \function{<} predicate expects two arguments and succeeds if the first is smaller than the second. Like many of the arithmetic functions, the arithmetic predicates are polymorphic, but require both arguments to be of the same type. 
+
+\q{<} is a standard operator, and \q{<} predicates are written in infix notation.
+
+\subsection{\function{=<} -- Less than or equal predicate}
+\synopsis{=<}{[T\impl{}number,T]\{\}}
+The \function{=<} predicate expects two arguments and succeeds if the first argument is smaller than or equal to the second.
+
+\subsection{\function{>} -- Greater than predicate}
+\synopsis{>}{[T\impl{}number,T]\{\}}
+The \function{>} predicate expects two arguments and succeeds if the first argument is greater than the second.
+
+\subsection{\function{>=} -- Greater than or equal predicate}
+\synopsis{>=}{[T\impl{}number,T]\{\}}
+The \function{>=} predicate expects two numeric arguments and succeeds if the first argument is greater, or equal to, the second.
+ 
+\section{Trigonometric functions}
+\label{arith:trig}
+The trigonometric functions generally accept either \q{integer} or \q{float} arguments. However, they will always \emph{return} a \q{float} result.
+
+\subsection{\function{sin} -- Sine function}
+\label{arith:sin}
+\synopsis{sin}{[number]\funarrow{}float}
+The \function{sin} function returns the sin of its argument -- interpreted in radians. The value of \q{sin} is only reliable if its argument in the range $[-2\pi,2\pi]$.
+
+\subsection{\function{asin} -- Arc Sine function}
+\label{arith:asin}
+\synopsis{asin}{[number]\funarrow{}float}
+The \function{asin} function returns the arc sin of its argument. The returned value will be in the range $[-\pi/2,\pi/2]$.
+ 
+\subsection{\function{cos} -- Cosine function}
+\label{arith:cos}
+\synopsis{cos}{[number]\funarrow{}float}
+     
+The \function{cos} function returns the cosine of its argument -- interpreted in radians. \q{cos(X)} is only reliable if \q{X} is in the range $[0,\pi]$.
+
+\subsection{\function{acos} -- Arc Cosine function}
+\label{arith:acos}
+\synopsis{acos}{[number]\funarrow{}float}
+The \function{acos} function returns the arc cosine of its argument in radians. 
+
+\subsection{\function{tan} -- Tangent function}
+\label{arith:tan}
+\synopsis{tan}{[number]\funarrow{}float}
+The \function{tan} function returns the tangent of its argument -- interpreted in radians.  \q{atan} requires its argument to be in the range $[-\pi/2,\pi/2]$.
+  
+\subsection{\function{atan} -- Arc Tangent function}
+\label{arith:atan}
+\synopsis{atan}{[number]\funarrow{}float}
+     
+The \function{atan} function returns the arc tangent of its argument.
+
+\subsection{\function{pi} -- return \texorpdfstring{$\pi$}{pi}}
+\label{arith:pi}
+
+\synopsis{pi}{()\funarrow{}float}
+The \q{pi} function returns $\pi$, accurate to the resolution of the underlying IEEE floating point arithmetic.
+
+\section{Other math functions}
+\label{arith:other}
+
+
+\subsection{\function{irand} -- random integer generator}
+\label{arith:irand}
+
+\synopsis{irand}{[integer]\funarrow{}integer}
+The \function{irand} function returns a random \q{integer} in the range $[0\ldots\param{X}-1]$, where $X$ is its argument. The value of \param{X} should be non-negative.
+
+\subsection{\function{rand} -- random number generator}
+\label{arith:rand}
+
+\synopsis{rand}{[number]\funarrow{}float}
+The \function{rand} function returns a random \q{float}ing point number in the range $[0\ldots\param{X})$, where \param{X} is its argument -- which may be either \q{integer} or \q{float}. The value of \param{X} should be non-negative.
+
+\subsection{\function{srand} -- seed random number generation}
+\label{arith:srand}
+
+\synopsis{srand}{[number]*}
+     
+The \function{srand} action `seeds' the random number generator with its \q{number} argumnent, which should be non-negative. \q{srand} can be used to either ensure a repeatable sequence (by seeding it with a fixed known value) or to ensure a more random, non-repeatable, sequence by seeding it with a value that is always different -- such as the current time.
+
+\subsection{\function{sqrt} -- square root function}
+\label{arith:sqrt}
+
+\synopsis{sqrt}{[number]\funarrow{}float}
+     
+The \function{sqrt} function returns the square root of its argument -- which should be non-negative. The argument may be either an \q{integer} or a \q{float}; however, the result is always a \q{float}.
+
+\subsection{\function{exp} -- exponentiation function}
+\label{arith:exp}
+
+\synopsis{exp}{[number]\funarrow{}float}
+     
+The \function{exp} function returns $e^{\param{X}}$, where \param{X} is its non-negative argument.
+        
+\subsection{\function{log} -- natural logarithm function}
+\label{arith:log}
+
+\synopsis{log}{[number]\funarrow{}float}
+     
+The \function{log} function returns $\log_e({\param{X})}$. Its argument should be non-negative.
+
+\subsection{\function{log10} -- decimal logarithm function}
+\label{arith:log10}
+
+\synopsis{log10}{[number]\funarrow{}float}
+     
+The \function{log} function returns $\log_{10}({\param{X})}$.  Its argument should be non-negative.
+        
+
+\section{Floating point manipulation}
+\label{arith:manip}
+
+These functions give special manipulation of floating point numbers; they are commonly used in converting between floating point numbers and strings: either for parsing a string into a numeric value or in ddisplaying a number as a string.
+
+\subsection{\function{ldexp} -- multiply by power of 2}
+\label{arith:ldexp}
+
+\synopsis{ldexp}{[float,float]\funarrow{}float}
+
+The expression \q{ldexp(X,Y)} evaluates to $X\times2^{Y}$. This is useful in converting between string representations of numbers and floating point numbers themselves.
+
+
+\subsection{\function{frexp} -- split into fraction and mantissae}
+\label{arith:frexp}
+
+\synopsis{frexp}{[float+,float-,integer-]\{\}}
+
+This predicate is satisfied if the fractional part of the first parameter -- \param{X} -- is equal to the second parameter -- \param{F} -- with the third parameter -- \param{E} -- equal to its exponent. More specifically, \param{F} should be a \emph{normalized} number -- i.e., its absolute value is in the range $[0.5,1)$, or zero -- and \q{frexp(X,F,E)} is satisfied if
+\[
+X=F\times2^{E} \wedge ( F=0 \vee |F| \epsilon [0.5,1) )
+\]
+If \param{X} is zero, then both \param{F} and \param{E} should also be zero.
+
+Although a predicate, the modes in this type definition indicate that \param{X} must be given and both \param{F} and \param{E} are output.
+
+
+\subsection{\function{modf} -- split into integer and fraction parts}
+\label{arith:modf}
+
+\synopsis{modf}{[flaot+,float-,float-]\{\}}
+
+A predication \q{modf(X,I,F)} is satisfied if the integer part of \param{X} is \param{I} and the fractional part is \param{F}. More specifically,  $X=I+F$, and \param{I} is integral.
+
+Although a predicate, the modes indicate that \param{X} must be given and both \param{I} and \param{F} are output.
+
+This primitive is particularly useful when displaying floating point numbers.

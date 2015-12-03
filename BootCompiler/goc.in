@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Execute the goc compiler
+
+export PATH=@aprildir@/bin:${PATH}
+export GO_DIR=@prefix@/
+unset APRIL_DIR
+
+exec april -h24000 file:///@prefix@/BootCompiler/goc.aam $*

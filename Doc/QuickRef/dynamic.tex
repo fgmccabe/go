@@ -1,0 +1,458 @@
+\chapter{Dynamic knowledge bases}
+\label{dynamic}
+
+\go supports several forms of dynamic storage: \emph{dynamic} relations using the \q{dynamic} class, \q{hash} tables and individual shareable resources using the \q{cell} class.
+
+The operators offered by the \q{dynamic} class to support dynamic knowledge bases permit the creation of `dynamic' predicates; accessing their values and modification of the underlying knowledge base.
+
+The \q{hash} class implements a more efficient form of access using hash tables -- with the restriction that elements are identified by unique keys.
+
+These facilities are similar to those found in \prolog; however there are some differences relating to the semantics and to the availability of these features:
+
+\begin{itemize}
+\item
+Dynamic knowledge bases must be specially declared in the sense that they are attached to particular variables, and those variables define the scope of the knowledge base.
+
+\item
+The second major difference is that the \q{dynamic} package only supports assertional facts -- facts with no conditions. This reflects the overwhelming majority case for dynamic relations: they are populated with ground assertions and not general rules.
+
+\item
+While the \q{dynamic} and \q{cell} packages support tuples with variables embedded in them, the \q{hash} package does not support non-ground keys or values. (Nor do normal re-assignable object and package variables.)
+
+\item
+Finally, modifications of dynamic knowledge bases are \emph{actions} -- which constrains the contexts in which they can be modified.
+\end{itemize}
+
+\section{\q{cell} class -- Shareable resource}
+\label{dynamic:cell}
+\index{read/write resource}
+\index{\q{cell} package}
+
+The \q{cell} class is used to create a basic read/write resource or `cell'. Using the \q{cell} class, it is possible to create resources that can be updated, shared and synchronized on.
+
+The \q{cell} class is available in the \q{go.cell} package. To use it, you need to include the statement:
+\libsynopsis{go.cell}
+in your program.
+
+The methods available in a \q{cell} object are listed in Table~\vref{cell:methods}. Since \q{cell} is a polymorphic class -- polymorphic in the type of the element stored in the \q{cell} -- we will refer to this type -- \q{T\sub{V}} -- when explaining the methods of a \q{cell} object.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+Method&Type&Description\\
+\hline
+\q{get}&\q{[]\funarrow{}T\sub{V}}&Access \q{cell} value\\
+\q{set}&\q{[T\sub{V}]*}&Reassign \q{cell} resource\\
+\q{show}&\q{[]\funarrow{}string}&Show contents as \q{string}\\
+\hline
+\end{tabular}
+\end{center}
+\caption{Standard elements of a \q{cell[T\sub{V}]} object\label{cell:methods}}
+\end{table}
+The \q{cell} is a \q{sync}hronized entity -- access to its contents are always serialized, making the \q{cell} itself thread-safe. However, if an action procedure requires access over several activities -- a \q{get} followed by a \q{set} for example -- then that transaction will require an overarching \q{sync} action.
+
+\subsection{Creating a new \q{cell} resource}
+\label{dynamic:newvar}
+\index{read/write resources!creating}
+\index{variable!read/write!declaration}
+\synopsis{cell}{[T\sub{V}]\sconarrow{}cell[T\sub{V}]}
+A \firstterm{cell}{A primitive resource that supports a re-assignable memory model.} must be instantiated from the \q{cell} class using a declaration of the form:
+\begin{alltt}
+\emph{Var} = cell(\emph{Exp})
+\end{alltt}
+where \emph{Exp} is the initial value of the \q{cell} variable.
+
+For example, to create a new \q{cell} variable whose initial value is \q{0} we could use:
+\begin{alltt}
+Counter = cell(0).
+\end{alltt}
+
+\subsection{\q{\emph{cell}.get} -- The value of a \q{cell} resource}
+\label{dynamic:getvar}
+\index{cell@\q{cell}!accessing its value}
+\index{accessing the value of a \q{cell} resource}
+
+\synopsis{\emph{cell}.get}{[]\funarrow{}T\sub{V}}
+where \q{T\sub{V}} is the type associated with the \q{cell} object when it is created.
+
+The \q{cell} object has just two exported methods: \q{get} and \q{set}. We use \q{get} to access the value of the dynamic variable:
+\begin{alltt}
+\ldots CurrVal = Counter.get() \ldots
+\end{alltt}
+\index{freshening unbound variables}
+Any unbound variables embedded in the value of the read/write variable are \emph{freshened} -- i.e., replaced with new variables not occurring anywhere else. This makes it effectively impossible for read/write variables to share logical variables.
+
+\subsection{\q{\emph{cell}.set} -- Assign to a \q{cell} variable}
+\label{dynamic:assignment}
+
+\synopsis{\emph{cell}.set}{[T\sub{V}]*}
+where \q{T\sub{V}} is the type associated with the \q{cell} object when it is created.
+
+\index{action!assignment}
+\index{assignment action}
+\index{type inference!assignment}
+The \q{set} action replaces a \q{cell} resource with a new value. It is written using the \q{set} attribute of the \q{cell}:
+\begin{alltt}
+\emph{Var}.set(\emph{Ex})
+\end{alltt}
+For example, to increment our counter we could use:
+\begin{alltt}
+\ldots;Counter.set(Counter.get()+1);\ldots
+\end{alltt}
+Note that \q{set}ting a \q{cell} variable is an action -- it can only be performed in a context where actions are expected.
+\index{read/write variable}
+\index{permanence of assignment}
+Furthermore, assignment to \q{cell}s is `permanent' -- i.e., it is not undone on backtracking.
+
+\subsection{\q{\emph{cell}.show} -- display contents of \q{cell}}
+\label{cell:show}
+\synopsis{\emph{cell}.show}{[]\funarrow{}string}
+
+The \q{show} method function displays the contents of the \q{cell} -- by invoking \q{show} on the bound value within the cell. The displayed string is prefixed by a \q{\$} character to highlight that a \q{cell}'s value is being displayed.
+
+\section{Hash tables}
+\label{hash:hash}
+\index{Hash table}
+The \q{hash} class provides a slightly more sophisticated form of shareable resource than the \q{cell} class. In particular it supports \emph{hash table} lookup: i.e., primarily keyword-based search and updating of a table.
+
+To access the \q{hash} table facilities it is necessary to incorporate the \q{hash} package:
+\libsynopsis{go.hash}
+The methods available in a \q{hash} object are listed in Table~\vref{hash:methods}. Since \q{hash} is a polymorphic type, in particular it polymorphic in the type of the key -- \q{T\sub{K}} -- and the type of the value -- \q{T\sub{V}}.
+
+However, for the actual keys associated with a \q{hash} table, and the values associated with those keys, must always be \emph{ground}.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+Method&Type&Description\\
+\hline
+\q{count}&\q{[]\funarrow{}integer}&Count of elements in table\\
+\q{find}&\q{[T\sub{K}]\funarrow{}T\sub{V}}&Access \q{hash} value\\
+\q{insert}&\q{[T\sub{K},T\sub{V}]*}&Reassign \q{hash} entry\\
+\q{present}&\q{[T\sub{K}+,T\sub{V}]\{\}}&Test for \q{hash} entry\\
+\q{delete}&\q{[T\sub{K}]*}&Delete \q{hash} entry\\
+\q{ext}&\q{[]\funarrow{}list[(T\sub{K},T\sub{V})]}&Access \q{hash} table as list\\
+\q{keys}&\q{[]\funarrow{}list[T\sub{K}]}&Return list of keys in table\\
+\hline
+\end{tabular}
+\end{center}
+\caption{Standard elements of a \q{hash[T\sub{K},T\sub{V}]} object\label{hash:methods}}
+\end{table}
+
+\subsection{\q{hash} -- Create Hash table}
+\label{hash:newhash}
+\index{Hash tables!new}
+
+\synopsis{hash}{[list[(T\sub{K},T\sub{V})],integer]\sconarrow{}hash[T\sub{K},T\sub{V}]}
+
+To create a new hash table we instantiate a new \q{hash} object giving it an \param{init}ial list of key/value pairs and its initial \param{size}:
+
+\begin{alltt}
+\ldots hash([('key1',Val1),\ldots],10) \ldots
+\end{alltt}
+The \q{size} parameter is used as a guide to building the size of the hash table; the actual size of the table may vary in time. The types of the hash key and hash entry respectively and inferred from the initial value given in the \q{hash} table and/or from other uses of the table.
+
+\paragraph{Multi-thread safe}
+The \q{hash} class is a synchronized class, and each of the methods are synchronized. The result is that a hash table may be shared between threads without invalid results being returned. Of course, if a hash table \emph{is} shared, then the internal synchronizations offered may not be enough to guarantee transactional integrity of applications -- for example, when multiple operations on a \q{hash} table are required.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINVAL'}]
+The type of the key associated with the hash table is not one of \q{symbol}, \q{number}, \q{char} or \q{string}.
+\end{description}
+
+\subsection{\q{\emph{hash}.find} -- Access elements of table}
+\label{hash:find}
+\index{Hash tables!finding elements}
+
+\synopsis{\emph{hash}.find}{[T\sub{K}]\funarrow{}T\sub{V}}
+The \q{find} function in the \q{hash} class is used to locate entries in the hash table. A function call of the form
+\begin{alltt}
+\emph{H}.find(\emph{Key})
+\end{alltt}
+returns the value associated with \emph{Key}.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOTFND'}]
+There was no entry corresponding to the key in the table.
+\end{description}
+
+\subsection{\q{\emph{hash}.present} -- Test presence of an element}
+\label{hash:present}
+\index{Hash tables!checking for elements}
+
+\synopsis{\emph{hash}.present}{[T\sub{K}+,T\sub{V}]\{\}}
+The \q{present} predicate in the \q{hash} class is used to test for the presence of entries in the hash table. A goal of the form:
+\begin{alltt}
+\emph{H}.present(\emph{Key},\emph{Val})
+\end{alltt}
+succeeds if there is an entry in \emph{H} that corresponds with \emph{Key} that unifies with \emph{Val}. Unlike the \q{find} method -- which raises an exception -- if the indicated Key is not present the predicate merely fails.
+
+Note, though, that the mode of \q{present}'s type indicates that the key argument should be given. This reflects the restriction that \q{present} requires that the key is known.
+
+\subsection{\q{\emph{hash}.insert} -- Add element to table}
+\label{hash:insert}
+\index{Hash tables!adding elements}
+\synopsis{\emph{hash}.insert}{[key:T\sub{K},value:T\sub{V}]*}
+The \q{insert} method in the \q{hash} class is used to add new entries to the hash table.
+The action
+\begin{alltt}
+\emph{H}.insert(\emph{Key},\emph{Value})
+\end{alltt}
+inserts the \emph{Value} term in association with \emph{Key} -- whether or not there already is an element corresponding to the \q{key} it is overwritten with the new \q{Value}.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINVAL'}]
+The value or the key is not completely ground.
+\end{description}
+
+\subsection{\q{\emph{hash}.delete} -- Remove element from table}
+\label{hash:delete}
+\index{Hash tables!deleting elements}
+\synopsis{\emph{hash}.delete}{[T\sub{K}]*}
+The \q{delete} action in the \q{hash} class is used to remove entries from the table. An action of the form:
+\begin{alltt}
+\emph{H}.delete(\emph{Key})
+\end{alltt}
+removes the entry corresponding to \emph{Key} from the hash table \emph{H}.
+
+If there is no element corresponding to the key, this action has no effect.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINVAL'}]
+The key used to access the element to delete is not ground.
+\end{description}
+
+\subsection{\q{\emph{hash}.ext} -- Return all elements of table}
+\label{hash:ext}
+\index{Hash tables!finding all elements}
+
+\synopsis{\emph{hash}.ext}{[]\funarrow{}list[(T\sub{K},T\sub{V})]}
+The \q{ext} function in the \q{hash} class is used to return all the entries in the hash table -- as a list of 2-tuples, each consisting of the key and the value.
+
+Note that the order of entries returned by \q{ext} does \emph{not} necessarily reflect the order that they were inserted, nor does it reflect any kind of ordering relation between the entries. Hash tables do not, in general, preserve any kind of ordering between the elements.
+
+\subsection{\q{\emph{hash}.keys} -- Return all keys of table}
+\label{hash:keys}
+\index{Hash tables!finding all keys}
+
+\synopsis{\emph{hash}.keys}{[]\funarrow{}list[T\sub{K}]}
+The \q{keys} function in the \q{hash} class is used to return all the distinct keys in the hash table -- i.e., for each entry in the table there will be a corresponding entry in the list returned by \q{keys}. The main advantage of using \q{keys} instead of \q{ext} is that the values themselves are not extracted from the hash table.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINVAL'}]
+There was an invalid entry in the table -- should never happen!
+\end{description}
+
+\subsection{\q{\emph{hash}.count} -- Count of elements in a hash table}
+\label{hash:count}
+\index{Hash tables!count elements}
+
+\synopsis{\emph{hash}.count}{[]\funarrow{}integer}
+The \q{count} function in the \q{hash} class is used to return the number of entries currently in the hash table.
+
+\section{Dynamic knowledge bases}
+\label{dynamic:knowledge}
+
+\index{dynamic relations}
+The \q{dynamic} class provides facilities for implementing a simple form of \emph{dynamic} relation. It provides a means for storing and manipulating `atomic' facts -- facts with no preconditions.
+
+The \q{dynamic} class is accessed by \q{import}ing the \q{go.dynamic} package:
+\libsynopsis{go.dynamic}
+
+The methods available in a \q{dynamic} object are listed in table~\vref{dynamic:methods}.
+
+In addition to \q{dynamic} class itself, the \q{go.dynamic} package defines an interface \q{dynTest[]}. This interface is used by the client code to allow certain \firstterm{callback}{A \emph{callback} is an interface that is implemented by the client code of an interface. Typically, callbacks are used to allow a library package to invoke specific functionality within the client to act as a kind of test. Callbacks are the object ordered analogue of lambda functions being passed in to higher order processing functions such as list map.}s when testing individual elements of the dynamic relation.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+Method&Type&Description\\
+\hline
+\q{mem}&\q{[T]\{\}}&Test if \q{T} is in the relation\\
+\q{add}&\q{[T]*}&Add entry to relation\\
+\q{del}&\q{[T]*}&Remove entry\\
+\q{delc}&\q{[dynTest[T]]*}&Remove E s.t. \q{C.check(E)}\\
+\q{delall}&\q{[T]*}&Remove all that match \q{T}\\
+\q{delallc}&\q{[dynTest[T]]*}&Remove all \q{E::C.check(E)}\\
+\q{ext}&\q{[]\funarrow{}list[T]}&Return relation as a list\\
+\q{match}&{\q{[dynTest[T]]\funarrow{}list[T]}}&Return all \q{E::C.check(E)}\\
+\hline
+\end{tabular}
+\end{center}
+\caption{Standard elements of a \q{dynamic[T]} object\label{dynamic:methods}}
+\end{table}
+
+The \q{dynTest[T]} interface is defined as:
+\begin{alltt}
+dynTest[T] \impl \{ check:[T]\{\} \}.
+\end{alltt}
+This will be used as a test interface -- for example with the \q{match} function only elements of the dynamic relation that satisfy the \q{check} predicate are returned.
+
+\subsection{\q{dynamic} -- Creating a dynamic relation}
+\label{dynamic:definition}
+\index{dynamic relations!initialization}
+\synopsis{dynamic}{[list[T]]\sconarrow{}dynamic[T]}
+A \q{dynamic} relation is created by creating a new instance of the \q{dynamic} class where the argument of the constructor is a list of the initial tuples in the dynamic relation:
+\begin{alltt}
+onTopOf = dynamic([('blockA','blockB')]).
+\end{alltt}
+This has the effect of declaring that \q{onTopOf} is a dynamic relation with an initial value approximately equivalent to the program:
+\begin{alltt}
+onTopOf('blockA','blockB').
+\end{alltt}
+In general the dynamic relation can be `seeded' with any number of initial facts, including no facts at all.
+
+\index{Dynamic relations!type inference}
+\index{Type inference!dynamic relations}
+Note that all tuples in a dynamic relation must of the same type, and that uses of the dynamic relation must be type consistent with the elements of the relation. In the sections that follow, we will use \q{T} to refer to the type of entries in the \q{dynamic} relation.
+
+\subsection{\q{\emph{dynamic}.mem} -- Member of a dynamic relation}
+\label{dynamic:invoke}
+\index{dynamic relations!invoking}
+\synopsis{\emph{dynamic}.mem}{[T]\{\}}
+The \q{mem} predicate is satisfied for elements of the dynamic relation that unify with its argument: 
+\begin{alltt}
+\ldots,onTopOf.mem((A,B)),\ldots
+\end{alltt}
+If an entry in the dynamic relation has variables in it, then each time that entry is `retrieved' via the \q{mem} method it is \emph{refreshed}: i.e., any variables in the tuple are replaced with fresh variables.\footnote{The technical term here is `standardizing apart'.} This has the net effect of making dynamic relations very analogous to `statically defined' relations -- i.e., regular programs.
+
+\subsection{\q{\emph{dynamic}.add} -- Adding to a dynamic relation}
+\label{dynamic:add}
+\index{dynamic relations!adding to}
+\index{adding to a dynamic relation}
+\synopsis{\emph{dynamic}.add}{[T]*}
+We can add to a dynamic knowledge base by applying the \q{add} method of the \q{dynamic} object. It takes as an argument the element to be added -- typically a tuple -- \q{add} adds the new tuple to the end of the dynamic relation.
+
+Note that the \q{add} method is an \emph{action}; i.e., it is only legal to modify a dynamic program wherever actions are legal -- typically within an action rule.
+
+An action of the form:
+\begin{alltt}
+\ldots,onTopOf.add(('blockC','blockD')),\ldots
+\end{alltt}
+will add the tuple
+\begin{alltt}
+('blockC','blockD')
+\end{alltt}
+to the \q{onTopOf} dynamic program.
+
+\subsection{\q{\emph{dynamic}.ext} -- Dynamic relation as a list}
+\label{dynamic:ext}
+\synopsis{dynamic.ext}{[]\funarrow{}list[T]}
+\index{dynamic relations!extension as a list}
+\index{accessing extension of a dynamic relation}
+The \q{ext} method returns the extension of the dynamic relation as a list of entries:
+\begin{alltt}
+\ldots{}onTopOf.ext()\ldots
+\end{alltt}
+will return, as a list, all the tuples in the \q{onTopOf} dynamic relation. Note that all variables in the dynamic relation are renamed to fresh variables in the returned list.
+\index{freshening variables in a dynamic relation}
+\index{dynamic relations!freshening}
+
+\subsection{\q{\emph{dynamic}.del} -- Remove element}
+\label{dynamic:del}
+\synopsis{dynamic.del}{[T]*}
+\index{removal from a dynamic relation}
+\index{dynamic relations!removal}
+There are several methods for removing elements from a dynamic relation. The simplest is the \q{del} method. The \q{del} method takes the form:
+\begin{alltt}
+\ldots,\emph{D}.del(\emph{Term}),\ldots
+\end{alltt}
+where \emph{D} is the dynamic relation, removes the first element that unifies with \emph{Term}.
+
+It is legal to remove a non-existent entry -- i.e., \emph{Term} may not unify with any of the entries in the dynamic relation.
+ 
+\subsection{\q{\emph{dynamic}.delc} -- Remove element}
+\label{dynamic:delc}
+\synopsis{dynamic.delc}{[dynTest[T]]*}
+\index{conditional removal!from a dynamic relation}
+\index{dynamic relations!conditional removal}
+The \q{delc} method removes a tuple from a dynamic relation that satisfies a query. The query has to be encoded as a class label or object whose type is \q{dynTest[T]}.
+
+The \q{delc} method takes the form:
+\begin{alltt}
+\ldots,\emph{D}.delc(Tst),\ldots
+\end{alltt}
+where \emph{D} is the \q{dynamic} object and \emph{Tst} is a \q{dynTest[T]} class. The \q{delc} method deletes the first entry in \emph{D} for which \q{Tst.check(\emph{E})} succeed.
+
+For example, given the \q{onTopOf} dynamic relation, a tuple representing a block being on top of itself -- physically impossible but not logically. We can delete such an entry by defining the labeled theory in program~\vref{dynamic:selftop} and
+using the action:
+\begin{alltt}
+\ldots;D.delc(selfTop(D));\ldots
+\end{alltt}
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+selfTop:[dynamic[T]]\$=dynTest[T].
+selfTop(D)..\{
+  check(E) :- D.mem((E,E))
+\}
+\end{alltt}
+\end{boxed}
+\caption{\label{dynamic:selftop}A theory about being on top of yourself}
+\end{program}
+
+\begin{aside}
+Note that there is no guarantee about the order of elements in a relation; therefore the \q{del} and \q{delc} methods should only be used when the programmer is certain that there is only one element that will match the test, or for which it doesn't matter.
+\end{aside}
+
+\subsection{\q{\emph{dynamic}.delall} -- Remove matching elements}
+\label{dynamic:delall}
+\synopsis{\emph{dynamic}.delall}{[T]*}
+\index{multiple removal from a dynamic relation}
+\index{dynamic relations!multiple removal}
+The \q{delall} method removes \emph{all} tuples from a dynamic relation that match a given test vector. The \q{delall} method takes the form:
+\begin{alltt}
+\ldots,\emph{D}.delall(\emph{Term}),\ldots
+\end{alltt}
+where \emph{D} is the dynamic program, \emph{Term} is a `test' term that will be used to match potential elements of the dynamic relation. Essentially, \q{delall} removes all elements of \emph{D} that match \emph{Term}.
+
+\subsection{\q{\emph{dynamic}.delallc} -- Conditional delete elements}
+\label{dynamic:delallc}
+\synopsis{\emph{dynamic}.delallc}{[dynTest[T]]*}
+\index{conditional removal!multiple entries}
+The \q{delallc} method removes all tuples from a dynamic relation that satisfies a query. The \q{delallc} primitive takes the form:
+\begin{alltt}
+\ldots,\emph{D}.delallc(Tst),\ldots
+\end{alltt}
+where \emph{D} is the dynamic program, \emph{Tst} is a `test' labeled theory -- in the same style as for \q{delc} (see section~\vref{dynamic:delc}) -- that will be used to match potential elements of the dynamic relation. Essentially, \q{delc} removes all elements \emph{T} of \emph{D} that satisfy \q{Tst.check(\emph{T})}.
+
+\subsection{\q{\emph{dynamic}.match} -- Return matching elements}
+\label{dynamic:match}
+\synopsis{\emph{dynamic}.match}{[dynTest[T]]\funarrow{}list[T]}
+\index{dynamic relations!extension as a list}
+\index{accessing extension of a dynamic relation}
+The \q{match} method returns a list of elements which satisfy the \q{check} predicate of the included \q{Tst} labeled theory:
+\begin{alltt}
+\emph{D}.match(\emph{Tst})
+\end{alltt}
+For example, given the \q{selfTop} class defined in program~\vref{dynamic:selftop}, the expression
+\begin{alltt}
+\ldots{}onTopOf.match(selfTop(onTopOf))\ldots
+\end{alltt}
+will return, as a list, all the tuples in the \q{onTopOf} dynamic relation which are 'on top of themselves'.
+
+\subsection{Sharing a dynamic relation across threads}
+\label{dynamic:sharerel}
+\index{dynamic relations!sharing across threads}
+\index{threads!sharing dynamic relations}
+\index{Synchronizing access to dynamic relations}
+
+Dynamic relations represent resources that may be shared across threads. In order to prevent `race conditions' where two threads compete for access to a dynamic relation, the programmer should use the \q{sync} action to synchronize access to the relation.
+
+The internal methods of a \q{dynamic} \emph{are} \q{sync}hronized; in effect guaranteeing that the defined actions in a \q{dynamic} relation are atomic. However, in order to support a larger grain transaction it will be necessary to use \q{sync} for a larger group of actions. For example, the following action removes from the \q{onTopOf} dynamic relation all entries that aslo satisfy the \q{green} predicate:
+\begin{alltt}
+(green.mem(B) *> onTopOf.del((B,\_)))
+\end{alltt}
+However, if the \q{green} and \q{onTopOf} relations are shared (or even just one of them is), then there can be undesirable race conditions between the evaluations of the \q{green.mem} and the \q{onTopOf.del} operations.
+In order to avoid this we can enclose the entire group in a \q{sync} action:
+\begin{alltt}
+sync(onTopOf)\{green.mem(B) *> onTopOf.del((B,_))\}
+\end{alltt}
+For this to work, of course, any other potential user of the \q{onTopOf} dynamic should also use the same object to \q{sync} on.

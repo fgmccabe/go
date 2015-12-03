@@ -1,0 +1,6 @@
+Makefile
+Makefile.in
+.DS_Store
+*.goc
+*.gof
+.gdb_history

@@ -1,0 +1,106 @@
+/*
+ * Import a module
+ */
+
+#include "go.ah";
+
+module
+  import {
+  interface <stdio.af> and
+  interface "errors.af" and
+  interface "misc.af" and
+  interface "decode.af" and
+  interface "types.af" and
+  interface "url.af"
+  }
+in
+{
+  importModule(Pkg,Opts,Lc) => valof{
+    if classPath(Dirs) in Opts then{
+      if dbgType in Opts then{
+        "Looking for package "<>slashify(Pkg,".")<>" in "<>Dirs^0<>"\n">>stdout;
+      };
+      for D in Dirs do{
+	if dbgType in Opts then
+	  "Checking "<>D<>" for "<>Pkg^0<>"\n">>stdout;
+
+        Fn = valof{
+	  xFn = D<>slashify(Pkg,"/")<>".goc";
+	  if ffile(xFn) then
+	    valis xFn
+	  else{
+	    yFn = trimDirs(D,Pkg)<>slashify(Pkg,"/")<>".goc";
+	    if ffile(yFn) then
+	      valis yFn
+	    else
+	      valis "";
+	  }
+	};
+
+        if dbgType in Opts then{
+          "Trying "<>Fn<>"\n">>stdout;
+        };
+
+        if Fn!="" then{
+          Fl = fopen(Fn,_open_read);              -- open up the file
+          symb(Nme) = decodeTerm(Fl);	  -- read the exported package name
+
+          symb(Vers) .= decodeTerm(Fl);	      -- read in the version information
+
+          Tps = fieldsOf(decodeType(Fl)); -- pick up the exported names and types
+
+	  Extra = fieldsOf(decodeType(Fl));  -- the other implied imported types
+          
+          fclose(Fl);				 -- We do not need anything else
+
+          if dbgType in Opts then{
+            "Import types "<>showType(faceType(Tps))<>"\n">>stdout;
+          };
+
+          valis ([(packageName(Nme),Tps,{if Vers=="*" then "" else Vers})],Tps<>Extra)
+        }
+      };
+      reportError("cant find package: "<>slashify(Pkg,"."),Lc);
+      valis ([],[])
+    }
+    else{
+      reportError("class path missing from options",Lc);
+      valis ([],[])
+    }
+  };
+
+  packageName(L) => valof{
+    Pk : [];
+    Pkg : [];
+    for C in L do{
+      if C==''. then{
+        Pkg := [rev(Pk),..Pkg];
+        Pk := [];
+      }
+      else
+        Pk := [C,..Pk]
+    };
+    if Pk!=[] then
+      Pkg := [rev(Pk),..Pkg];
+    valis rev(Pkg);
+  };
+
+  slashify(L,Sep) => L\\((X,Y)=>X++Sep++Y);
+
+  trimDirs(D,Pkg) => case Pkg in {
+    [Pre,..Rest] => if ends(D,Pre) then
+      trimDirs(trimD(D,Pre),Rest)
+    else
+      D
+  | [] => D
+  };
+
+  ends(S1,S2) => F<>("/"<>S2<>"/").=S1;
+
+  trimD(S1,S2) =>
+    valof{
+    F <>(S2<>"/") .= S1;
+    valis F
+  };
+
+} export (importModule,slashify);

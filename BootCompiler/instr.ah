@@ -1,0 +1,106 @@
+/* Automatically generated, do not edit */
+instruction ::=              -- type defining the opcodes
+   lbl(symbol)               -- label in code stream
+ | cmt(string)               -- comment code stream
+ | halt		-- stop execution
+ | die		-- stop current process
+ | succ		-- Succeed a clause
+ | kawl(number,symbol)		-- call to program
+ | lkawl(number,symbol)		-- last call to program
+ | dlkawl(number,symbol)		-- deallocating last call
+ | kawlO(number,number)		-- call object method
+ | lkawlO(number,number)		-- last method call
+ | dlkawlO(number,number)		-- deallocating last variable call
+ | go_to(symbol)		-- jump
+ | escape(number,char[])		-- service function
+ | alloc(number,number)		-- allocate locals
+ | dealloc		-- deallocate locals
+ | tryme(symbol)		-- try inline clause
+ | retryme(symbol)		-- retry inline clause
+ | trustme		-- last inline clause
+ | trycl(symbol)		-- try clause
+ | retry(symbol)		-- retry clause
+ | trust(symbol)		-- last clause
+ | fayl		-- fail current execution
+ | cut		-- cut choice point
+ | indexc(number,number)		-- character index jump
+ | indexl(number)		-- list index
+ | indexs(number,number)		-- symbol index jump
+ | indexn(number,number)		-- numerical index jump
+ | indexx(number,number)		-- constructor index jump
+ | trpblk		-- start error block
+ | trpend		-- end error block
+ | except(number)		-- raise run-time exception
+ | gcmap(number,number)		-- Set active arguments & local depth
+ | gc(number,number)		-- Invoke GC if not enough space
+ | susp(number,number)		-- suspend/execute call
+ | resume(number)		-- continue from suspended call
+ | trgr(number)		-- trigger suspended calls
+ | uAA(number,number)		-- Unify argument registers
+ | uAY(number,number)		-- Unify
+ | uAS(number)		-- Unify
+ | ucAS(number)		-- Unify with occurs check
+ | uAlit(number,symbol)		-- Unify with literal
+ | uAcns(number,symbol)		-- Unify with constructor
+ | uYY(number,number)		-- Unify Y[h],Y[m]
+ | uYS(number)		-- Unify
+ | ucYS(number)		-- Unify with occurs check
+ | uYnil(number)		-- Unify empty list
+ | uSlit(symbol)		-- Unify literal
+ | uScns(symbol)		-- Unify constructor
+ | uAcns0(symbol)		-- Unify A[0] with constructor
+ | uAcns1(symbol)		-- Unify A[1] with constructor
+ | uAcns2(symbol)		-- Unify A[2] with constructor
+ | uAcns3(symbol)		-- Unify A[3] with constructor
+ | uAcns4(symbol)		-- Unify A[4] with constructor
+ | mAA(number,number)		-- Move
+ | mAY(number,number)		-- Move
+ | muAY(number,number)		-- Move unsafe
+ | mAS(number)		-- Move
+ | mAlit(number,symbol)		-- Move literal
+ | mAcns(number,symbol)		-- Build constructor 
+ | mYA(number,number)		-- Move
+ | mYY(number,number)		-- Move
+ | mYS(number)		-- Move
+ | mSA(number)		-- Move
+ | mSY(number)		-- Move
+ | mSlit(symbol)		-- Move literal
+ | mScns(symbol)		-- Build constructor
+ | oAU(number)		-- Unbind A[h]
+ | oYU(number)		-- Unbind local
+ | oYA(number,number)		-- Overwrite local
+ | oYnil(number)		-- Overwrite with empty list
+ | cAA(number,number)		-- Match
+ | cAY(number,number)		-- Match
+ | cAS(number)		-- Match
+ | cAlit(number,symbol)		-- Match literal
+ | cAcns(number,symbol)		-- Match constructor
+ | cYA(number,number)		-- Match
+ | cYS(number)		-- Match
+ | cSA(number)		-- Match
+ | cSY(number)		-- Match
+ | cSlit(symbol)		-- Match literal
+ | cScns(symbol)		-- Match constructor
+ | cAcns0(symbol)		-- Match constructor in A[0]
+ | cAcns1(symbol)		-- Match constructor in A[1]
+ | cAcns2(symbol)		-- Match constructor in A[2]
+ | cAcns3(symbol)		-- Match constructor in A[3]
+ | cAcns4(symbol)		-- Match constructor in A[4]
+ | clAA(number,number)		-- First/clear
+ | clAY(number,number)		-- First/clear
+ | clAS(number)		-- First/clear
+ | clSA(number)		-- First/clear
+ | clSY(number)		-- First/clear
+ | vrA(number)		-- Test for variable
+ | vrY(number)		-- Test for variable
+ | nvrA(number)		-- Test for non-variable
+ | nvrY(number)		-- Test for non-variable
+ | vdA(number)		-- Void \q{A[h]}
+ | vdAA(number,number)		-- Void \q{A[h],Count}
+ | vdY(number)		-- Void \q{Y[X]}
+ | vdYY(number,number)		-- Void \q{Y[X],Count}
+ | clA(number)		-- Clear \q{A[h]}
+ | clY(number)		-- Clear \q{Y[X]}
+ | clS		-- Clear \q{S++}
+ | clYY(number,number)		-- Clear \q{Y[X],Count}
+;                           -- end of instruction type

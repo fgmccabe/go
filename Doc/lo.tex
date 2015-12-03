@@ -1,0 +1,605 @@
+\chapter{Logic and Objects}
+\label{lo}
+
+\index{object oriented programming}
+\go's object oriented notation is based on `Logic and Objects' (\cite{fgm:92}) with some simplifications and modifications to incorporate \go's type system and the notion of an \emph{instance} as well as a class. It provides a straightforward technique to build large scale systems and to represent knowledge. 
+
+The fundamental concept behind \go's object notation is the \emph{labeled theory}. A theory is simply a set of facts (presented as rules of various kinds) that is known about some concept. A label is a term that represents a handle on the theory that allows the knowledge contained in multiple theories to interact in structured ways -- in effect, the label term might be viewed as the concept identifier and the theory itself a view on what is known about the concept.
+
+\go's classes reflect the notational conventions of object oriented programming: theories' knowledge can be inherited from other theories, and theory elements -- a.k.a. methods -- can be referenced from outside a theory using the theory label.
+
+A \emph{class} is defined with a combination of a \emph{class body} and zero or more \emph{class rules}. Program~\vref{lo:bird} demonstrates a simple example of a labeled theory, where the \q{bird} class has a class body and a class rule relating birds to \q{animal}s.
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+birdness \impl \{no\_of\_legs:[integer]\{\}, mode:[symbol]\{\}\}.
+
+bird:[]\conarrow{}birdness.
+bird\classarrow{}animal.
+bird..\{
+  no\_of\_legs(2).
+  mode('fly').
+\}.
+\end{alltt}
+\end{boxed}
+\caption{\label{lo:bird}A \q{bird} class}
+\end{program}
+
+
+\section{Class types}
+\label{objects:classtype}
+\index{class!type}
+
+Like other kinds of programs, a class requires a \emph{type declaration}. The type declaration for the class constructor serves as an introduction to the labeled theory that is associated with the constructor. 
+
+There are two styles of class definition, corresponding to \emph{state-free} classes and \emph{state-full} classes. The former are very close to regular declarative theories, the latter are intended to capture state as well as knowledge.
+
+The type declaration for a state-free class looks like:
+\begin{alltt}
+\emph{label}:[T\sub1,\ldots,T\subn] \conarrow{} \emph{Type}.
+\end{alltt}
+This type declaration introduces the constructor \q{\emph{label}} as a function symbol for the \q{\emph{Type}} -- of arity \emph{n}. If \emph{n} is zero then the constructor may be written without arguments.
+
+The \emph{Type} expression declares what the type of instances of the class are; in the case of state-free classes this is equivalent to giving the type of the class label term. In the case of a state-full class, the type is the type of objects that are instances of this class.
+
+The \emph{Type} also defines the \emph{interface} of the class -- the functions and other elements that must be defined within the class and which are accessible by users of the class. This is because all user-defined types have an interface.
+
+The type declaration for a state-full class is very similar to the state-free class type declaration, albeit with a different operator:
+\begin{alltt}
+\emph{label}:[T\sub1,\ldots,T\subn] \sconarrow{} \emph{Type}.
+\end{alltt}
+
+Note that, unlike with state-free constructors, a zero-arity state-full constructor must always use the empty argument tuple \q{()}. I.e., given
+\begin{alltt}
+foo:[]\sconarrow{}SomeType.
+\end{alltt}
+any instance of \q{foo} must include the empty argument tuple:
+\begin{alltt}
+foo()
+\end{alltt}
+
+\paragraph{Polymorphic classes}
+\index{polymorphic classes}
+\index{type variables in a class}
+\go supports polymorphic classes; however, the polymorphism of a class is reflected in the initial class label given with the class body (and any class rules).
+
+In particular, a class may not be `more polymorphic' -- i.e., polymorphic in additional type variables -- than the \q{\emph{Type}} it is associated with.
+
+
+\section{Class body}
+\label{object:class body}
+\index{Class body}
+\index{objects!class body}
+Class bodies give the implementation of methods and other exported values and class rules express the inheritance relationships. As with other programs, the elements that make up a given class must be contiguous within a package body.
+
+A class body consists of a structure of the form:
+\begin{alltt}
+\emph{label}(\emph{A\sub1},\ldots,\emph{A\subn})..\{
+  \emph{local definitions}
+\}.
+\end{alltt}
+where
+\begin{alltt}
+\emph{label}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+is the \emph{class label} and the definitions in
+\begin{alltt}
+\{
+  \emph{local definitions}
+\}.
+\end{alltt}
+form the \emph{class theta environment}.
+
+\subsection{Class labels}
+\label{object:class label}
+The label of a class is a term that identifies the class. In a class definition, a \firstterm{class label}{A class label is a term that is associated with a theory -- a set of axioms that collectively describes a concept.} takes the form:
+\begin{alltt}
+\emph{label}(\emph{A\sub1},\ldots,\emph{A\subn})
+\end{alltt}
+where all of \q{\emph{A\subi}} are \emph{variables}. This is also a constructor function -- in \go all constructor functions are class labels.
+
+The class label is the key to understanding \go's object notation: class labels denote the set of axioms and other definitions in much the same way that predicate symbols denote relations and function symbols denote functions. The main distinction between such symbols and class labels is that the latter may themselves be structured, and that class labels identify \emph{sets} of relations, functions and so on.
+
+The types of the arguments of the label are matched up with the types of the arguments in the label's type declaration. Thus, \emph{\q{A\subi}} has type \q{T\subi}. 
+
+\subsection{Constructors, patterns and modes of use}
+Semantically, constructors are a kind of \emph{function}. State-free constructors are \emph{bijections} (i.e., one-to-one and onto) where state-full constructors are not.
+
+The critical property of a bijection is that it is guaranteed to have an \emph{inverse}; which leads to their use in \emph{patterns}. When we use a state-free constructor to match against an input term, we are effectively using the constructor function's inverse to recover the arguments of the expression. On the other hand, because state-full constructors do not have inverses, they cannot be used in patterns.
+
+Because of the inherently bi-directional nature of state-free constructor functions, they are \emph{not} associated with modes of use -- it is always bi-directional. This also means that the type of an argument of a constructor function must be \emph{equal} to the type declared for that argument -- it may not be a sub-type or a super-type of the declared argument type.
+
+However, a state-full constructor's default mode of use is \emph{input}; much like a regular function. The other modes of use are theoretically available for state-full constructors but they are not all that useful -- because the parameters of the label in a class definition must consist of variables.
+
+Recall that an input-moded parameter is permitted to have an actual argument that is a strict sub-type of the expected type. This is not the case for either bidirectionally-moded parameters nor output-moded parameters.
+
+Although the rules for legal state-free and state-full classes are different -- they can contain different kinds of definitions -- a constructed value is \emph{accessed} in the same way whether it is defined in a state-free or a state-full manner. 
+
+\subsection{Class theta environment}
+The body itself consists of a set of definitions -- called the class \firstterm{theta environment}{A theta environment is a set of mutually recursive definitions that make up the definitions of a class or package.}. There are slightly different constraints for state-free classes and state-full classes: the former is permitted only to contain rules of various kinds, whereas a state-full class body may also contain variables and constants.
+
+Both state-free and state-full class theta environments may contain inner classes, but a state-free class may not contain any state-full inner classes.
+
+Finally, both types of classes may contain inner type definitions; although any \emph{exported} program may not reference the inner type in the types of its arguments or returned result.
+
+Any variables mentioned in the constructor arguments are in scope across the entire class body -- as are special variables denoting the super classes and \q{this} which is the finally constructed object.
+
+The class theta environment must contain definitions for each of the methods declared in the \emph{\q{Type}}'s interface -- except for definitions that are inherited. There is no equivalent, in \go, of the \emph{abstract class} found in some object oriented languages.
+
+\paragraph{Private definitions}
+\index{Private methods in an object}
+\index{Object!Private methods}
+Any variables or other definitions that are defined within a state-full class body are \emph{private} to the class: they may not be referenced either by any sub-class or by any external query.
+\begin{aside}
+The fact that only rule types may to be included in a type interface prevents variables being referenced directly externally.
+\end{aside}
+
+Of course, any additional programs must be \emph{declared} -- just as programs in the package are declared.
+
+\subsection{Special elements in state-full class theta environments}
+A state-full class may include, in addition to those elements permitted in a state-free class body, object \emph{constants} and object \emph{variables}.
+
+\subsubsection{Object Constant}
+\label{lo:constant}
+\index{class!constant}
+An \emph{object constant} is a symbol that is given a fixed value within a class body. Object constants are introduced using equality statements within the class body. Note that constants are, by definition, restricted to being \emph{private} to the class body in which they are defined.
+
+\paragraph{Rules for evaluation}
+\index{class!evaluating constants}
+An object constant is evaluated when an instance of the class is created -- when its constructor function is invoked.
+
+\paragraph{Groundedness}
+\index{class!constant!groundedness}
+Object constants may not be nor include unbound variables in their value. 
+
+\subsubsection{Object Variable}
+\label{lo:variable}
+An \emph{object variable} is a symbol that is given a reassignable value within a class body. Object variables are introduced using \q{:=} statements within the class body. Variables can be re-assigned by rules -- primarily action rules -- that are located \emph{within} the class body that they are defined in. 
+
+\index{variable!in class body}
+Like constants, object variables are always private to the class body: they may not be referenced either by any sub-class or by any external query.
+
+Note that object variables and constants also require type declarations; which, in the case of constant and variable definitions, can be included in the defining statement:
+\begin{alltt}
+\ldots\{
+  iX:integer := 0.
+\ldots
+\}
+\end{alltt}
+is equivalent to:
+\begin{alltt}
+\ldots\{
+  iX:integer.
+  iX := 0.
+\ldots
+\}
+\end{alltt}
+\index{variable!object!groundedness}
+Like object constants, object variables may not be unbound, nor may their values contain any unbound elements: they must be \emph{ground}.
+
+
+The \q{queue} class, shown in Program~\vref{lo:class:queue} shows a variable being reassigned by the action rules for \q{push} and \q{pull}. Should there be a sub-class of \q{queue}, no rules defined within that sub-class are permitted to re-assign the \q{Q} variable.
+
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+queue[T] \impl \{ push:[T]*, pull:[T]* \}.
+
+queue:[list[t]] \sconarrow{} queue[t].
+queue(I)..\{
+  Q : list[_].
+  Q := I.
+  
+  push(e) -> Q := Q<>[e].
+    
+  pull(e) -> [e,..R].=Q; Q := R.
+\}
+\end{alltt}
+\end{boxed}
+\caption{\label{lo:class:queue}A simple \q{queue} class}
+\end{program}
+the \q{queue} type is explicitly polymorphic, and the \q{queue} class is similarly polymorphic -- \q{queue}s can be queues of any kind of value.
+
+Note that the variable \q{Q} in the \q{queue} class body has a type declaration associated with it. Note also that although it is declared to be a \q{list}, its not further constrained. In fact, the other occurrences of \q{Q} constrain its type to be the same as that of the label argument \q{I}. We could have made this explicit by annotating the argument:
+\begin{alltt}
+queue(I:list[t])..\{
+  Q : list[t] := I.
+  \ldots
+\}
+\end{alltt}
+The use of the same type variable \q{t} as in \q{queue}'s type declaration is coincidence, the same effect would be had by using a type variable \q{alpha}. The annotation in the label -- together with the type declaration for \q{Q} -- are there to bind the type of \q{Q} to that of \q{I}.
+
+\paragraph{Rules for evaluation}
+\index{variable!object!evaluation of}
+An object variable is initialized when an instance of the class is created. 
+
+The order of evaluation between different variables and constants is not fixed by their order of appearance within the class theta environment. Instead, they will be evaluated in such a way that constants and variables are evaluated \emph{after} any variables and constants they depend on.
+
+Such an ordering is not possible in general, in which case, the result is not defined (the compiler may issue an error in this case).
+
+\subsubsection{Static initialization}
+\label{object:initialization}
+\index{initialization!static}
+For those situations where the initialization of an object is more involved, \go supports a special initialization construct within class bodies. An \q{\emph{InitAction}} of the form:
+\begin{alltt}
+\emph{label}..\{
+  \ldots
+  \$\{
+    \emph{InitAction}
+  \}
+\}
+\end{alltt}
+is executed -- after the initialization of variables and constants defined in the class. This \q{\emph{InitAction}} may perform any action that is legal within the context of the class. If a class inherits from another class then the super-classes initialization actions are performed before the sub-class'es initialization actions.
+
+
+\section{Inheritance and Class rules}
+\label{object:class rule}
+\index{Class rules}
+\index{objects!class rule}
+\index{inheritance}
+
+Inheritance is expressed via the use of \emph{class rules}. A class rule is a rule that defines how a sub-class inherits from a super-class:
+\begin{alltt}
+\emph{label}(\emph{A\sub1},\ldots,\emph{A\subn}) \classarrow \emph{mabel}(\emph{E\sub1},\ldots,\emph{E\sub{m}}).
+\end{alltt}
+where the parentheses may be dropped if \emph{n} is zero.
+
+For example, to denote the fact that birds are animals, we can use the class rule:
+\begin{alltt}
+bird \classarrow{} animal.
+\end{alltt}
+From a labeled theoretic perspective, the (informal) semantics of a class rule such as this is:
+\begin{quote}
+all the consequences of the \q{animal} theory are also consequences of the \q{bird} theory.
+\end{quote}
+reflecting the intuition that inheritance is specialization, and specialization generally consists of refining and adding to knowledge.
+
+A class rule has the effect of defining within the scope of the sub-class all the elements -- except types -- that are present in the super-class. However, if an element is defined both within the super-class and the sub-class, then the sub-class'es definition \emph{overrides} the inherited definition \emph{within the sub-class}. The simple rule is that if its defined locally, then the inherited definition is masked -- much like a local variable in a theta expression can mask a variable from an outer scope.
+
+However, it is still possible to access any public element from any inherited class -- via the super mechanism (see Section~\vref{objects:super}).
+
+\begin{aside}
+There is a subtle -- though important -- difference between the way that \go treats inheritance and that found in other object oriented languages. Within a class body, unless explicitly marked with the \q{this} keyword (see Section~\vref{objects:this}) any references to programs from within a class body refer to other programs \emph{either in the same class body or inherited definitions}. In particular, there is no automatic `down-shifting' to definitions found in sub-classes.
+
+This is important because if you wish to use the `current' version of a program then you will need to use the \q{this} keyword to do so. It is also important for security of programs: it becomes impossible to pervert the programmers intentions in a program simply by sub-classing and overriding a definition.
+\end{aside}
+
+\subsubsection{Inheritance and types}
+If a class includes any class rules, then the type of the class must be a sub-type of the inherited types. Often the inheritance in a class hierarchy reflects a similar inheritance in the type hierarchy.
+
+Note that it is not permitted for a state-free class to inherit from a state-full class.
+
+The main type inference rule for class rules expresses the main constraints on safe inheritance for state-free classes:
+\begin{equation}
+\insertBetweenHyps{\hskip-0.5pt}
+\AxiomC{\typeprd{E}{\q{C}}{\q{[T\sub{C\sub1},\ldots,T\sub{C\subn}]\conarrow{}\emph{T\sub{C}}}}}
+\AxiomC{\typeprd{E}{\q{S}}{\q{[T\sub{S\sub1},\ldots,T\sub{S\sub{m}}]\conarrow{}\emph{T\sub{S}}}}}
+\AxiomC{\subtype{T\sub{C}}{T\sub{S}}}
+\TrinaryInfC{\typesafe{E}{C(C\sub1,\ldots,C\subn)\classarrow{}S(S\sub1,\ldots,S\sub{m})}}
+\DisplayProof
+\end{equation}
+where
+\begin{equation*}
+\typeprd{E}{C\subi}{T\sub{C\subi}}
+\end{equation*}
+and
+\begin{equation*}
+\typeprd{E}{S\subi}{T\sub{S\subi}}
+\end{equation*}
+
+For example, we might have a type defining the interface for \q{animal}s:
+\begin{alltt}
+animal \impl \{ mode:[symbol]\{\}, eats:[]=>string \}.
+\end{alltt}
+and a sub-type of \q{animal} -- \q{bird} -- which refines it with aspects of birdness:
+\begin{alltt}
+birdness \impl \{no\_of\_legs:[integer]\{\}\}.
+birdness \impl animal.
+\end{alltt}
+When it comes to defining classes that implement the \q{animal} and \q{bird} interfaces we may see a similar hierarchy. For example, Program~\vref{lo:animal} defines a prototypical animal and Program~\vref{lo:bird} defines a prototypical bird in terms of the prototypical animal.
+
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+animal:[]\conarrow{}animal.      -- {\rm labels and types can have same name}
+animal..\{
+  mode('walk').
+  mode('run').
+  
+  eats()=>"grass"
+\}
+\end{alltt}
+\end{boxed}
+\caption{\label{lo:animal}An \q{animal} class}
+\end{program}
+Note that \go's class system allows for alternate implementations of the type. Thus one might have another kind of bird, an \q{ostrich} for example, that derives its implementation completely independently from \q{animal} -- as in Program~\vref{lo:ostrich}.
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+ostrich:[]\conarrow{}birdness.
+ostrich..\{
+  no\_of\_legs(2).
+  mode('walk').
+  mode('run').
+  
+  eats()=>"sand".       -- {\rm Why else do they bury their head in it?}
+\}.
+\end{alltt}
+\end{boxed}
+\caption{\label{lo:ostrich}An \q{ostrich} class}
+\end{program}
+
+\subsection{Multiple inheritance}
+\index{multiple inheritance}
+\index{objects!multiple inheritance}
+\index{inheritance!multiple}
+\go's object notation permits \emph{multiple inheritance} -- with some simple restrictions. If a given element can be inherited from more than one super class, only one of the super elements will be used: they will \emph{not} be unioned.\footnote{This avoids one of the classic problems of multiple inheritance where a method can be inherited more than once.} Which of the available definitions used is \emph{not} defined; and so they had better refer to the same actual definition.  However, see below for techniques for accessing particular elements of a super class.
+
+\section{Accessing and using classes}
+\label{lo:access}
+\index{Accessing definitions of a class}
+
+The fundamental operator used in accessing the definitions of a labeled theory is the dot operator:
+\begin{alltt}
+\emph{Exp}.\emph{M}(\emph{X\sub1},\ldots,\emph{X\subn})
+\end{alltt}
+which means
+\begin{quote}
+invoke \q{\emph{M}(\emph{X\sub1},\ldots,\emph{X\subn})} from the definitions in the theory identified by the label \emph{Exp}.
+\end{quote}
+
+The query \q{\emph{M}(\emph{X\sub1},\ldots,\emph{X\subn})} may be a goal (see section~\vref{goal:dot}), action (see section~\vref{action:dot}), grammar call (see section~\vref{grammar:dot}) or function call (see section~\vref{expression:dot}), depending on the context and type integrity. 
+\begin{aside}
+What the query \emph{cannot} be is a reference to an object variable (a.k.a. instance variable). \go does not support accessing object variables and constants from outside the class body in which they are defined.
+\end{aside}
+
+The main issue to remember here is that only those interface elements that are associated with the type of \emph{term} may be accessed using the dot operator. The type gives the interface, and the interface determines the legal accesses.
+
+It is possible to give a formal set of inference rules for proving theorems in the context of multiple labeled theories: essentially reflecting the two choices of reducing a condition of the form: $L.P$ by reducing the $P$ part -- with a rule from the theory identified by $L$ -- and reducing the $L$ part -- with a class rule to replace $L$ with another label term $M$ (say).
+
+\subsection{Creating objects}
+\label{objects:create}
+\index{objects!creation}
+\index{creating objects}
+\index{\new{} operator}
+\index{operator!|new}
+
+An instance of a class corresponds simply to an occurrence of its constructor term. For state-free classes, these constructor terms are directly analogous to \prolog terms: two occurrences of expressions for state-free class labels that are unifyable refer to the same class. For example, 
+\begin{alltt}
+bird=bird
+\end{alltt}
+is true because \q{bird} is a class label for a state-free class.
+
+However, given a state-full class, such as the \q{stack} class:
+\begin{alltt}
+stack:[list[t]]\sconarrow{}stack.
+stack(I)..\{
+  S:list[t] := I.
+
+  push(E) -> S:=[E,..S].
+
+  \ldots
+\}
+\end{alltt}
+two occurrences of a \q{stack} terms are \emph{not} equal, even if they are unifyable:
+\begin{alltt}
+\nasf{} stack([2])=stack([2])
+\end{alltt}
+This is because a state-full constructor's value is not the expression itself but a new object -- each evaluation of the constructor will yield a different object.
+
+This reflects, of course, the intended semantics of a state-full class where the object may evolve over the course of a computation.
+
+\subsection{\q{this} object}
+\label{objects:this}
+
+\index{objects!\q{this} keyword}
+\index{accessing the created object in a class}
+\index{objects!created}
+Under normal circumstances, within a class body references to names either refer to elements defined within the same class body or to elements that are defined in a super class. Occasionally, it is necessary to be more explicit about the appropriate source of an element.
+
+The \q{this} keyword -- which only permitted in a definition in a class body -- refers to the object as created. The object might not have been created directly as an object of the `current' class -- the class may have been sub-classed and an object of the sub-class created.
+
+For example, in the \q{animal} class, we might have a rule for mode of travel involving running:
+\begin{alltt}
+animal:[]\conarrow{}animal.
+animal..\{
+  mode('run') :-
+    this.no\_of\_legs(2).
+  \ldots
+  no\_of\_legs(4).       -- by default, animals have 4 legs
+\}
+\end{alltt}
+The \q{mode} clause references the \q{no\_of\_legs} predicate relative to the \q{this} keyword. This will always refer to the \q{no\_of\_legs} definition as it is defined in the object actually created. If we reference an \q{animal} object directly, then \q{this} refers to an object of type \q{animal}. If we sub-class \q{animal}, and reference an instance of that sub-class, then \q{this} will refer to the sub-classed object.
+
+So, for example in the definition of \q{bird} in Program~\vref{lo:bird}, it is declared that a \q{bird} has 2 legs. If we evaluate \q{mode} relative to a \q{bird} object, then \q{mode('run')} will be satisfied; because even though \q{animal} defines \q{no\_of\_legs} to be four,
+\begin{alltt}
+this.no\_of\_legs(2)
+\end{alltt}
+is true due to the definition in \q{bird}.
+
+Normally, even when sub-classed, methods and other elements in a class body do not access the `leaf' methods of the class associated with the object. The \q{this} keyword is useful for those occasions where a definition in a class body requires access to overridden methods rather than locally defined methods.
+
+\subsection{Super and inherited definitions}
+\label{objects:super}
+\index{objects!accessing super class elements}
+\index{accessing elements of a super class}
+For the most part -- where a method is not defined in a class and it is defined in a super class -- super class methods are automatically `in scope' in a class body. 
+
+Since \go permits multiple inheritance there may be more than one super class that defines a given method. Furthermore, it is possible to get a lattice-like structure where a single definition may be inherited multiple times from a single ancestor class.
+
+To avoid problems associated with such multiple definitions, only \emph{one} definition of a class's super classes is used. Which one used is left undefined in the definition of \go. Thus, even if multiple definitions of a method might be available through different inheritance routes, only one `copy' of the definition will ever be used.  As a result it \emph{should} be the case that if a given definition is multiply defined then it shouldn't matter which definition is used.
+
+It is possible, however, to explicitly \emph{program} using inherited definitions from more than one super class. To directly access definitions associated with super classes -- even if the methods have been overridden -- \go introduces `into scope', within the class body, identifiers that denote each of the super classes of that class. The identifiers used are the class names of the super classes.
+
+For example, in the \q{bird} class, we might wish to redefine \q{mode} using \q{animal}'s \q{mode} with a modification. We can do this explicitly by using \q{animal.mode}:
+\begin{alltt}
+bird\classarrow{}animal.
+bird..\{
+  mode('fly').
+  mode('run') :- animal.mode('walk').
+  \ldots
+\}
+\end{alltt}
+The second rule for \q{mode} bypasses the local definition of \q{mode} and uses the definition from \q{animal}. 
+
+\begin{aside}
+Using explicit super calls such as in \q{mode} above can be used to deliver a kind of \emph{inheritance union}. The normal interpretation of inheritance does not allow a sub-class to \emph{extend} an inherited definition -- only to replace it. However, we can use explicit \emph{super} references to extend an inherited definition and also to access all available definitions from super classes:
+\begin{alltt}
+pred(x) :- super\sub1.pred(x).
+\ldots
+pred(x) :- super\subn.pred(x).
+\end{alltt}
+where \q{super\subi} are the super-classes of the class in which \q{pred} is defined. Of course, this kind of definition is not especially elegant.
+\end{aside}
+
+\section{Inner Classes}
+\label{lo:inner}
+\index{class!inner}
+\index{inner class}
+An \emph{inner} class is on that is defined within a class body. For example, in Program~\vref{lo:inner:parasite} we have an inner \q{parasite} class that is defined in the \q{bird} class. Inner classes represent a particular form of aggregation: the inner theory is defined inside and is part of the outer theory.
+
+\begin{program}
+\vspace{0.5ex}
+\begin{boxed}
+\begin{alltt}
+bird:[]\conarrow{}birdness.
+bird..\{
+  no_of_legs(2).
+  mode('fly').
+  
+  para\impl{}\{ eat:[]\funarrow{}string. \}.
+  parasite:[string]\conarrow{}para.
+  parasite(Where)..\{
+    eat()::mode('fly')=>"wings".
+    	eat()=>Where.
+  \}.
+\}.
+\end{alltt}
+\vspace{-2ex}
+\end{boxed}
+\caption{An inner parasite}
+\label{lo:inner:parasite}
+\end{program}
+
+An inner class may be \emph{exported} by a class if the class type signature is part of the class's type signature. For example, Program~\vref{lo:inner:para2} is very similar to Program~\ref{lo:inner:parasite}, except that the inner class type is now part of \q{bird}'s type.
+\begin{program}
+\vspace{0.5ex}
+\begin{boxed}
+\begin{alltt}
+birdness \impl \{ no_of_legs:[number]\{\}. mode:[symbol]\{\}.
+    parasite:[string]\conarrow{}para. \}.
+para\impl{}\{ eat:[]\funarrow{}string. \}.
+
+bird:[]\conarrow{}birdness.
+bird..\{
+  no_of_legs(2).
+  mode('fly').
+  
+  parasite(Where)..\{
+    eat()::mode('fly')=>"wings".
+    	eat()=>Where.
+  \}.
+\}.
+\end{alltt}
+\end{boxed}
+\vspace{-2ex}
+\caption{An exported inner parasite}
+\label{lo:inner:para2}
+\end{program}
+\begin{aside}
+Inner classes are not needed that often; but when they are, there is no alternative! The key is that variables and programs that are defined in an enclosed class are in scope in the inner class.
+\end{aside}
+Once exported, the inner constructor can be used in the same way that other programs are referenced from a class:
+\begin{alltt}
+Tweety = bird;
+TweetyParasite = Tweety.parasite("stomach")
+\end{alltt}
+The type of \q{TweetyParasite} is \q{para} -- this type had to be declared in the same level as \q{bird} because the \q{birdness} type references it.
+\begin{aside}
+Where constructors for a top-level class are directly analogous to normal \prolog terms, the same is not precisely true for constructors for inner classes. An inner constructor is a term but it has hidden extra arguments that are added as part of the compilation process.
+\end{aside}
+
+
+
+
+\subsection{Anonymous classes}
+\label{lo:anonymous}
+An anonymous class is a particular kind of class which is defined and used at once. Anonymous classes are \emph{expressions} that define both the class and the single instance of that class. There is no constructor defined for this class -- its occurrence also defines the only instance of the class.
+
+There are two variants of the anonymous class, either a template type is specified, or a label term is given which the anonymous class is sub-classing:
+\begin{itemize}
+\item
+If the anonymous class takes the form:
+\begin{alltt}
+(\emph{label}..\{ \emph{definitions} \})
+\end{alltt}
+then this defines a new object whose type is the type of \emph{label} with \emph{definitions} being used to override inherited definitions from the \emph{label} class. This is equivalent to the expression:
+\begin{alltt}
+\emph{NewLbl}(\emph{F\sub1},\ldots,\emph{F\subn})
+\end{alltt}
+together with a new class definition:
+\begin{alltt}
+\emph{NewLbl}:[\emph{T\sub{F\sub1}},\ldots,\emph{T\sub{F\subn}}]\sconarrow{}\emph{Type\sub{label}}.
+\emph{NewLbl}(\emph{F\sub1},\ldots,\emph{F\subn}) <= \emph{label}.
+\emph{NewLbl}(\emph{F\sub1},\ldots,\emph{F\subn})..\{
+  \emph{definitions}
+\}
+\end{alltt}
+where \emph{NewLbl} is a new constructor symbol not occurring elsewhere in the program, \emph{F\subi} are the free variables occurring in the \emph{definitions} that are defined in an outer context, and \emph{T\sub{F\subi}} are the corresponding types of \emph{F\subi}.
+\item
+If the anonymous class expression is of the form
+\begin{alltt}
+(:\emph{type}..\{ \emph{definitions} \})
+\end{alltt}
+then this defines an object of type \emph{type} which does not inherit from any existing class. It is the responsibility of the programmer to ensure that the enclosed \emph{definitions} correctly implements the interface associated with \emph{type}. This form of anonymous class is equivalent to the expression:
+\begin{alltt}
+\emph{NewLbl}:[\emph{T\sub{F\sub1}},\ldots,\emph{T\sub{F\subn}}]\sconarrow{}\emph{type}.
+\emph{NewLbl}(\emph{F\sub1},\ldots,\emph{F\subn})
+\end{alltt}
+together with the new class definition:
+\begin{alltt}
+\emph{NewLbl}(\emph{F\sub1},\ldots,\emph{F\subn})..\{
+  \emph{definitions}
+\}
+\end{alltt}
+where \emph{NewLbl} is a new constructor symbol not occurring elsewhere in the program.
+\end{itemize}
+
+Anonymous classes are useful for providing implementations of callbacks as well as acting as a more general form of lambda closure. For example, the \q{sort} function in Program~\vref{lo:sort} takes as argument
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+sort:[list[t],compare[t]]=>list[t].
+sort([],\_) => [].
+sort([E],\_) => [E].
+sort([E,..L],C)::split(L,C,E,S1,S2) => 
+    sort(S1,C)<>[E]<>sort(S2,C).
+
+split:[list[t],compare[t]+,list[t]-,list[t]-]\{\}.
+split([],\_,[],[]).
+split([D,..L],C,E,[D,..S1],S2) :-
+  C.less(D,E),
+  split(L,C,E,S1,S2).
+split([D,..L],C,E,S1,[D,..S2]) :-
+  \nasf C.less(D,E),
+  split(L,C,E,S1,S2).
+\end{alltt}
+\end{boxed}
+\caption{A \q{sort} function\label{lo:sort}}
+\end{program}
+a list and a theory label that implements the \q{compare[]} interface, as defined in:
+\begin{alltt}
+compare[T] \impl \{ less:[T,T]\{\} \}
+\end{alltt}
+We can use an anonymous class in a call to \q{sort} that constructs a specific predicate for comparing \q{integer}s:
+\begin{alltt}
+sort([1,2,0,10,-45],(:compare[integer]..\{
+  less(X,Y) :- X<Y.
+\}))
+\end{alltt}
+
+\paragraph{Free variables}
+The definitions within an anonymous class may \emph{share variables} with other expressions that are in scope. Such variables are \emph{free} variables of the anonymous class. However, there is an important caveat, the value recorded within the anonymous class is a copy of the values of those free variables -- unifying against a free variable within the anonymous class cannot affect outer instances of the variable; conversely if the outer instances are unified against that will not affect the inner occurrences.
+
+However, where the free variables represent objects or read/write variables then the free variables within the anonymous do directly reflect the value of the original variables (such variables cannot be meaningfully be unified against).
+

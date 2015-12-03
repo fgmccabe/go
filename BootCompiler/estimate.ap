@@ -1,0 +1,107 @@
+  /* Estimate the amount of heap space required to compile a term
+  (c) 2001 F.G. McCabe
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+  Contact: Francis McCabe <fgm@fla.fujitsu.com>
+*/
+
+#include "go.ah";                       -- standard header for the compiler
+
+module
+import {
+  interface "canon.af" and
+  interface "display.af" and
+  interface "errors.af" and
+  interface "ground.af" and
+  interface "hash.af" and
+  interface <stdio.af>
+} in
+{
+
+  estimateUnifySpace(A,top,Opts)=> valof{
+    case A in {
+      idnt(_) -> {
+        if top then
+          valis 2
+        else
+          valis 0
+      }
+
+    | mtch(T) ->
+        valis 0                           -- matching cannot generate data
+
+    | bild(T) ->
+        valis estimateBuildSize(T,top,Opts)
+
+    | X::isGroundC(A) -> 
+        valis 0
+
+    | cons(Nm,L) -> {
+        size : listlen(L)+2;
+
+        for E in L do{
+          size +:= estimateUnifySpace(E,false,Opts);
+        };
+        
+        valis size
+      }
+
+    | _ ->
+        exception error("can't do an estimate for "++showCT(A),'fail)
+    }
+  };
+
+  estimateArgsSpace(L,top,Opts) => valof{
+    size : 0;
+    
+    for E in L do{
+      size +:= estimateUnifySpace(E,top,Opts)
+    };
+    
+    valis size;
+  };
+
+  estimateBuildSize(T,top,Opts) => estimateUnifySpace(T,top,Opts);
+  
+  estimateBuildArgs(L,top,Opts) => estimateArgsSpace(L,top,Opts);
+  
+  estimateGoalSize(L,Opts) => valof{
+    hsize : 0;
+    gsize : 0;
+    
+    for G in L do{
+      case G in {
+        fail(_) -> {}
+      | neck(_) -> {}
+      | defn(_,T,_) -> hsize +:= estimateBuildSize(T,true,Opts)
+      | call(_,A,_) -> hsize+:= estimateBuildArgs(A,true,Opts)
+      | suspc(V,A,_) -> hsize+:= estimateBuildArgs([V,A],true,Opts)
+      | trpBegin -> {}
+      | trpEnd -> {}
+/*      | errr(E,_) -> {
+          (he,ge) = estimateGoalSize(E,Opts);
+          hsize+:=he;
+          gsize+:=ge;
+        }
+*/
+      | rais(E,_) -> hsize+:= estimateBuildSize(E,true,Opts)
+      | _ -> exception error("invalid goal: "++showCC(G),'inval)
+      }
+    };
+    valis (hsize,gsize);
+  };
+
+} export {estimateUnifySpace,estimateArgsSpace,estimateGoalSize};

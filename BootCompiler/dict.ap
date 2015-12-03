@@ -1,0 +1,144 @@
+/*
+ * Dictionary management
+ */
+
+#include "go.ah";
+
+module
+import{
+  interface "misc.af" and
+  interface "display.af" and
+  interface "errors.af" and
+  interface <stdio.af>
+} in
+{
+
+  dictEntry(Nm,logical?intd,logical?def,Lc,U) => {
+    i : intd;
+    inited() => i;
+    init(I){
+      i:=I;
+    };
+    
+    d:def;
+    defined() => d;
+    df(D){
+      d := D;
+    };
+    
+    Loc : Lc;
+    locn() => Loc;
+    reset(Lc){
+      Loc := Lc;
+    };
+  }.de(Nm,inited,init,defined,df,locn,reset,U);
+
+  cloneDict(Dict) => collect{
+    for de(Nm,i,_,d,df,locn,reset,U) in Dict do
+      elemis dictEntry(Nm,i(),d(),locn(),U)
+  };
+  
+  shLoc(L) => {case L in {
+      notAlloc => "?"
+    | voidVar => "voidVar"
+    | aReg(R) => "A["++R^0++"]"
+    | yReg(Lc,true) => "Y["++Lc^0++"]"
+    | yReg(Lc,false) => "Y{"++Lc^0++"}"
+    | sReg => "sReg"
+    }
+  };
+
+  showDict(dict) =>
+    dict//+(de(Nm,i,_,d,_,locn,_,_)=>"\n"++string%%Nm++"("++shLoc(locn())++{if i() then "" else " NI"}++{if d() then "" else " ND"}++")");
+    
+  lookupVar(Nm,dict,Used) => valof{
+    if de(Nm,i,s,d,df,locn,reset,U) in dict then{
+      vLoc = locn();
+      
+      if vLoc==notAlloc then{
+      	usdRgs(rU,lU,frReg,E,lclG) = Used;
+        -- "Finding place for var "++string%%Nm++" from "++showUse(Used)++"\n">>stdout;
+      	[Use,noUse,.._] = U;                -- unpack the details
+      	
+        for Rg in Use do{
+          if Rg in frReg then{
+            reset(aReg(Rg));
+            -- string%%Nm++" allocated to A["++Rg^0++"] (use)\n">>stdout;
+      	    valis (aReg(Rg),i,s,d,df,usdRgs(rU\/[Rg],lU,frReg^\Rg,E,lclG))
+          }
+        };
+          
+        for Rg in frReg do{
+          if !Rg in noUse then{
+            reset(aReg(Rg));
+            -- string%%Nm++" allocated to A["++Rg^0++"] (nouse)\n">>stdout;
+     	    valis (aReg(Rg),i,s,d,df,usdRgs(rU\/[Rg],lU,frReg^\Rg,E,lclG))
+          }
+        };
+        -- "register spill on "++string%%Nm++"\n">>stdout;
+        
+        reset(yReg(E+1,true));
+        -- string%%Nm++" allocated to Y["++(E+1)^0++"]\n">>stdout;
+        valis (yReg(E+1,true),i,s,d,df,usdRgs(rU,lU,frReg,E+1,lclG));
+      }
+      else if aReg(-1).=vLoc then
+        exception error("using discarded variable "++string%%Nm,'fail)
+      else
+        valis (vLoc,i,s,d,df,Used)
+    }
+    else
+      exception error("'"++string%%Nm++"' not in dictionary",'notfound)
+  };
+  
+  initedVar(Nm,dict) => valof{
+    if de(Nm,i,s,d,df,locn,reset,U) in dict then
+      valis locn()!=notAlloc && i()
+    else
+      valis false
+  };
+  
+  regUsed(usdRgs(R,L,F,E,Gl),O) => usdRgs(R\/[O],L,F,E,Gl);
+  freeAReg(usdRgs(R,L,F,E,Gl),Rg) => usdRgs(R^\Rg,L,F\/[Rg],E,Gl);
+  locUsed(usdRgs(R,L,F,E,Gl),O) => usdRgs(R,L\/[O],F,E,Gl);
+  isRegUsed(usdRgs(Rs,_,_,_,_),R) => R in Rs;
+  rmFreeReg(usdRgs(R,L,F,E,Gl),A) => usdRgs(R,L,F\A,E,Gl);
+  lclGc(usdRgs(R,L,F,E,Gl),X) => usdRgs(R,L,F,E,Gl+X);
+  spareAReg(usdRgs(R,L,F,E,Gl)) => valof{
+    if A in F then
+      valis (A,usdRgs(R\/[A],L,F\ [A],E,Gl))
+    else
+      exception error("no spare registers",'fail)
+  };
+
+  
+  gcPredict(usdRgs(_,_,_,_,L)) => L;
+  
+  maxLocals(usdRgs(_,L,_,_,_)) => valof{
+    max : 0;
+    for I in L do{
+      if I>max then
+        max := I
+    };
+    valis max
+  };
+  
+  maxReg(usdRgs(A,_,_,_,_)) => valof{
+    max : 0;
+    for I in A do{
+      if I>max then
+        max := I
+    };
+    valis max
+  };
+  
+  resetGc(usdRgs(R,L,F,E,_)) => usdRgs(R,L,F,E,0);
+  
+  resetUsed(usdRgs(_,L,_,E,_)) => usdRgs([],L,1..32,E,0);
+
+  __debug_display__(any(X)) => X^0;
+
+  showUse(usdRgs(aU,lU,fr,E,_)) => showRange(aU)++":"++showRange(fr)++"/"++showRange(lU)++":"++E^0;
+
+} export (dictEntry,cloneDict,lookupVar,initedVar,showDict,showUse,showRange,
+          regUsed,locUsed,resetUsed,resetGc,isRegUsed,rmFreeReg,freeAReg,spareAReg,lclGc,gcPredict,
+          maxLocals,maxReg)

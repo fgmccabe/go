@@ -1,0 +1,169 @@
+%%
+%% Header file for use with NAP books
+%%
+\NeedsTeXFormat{LaTeX2e}[1995/05/16]
+\ProvidesPackage{nap}
+    [2004/4/14 v1.0 package for formatting books in the Network Agent Press style]
+    
+\paperwidth = 6in
+\paperheight = 9in
+%\paperwidth = 7.44in
+%\paperheight=9.68in
+\voffset = -1in
+\hoffset = -1in
+% space on top before any text
+\topmargin = 0.75in
+
+% space on left side of text on odd numbered pages
+\oddsidemargin = 22mm
+% space on left side of text on even numbered pages
+\evensidemargin = 20mm
+
+% space allowed for header
+\headheight = 1.5ex
+
+% space between header and body of text
+\headsep = 4ex
+
+% width of the main text body
+\textwidth = 110mm
+%\textwidth=147mm
+% the heigth of the main text body
+\textheight = 178mm
+%\textheight=195mm
+
+% how much room to leave before the footer
+%\footskip 0.5in
+
+% space for any callouts
+\marginparsep  = 0.5in
+
+% size of a callout
+\marginparwidth = 2in
+
+%\parskip = 1 ex
+%\parindent = 0.0in
+
+\marginparwidth 1.25in
+\marginparsep 0.1in
+
+\newcommand{\sidenote}[1]{\marginpar{\footnotesize{}#1}}
+
+\newcommand{\function}[1]{\mbox{\tt #1}}
+\newcommand{\constant}[1]{{\tt #1}}
+\newcommand{\type}[1]{{\tt #1}}
+%\newcommand{\firstterm}[2]{\emph{#1}\nomenclature{\bf#1}{#2}}
+\long\def\firstterm#1#2{\emph{#1}\nomenclature{\bf#1}{#2}}
+
+\newcommand{\application}[1]{{\bf #1}}
+\newcommand{\dotspace}{{\tt.\char`\ }\xspace}
+\newcommand{\spce}{\tt{\char`\ }}
+\newcommand{\bslash}{{\tt \char'134}}
+\newcommand{\bsl}{{\tt \char'134}}
+\newcommand{\vbar}{{\tt \char`|}\xspace}
+\newcommand{\tilda}{\sub{\textstyle\tt\char`~}\xspace}
+\newcommand{\tlda}{\sub{\textstyle\tt\char`~}}
+\newcommand{\cent}{{\char`\%}}
+\newcommand{\cast}{{\mbox{\tt \sub{\textstyle\char`~}>}\xspace}}
+\newcommand{\impl}{{\mbox{\tt <\tilda}\xspace}}
+\newcommand{\uphat}{{\tt \char`^}\xspace}
+\newcommand{\upht}{{\tt \char`^}}
+\newcommand{\nasf}{{\tt \bsl+}\xspace}
+\newcommand{\hash}{{\tt \#}}
+\newcommand{\param}[1]{{\mbox{\rm\em #1}}}
+\newcommand{\pling}{{\tt \char'041}\xspace}
+\newcommand{\q}[1]{{\protect\texorpdfstring{\mbox{\tt #1}}{#1}}}
+\newcommand{\qx}[1]{{\protect\texorpdfstring{\mbox{\tt<#1/>}}{<#1>}}}
+\newcommand{\qs}[1]{\mbox{\tt"#1"}}
+\newcommand{\ui}[1]{\mbox{\tt"#1"}}
+\newcommand{\code}[1]{\mbox{\tt #1}}
+\newcommand{\literal}[1]{\mbox{``#1''}}
+\newcommand{\meta}[1]{\mbox{\q{\emph{#1}}}}
+\newcommand{\keycap}[1]{{\tt#1}}
+\newcommand{\tinfers}{\mbox{$\vdash_{t}$}}
+\newcommand{\minsert}[1]{{\ifmmode{{#1}}\else{\mbox{${#1}$}}\fi}}
+\newcommand{\typeprd}[3]{\ensuremath{\emph{#1}~\tinfers{}#2\leadsto#3}}
+\newcommand{\tm}{\ensuremath{^{\mbox{\scriptsize{TM}}}}}
+\newcommand{\return}{\ensuremath{\hookleftarrow}\xspace}
+
+% a command for embedding a picture
+\newcommand{\snap}[1]{\begin{center}\vspace{1ex}\includegraphics{#1}\end{center}}
+
+% a command for subscripting
+\newcommand{\sub}[1]{\minsert{{_{#1}}}}
+\newcommand{\subn}{\minsert{{_{n}}}}
+\newcommand{\subi}{\minsert{{_{i}}}}
+
+\newcommand{\super}[1]{\minsert{{^{#1}}}}
+\newcommand{\superth}{\minsert{{^{th}}}}
+\newcommand{\superi}{\minsert{{^{i}}}}
+
+% An environment for introducing asides
+\newenvironment{aside}[1][\dbend]{\begin{itemize}\item[#1]}{\end{itemize}}
+
+% define a note as a footnote
+\newcommand{\note}[1]{\footnote{#1}}
+
+% From TeXMaG Volume 2, Number 6
+% Don Hosek <DHOSEK@HMCVAX.BITNET>
+%
+\long\def\epigram#1{% We use \long\def to allow the argument
+                    % to span several paragraphs.
+    \bigskip       % extra space above.
+    \setbox0=\hbox{#1} % put the text into a box
+    \ifdim\wd0>\critwidth %check the length
+         \centerline{\vtop{\hsize=\episize\noindent#1}}
+              % If the length is greater than
+              % the critical length, make a
+              % displayed paragraph
+    \else          % otherwise, we just center the text.
+         \centerline{\box0}
+    \fi
+    \smallskip     % extra space for the end.
+}
+     
+\newdimen\critwidth          \critwidth=.75\hsize
+\newdimen\episize            \episize=.6\hsize
+
+
+\newfont{\scaledfont}{cmr12 scaled 6000}
+\renewcommand\thechapter{\arabic{chapter}}
+\makeatletter
+\def\@makechapterhead#1{%
+\vspace*{30\p@}%
+  {\parindent \z@ \raggedright \normalfont
+    \ifnum \c@secnumdepth >\m@ne
+      \if@mainmatter
+        \par\nobreak
+        \vskip 0\p@
+      \fi
+    \fi
+    \interlinepenalty\@M
+    \parbox[b]{0.75\textwidth}{\raggedright\Huge \textbf{#1}}\ %
+    \if@mainmatter
+        \hfill\scaledfont\thechapter\par\normalsize%
+    \fi
+    \rule{\textwidth}{1pt}%  <--- the rule
+    \nobreak
+    \vskip 15\p@
+  }%
+}
+\def\@makeschapterhead#1{%
+\vspace*{30\p@}%
+  {\parindent \z@ \raggedright \normalfont
+    \ifnum \c@secnumdepth >\m@ne
+      \if@mainmatter
+        \par\nobreak
+        \vskip 0\p@
+      \fi
+    \fi
+    \interlinepenalty\@M
+    \parbox[b]{0.75\textwidth}{\raggedright\Huge \textbf{#1}}\ %
+    \rule{\textwidth}{1pt}%  <--- the rule
+    \nobreak
+    \vskip 15\p@
+  }%
+}
+
+\makeatother
+ 

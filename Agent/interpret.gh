@@ -1,0 +1,58 @@
+/*
+  The Go agent content language (GACL) definition
+  (c) 1994-2001 Imperial College and F.G. McCabe
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+  Contact: Francis McCabe <fgm@fla.fujitsu.com>
+*/
+
+  /* This gives us the logical framework for expressible contracts */
+  
+  -- An agent's name has no structure
+  
+  agent ::= aId(symbol).
+  
+  -- Content expressions
+  
+  propForm(CT,AT,ST) ::=  or(propForm(CT,AT,ST),propForm(CT,AT,ST)) | 
+		&(propForm(CT,AT,ST),propForm(CT,AT,ST)) | 
+		not(propForm(CT,AT,ST)) | 
+		?+(CT)  | ?\+(CT) | ?=(T,T) | ?\=(T,T) |
+		gt(T,T) | lt(T,T) | TRUE |
+		md(modal(CT,AT,ST)).
+		
+  -- A rule is either a logical rule or a modal rule
+  
+  rule(CT,AT,ST) ::= rl(CT,propForm(CT,AT,ST)) | cl(modal(CT,AT,ST),propForm(CT,AT,ST)).
+  
+  -- modal conditions are somewhat different from regular predicates
+  
+  modal(CT,AT,ST) ::=                                -- CT is a content ontology, AT an action ontology and ST a social ontology
+    allowed(ST,agent,AT) | obliged(ST,agent,AT) |    -- deontic operators
+      feasable(agent,AT) | done(agent,time,AT) |     -- action operators
+      authorized(ST,agent,propForm(CT,AT,ST)) | entitled(ST,agent,propForm(CT,AT,ST)) -- societal operators.
+  
+  -- Communicative Acts
+  
+  caForm(CT,AT,ST) ::= inform(propForm(CT,AT,ST)) | pronounce(ST,propForm(CT,AT,ST)) | 
+       request(propForm(CT,AT,ST) | commit(agent,rule(CT,AT,ST)[]).
+       
+  -- Contracts are sets of rules
+  
+  cTract(CT,AT,ST) ::= contract(rule(CT,AT,ST)[]).
+  
+  
+       

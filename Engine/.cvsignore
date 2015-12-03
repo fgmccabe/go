@@ -1,0 +1,9 @@
+Makefile
+Makefile.in
+.libs
+.deps/*
+.deps
+t
+.gdb_history
+.DS_Store
+*.goc

@@ -1,0 +1,144 @@
+\chapter{Running \texorpdfstring{\go}{Go!} programs}
+\label{compile}
+
+\section{Compiling a \texorpdfstring{\go}{Go!} program}
+\label{compile:compile}
+
+Before an \go program can be executed, the source code must first be compiled into abstract machine instructions -- this is done using a separate compiler program.\footnote{For the Technology Preview Release the \go compiler requires the \april language system to be installed.}  The \go compiler is invoked at the command-line using the \q{goc} command as follows:
+\begin{alltt}
+goc [-g] [-gb \emph{progName}]* [-b \emph{progName}]* [-p] [-P \emph{dir}]* \emph{filename*}
+\end{alltt}
+where \emph{file}s specify one or more \go source files.  The options have the following meanings:
+
+\begin{description}
+\item[\q{-g} -- enable debugging]
+Results in extra debugging information included with the compiled code.  This extra code is activated When the compiled program is run with the `\q{-g}' option -- see section~\vref{debugger:builtin} for one example of how to trace the execution of a \go program.
+
+\item[\q{-b \emph{progName}} -- set break point]
+If debugging is enabled, the break option requests that a break point is set on entry to a particular program. When execution reaches that program then the debugger will be notified of the break point.
+
+\item[\q{-gb \emph{program}} -- enable debugging for \q{\emph{program}} only]
+The plain \q{-g} option enables debugging for all programs in a package. The \q{-gb} option enables debugging for specific programs only; other programs will not have debugging information compiled for them.
+
+\begin{aside}
+The compiler will generate debugging information for \emph{any} program of the given name -- whether it is defined inside a class body or at the top-level.
+\end{aside}
+
+\item[\q{-p} -- enable profiling]
+Compiles extra information that can be used to help profile performance of the executing program. When a program is compiled with the \q{-p} option, then, when the program is run, a file \q{goProfile.out} is generated that contains a trace of the execution of the program. This file can be processed to extra performance statistics -- such as the number of times each line of source is visited.
+
+The standard \go program \q{go.profiler} is a simple program that analyses the results of a \q{goProfile.out} file, generating a listing of the number of times each line of the program is executed.
+
+\item[\q{-P} \emph{dir} -- Add to compiler path]
+Adds \emph{dir} to the end of the `class path'. The class path is a list of directories which is used to locate source files \emph{and} pre-compiled modules that are \q{import}ed.
+
+The default compiler path is:
+\begin{alltt}
+.:/opt/go
+\end{alltt}
+assuming that \q{/opt/go} is the installation point of your \go system.
+
+%\item[\q{-O} -- Invoke source optimization]
+%This option invokes certain optimizations based on a source-to-source transformation. These are not guaranteed to make the program execute faster!
+
+The compiler is aware of the \q{GO\_DIR} environment variable. If set then this environment variable overrides the default compiler path.
+
+\end{description}
+
+The \emph{file}s are assumed to contain \go source code.  The standard extension for \go source programs is \emph{.go}. Note that the compiler enforces the convention that the `package name' of the program reflects the file name. For example, if a program file contained the package:
+\begin{alltt}
+foo.bar.jar\{
+  \ldots
+\}
+\end{alltt}
+then this must be contained in a file whose name takes the form:
+\begin{alltt}
+\ldots{}/foo/bar/jar.go
+\end{alltt}
+I.e., the tail of the complete file name must match the declared package name in the file.
+
+The reason for this is that is a program file \q{import}s a package, as in:
+\begin{alltt}
+\ldots{}
+  import foo.bar.
+\ldots{}
+\end{alltt}
+then the compiler will search for a file of the form \q{\ldots{}/foo/bar.goc} occurring on the class path.
+
+\section{Running a \texorpdfstring{\go}{Go!} program}
+\label{compile:run}
+
+A \go program is run using the \q{go} runtime engine command:
+
+\begin{alltt}
+\% go \emph{options} \emph{prog} \emph{Arg\sub1} \ldots \emph{Arg\subn}
+\end{alltt}
+
+where \emph{prog} is a package contained in a file \q{prog.goc} occurring on the class path; and \emph{Arg\subi} are the program arguments to be passed to the \go program.
+
+
+By default, the standard entry point of a program is an action procedure called \q{main} -- this takes as its argument a list of \q{string}s -- the strings forming the arguments to the application. The entry point can be changed by using the \q{-m} option.
+
+\begin{aside}
+The command line arguments may be parsed -- into \q{integer}s for example -- using the facilities provided by the \q{go.stdparse} package. For example, to parse the first argument into a \q{integer} use:
+\begin{alltt}
+\ldots
+  main([F,..R]) ->
+    doSomething(integerOf\%\%F);
+    \ldots
+\end{alltt}
+\end{aside}
+
+Command line options are always consumed by the engine. If there are arguments that follow the package name they are \emph{not} processed by the engine and are passed as normal arguments to the \go application. For example, to pass application specific command-line options use a command such as:
+\begin{alltt}
+go \emph{package} -a1 -a2 \ldots
+\end{alltt}
+to start the \go application. The arguments \q{-a1}, \q{-a2} etc., are passed as is to the \go program; and can be accessed using the standard \q{\_\_command\_line} function (see Section~\vref{misc:commandline}).
+
+\begin{description}
+\item[\q{-v} -- display version information]
+
+This option causes the engine to display a line indicating the version of the engine before executing the program.
+
+\item[\q{-h \emph{N}} -- set initial size of global heap]
+
+This option sets the initial size of the global heap to $N\times1024$ cells. The global heap will grow automatically as required; however, this may require a number of expensive garbage collections before the system decides the heap should be larger.
+
+The default value for the initial global heap size is 200K cells (on a 32bit system, slightly less than 1MB) setting a larger value for some programs may improve performance.
+
+\item[\q{-s \emph{N}} -- set default initial thread heap size]
+
+Each thread has its own local heap, on which most terms are constructed during unification. The default initial size of the thread heap is 1024 cells; the \q{-s} option will change that to $N\times1024$ cells.
+
+Again, the system will automatically grow a thread's heap if required. However, performance may be improved by setting the default to a larger value. Note that this sets the initial heap size for \emph{all} threads created in the application.
+
+\item[\q{-m \emph{entry}} -- non-standard entry point]
+
+By default, the \go run-time executes the \q{main} action procedure occurring in the loaded program. However, the \q{-m} flag can be used to invoke a different program. Which ever entry point is specified, it must be a single argument action procedure that takes a list of \q{string}s as its argument.
+
+\item[\q{-P} \emph{dir} -- add \emph{dir} to the class path]
+The \q{-P} option adds the named \emph{dir} to the front of the class path. This list of directories is used to locate the compiled code of packages that are loaded -- either directly as the main program package -- or indirectly when that package (or other packages) \q{import} additional packages.
+
+Like the compiler, the \go engine is aware of the \q{GO\_DIR} environment variable. If set then this environment variable overrides the default execution path:
+\begin{alltt}
+/opt/go/:\emph{cwd}/
+\end{alltt}
+is used -- where \q{/opt/go/} is the \emph{installation directory} that \go is installed in and \emph{cwd} is the current directory.
+
+\item[\q{-d \emph{dir}} -- set non-default initial working directory]
+
+Normally the initial working directory for the \go engine is based the value of the \q{PWD} shell environment variable.\footnote{Strictly, the value returned by the \q{getcwd()} system call.} Using the \q{-d} option allows you to override this with a different directory.
+
+\item[\q{-g} -- invoke debugger]
+
+This option turns on any debugging code that was compiled into the application by the \q{-g} option of the compiler. More precisely, the \go loads the \q{go.debug} package and initializes the package with the command line option.
+
+\item[\q{-L} URL -- set logfile]
+
+Occasionally the \go engine will report messages in a logfile. By default the logfile is equivalent to \q{stderr}. Using the \q{-L} option allows log messages to be recorded in a file.
+
+If it is used, the \q{-L} option should be the first command line option.
+
+\item[\q{-R \emph{seed}} -- Set randomization seed]
+By default the random number generator uses the same seed for every execution. However, setting the initial \emph{seed} -- which should be a large integer for maximum randomness -- will help to ensure more random random numbers.
+\end{description}

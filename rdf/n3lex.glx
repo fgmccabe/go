@@ -1,0 +1,142 @@
+/*
+ * A golex file for the N3 parser
+ */
+
+yyTokType ::= BARENAME(string)
+          | URI(string)
+	  | QNAME(string,string)
+	  | INT(integer) | DEC(float) | FLT(float) | STR(string)
+	  | PREFIX | A | IS | HAS | OF
+	  | LANG(string) | ID(string)
+	  | HAT | EQUAL | LESSEQ | GREATERQ 
+	  | EOF
+          | DOT | COMMA | SEMI 
+	  | LPAR | RPAR | LSQ | RSQ | LBRC | RBRC.
+
+-- Import stuff
+  import go.hash.
+  import go.stdparse.
+  import go.io.
+
+  keywords:hash[string,yyTokType] = hash([("a",A),
+                                          ("is",IS),("has",HAS),
+					  ("of",OF),
+					  ("prefix", PREFIX) ],8).
+
+%%
+
+-- The token tules themselves
+
+[ \n\t\b\r]+ => skip
+
+"#"[^\n]*"\n"		       	-- line comment
+--"#".*"\n" => skip
+
+"a" => (A)
+"is" => (IS)
+"has" => (HAS)
+"of" => (OF)
+
+[a-zA-Z_][a-zA-Z0-9_]* => (
+		       keywords.present(yyTok,Tok) ? Tok | 
+		       BARENAME(yyTok))
+
+([a-zA-Z_][a-zA-Z0-9_]*)?":"([a-zA-Z_][a-zA-Z0-9_]*)? => (qname(yyTok))
+
+"<"[^>]*">" => explicitURI(yyTok)   -- Looking for an explicit URI
+
+[-+]?[0-9]+"."[0-9]+ => DEC(floatOf%%yyTok)
+
+[-+]?[0-9]+ => INT(integerOf%%yyTok)
+
+[-+]?[0-9]+("."[0-9]+)?[eE][-+]?[0-9] => FLT(floatOf%%yyTok)
+
+"\""([^\\\"]|"\\"(("+"[0-9a-fA-F]+";")|[^+]))*"\"" => STR(tok2str(yyTok))
+
+
+"@prefix" => PREFIX
+"@a" => A
+"@is" => IS
+"@has" => HAS
+"@of" => OF
+"<=" => LESSEQ
+"=>" => GREATERQ
+"=" => EQUAL
+"^^" => HAT
+
+"." => DOT
+";" => SEMI
+"," => COMMA
+
+"(" => LPAR
+")" => RPAR
+"[" => LSQ
+"]" => RSQ
+"{" => LBRC
+"}" => RBRC
+
+"@"[a-z]+(-[a-z0-9]+)* => LANG(tail(yyTok,1))
+
+%%
+
+  private tok2str:[string]=>string.
+
+  tok2str([`",..X]) => dequoteStr(X,`").
+
+  private dequoteStr:[string,char]=>string.
+
+  dequoteStr([C],C)=>[].
+  dequoteStr([],_) =>[].
+  dequoteStr([`\\,`a,..L],C) => [`\a,..dequoteStr(L,C)].
+  dequoteStr([`\\,`b,..L],C) => [`\b,..dequoteStr(L,C)].
+  dequoteStr([`\\,`d,..L],C) => [`\d,..dequoteStr(L,C)].
+  dequoteStr([`\\,`e,..L],C) => [`\e,..dequoteStr(L,C)].
+  dequoteStr([`\\,`f,..L],C) => [`\f,..dequoteStr(L,C)].
+  dequoteStr([`\\,`n,..L],C) => [`\n,..dequoteStr(L,C)].
+  dequoteStr([`\\,`r,..L],C) => [`\r,..dequoteStr(L,C)].
+  dequoteStr([`\\,`t,..L],C) => [`\t,..dequoteStr(L,C)].
+  dequoteStr([`\\,`v,..L],C) => [`\v,..dequoteStr(L,C)].
+  dequoteStr([`\\,`+,..L],C) => 
+     valof{
+       extractUnicode(L,U,rL);
+       valis [__charOf(hexNum%%U),..dequoteStr(rL,C)]
+     }.
+  dequoteStr([`\\,X,..L],C) => [X,..dequoteStr(L,C)].
+  dequoteStr([X,..L],C) => [X,..dequoteStr(L,C)].
+
+  private extractUnicode:[string,string-,string-]*.
+  extractUnicode([],[],[])->{}.
+  extractUnicode([`;,..L],[],L)->{}.
+  extractUnicode([C,..L],[C,..U],rL) -> extractUnicode(L,U,rL).
+
+  private tok2int:[string]=>integer.
+  tok2int(L)=>integerOf%%L.
+
+  private tok2float:[string]=>float.
+  tok2float(L)=>floatOf%%L.
+
+  private tok2sym:[string]=>symbol.
+  tok2sym([`',..L])=>implode(dequoteStr(L,`')).
+
+  private tok2chr:[string]=>char.
+  tok2chr([``,..L]) => dequoteStr(L,`\+ffff;).head().
+
+  private qname:[string]=>yyTokType.
+  qname(N)::append(F,[`:,..B],N) => QNAME(F,B).
+
+  private explicitURI:[string]=>yyTokType.
+  explicitURI([`<,..U]) :: append(F,">",U) => URI(F).
+
+  private n3tokens:[yyLexer]=>list[yyToken].
+  n3tokens(Lx) =>
+     valof{
+       tK = Lx.nextToken();
+       (tK.token()=EOF ?
+         valis []
+       | valis [tK,..n3tokens(Lx)]
+       )
+     }.
+
+  tokenizeFile:[string]=>list[yyToken].
+  tokenizeFile(F) => n3tokens(yyn3lex(getFile(F,utf8Encoding),1,1)).
+

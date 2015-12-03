@@ -1,0 +1,93 @@
+% Automatically generated, do not edit 
+\setlongtables
+\begin{longtable}{|llll|}
+\caption{\go standard operators}\label{grammar:operators}\\ 
+\hline
+\small{}Operator&\small{}Priority&\small{}Assoc.&Description\\
+\hline
+\endfirsthead
+\multicolumn{4}{c}{
+{Table \ref{grammar:operators} \go standard operators (cont.)}}\\
+\hline
+\small{}Operator&\small{}Priority&\small{}Assoc.&\small{}Description\\
+\hline
+\endhead
+\hline\multicolumn{4}{r}{\small\emph{continued\ldots}}\
+\endfoot
+\hline
+\endlastfoot
+\tt .\char`\ &\small{}1900&\small{}right&\small{}statement separator\\
+\tt ::=&\small{}1460&\small{}infix&\small{}user type definition\\
+\tt |&\small{}1250&\small{}right&\small{}type union\\
+\tt ?&\small{}1200&\small{}infix&\small{}conditional operator\\
+\tt =>&\small{}1200&\small{}infix&\small{}function arrow\\
+\tt :-&\small{}1200&\small{}infix&\small{}clause arrow\\
+\tt :--&\small{}1200&\small{}infix&\small{}strong clause\\
+\tt ->&\small{}1200&\small{}infix&\small{}process rule\\
+\tt -->&\small{}1200&\small{}infix&\small{}grammar rule\\
+\tt *>&\small{}1152&\small{}infix&\small{}all solutions\\
+\tt ;&\small{}1150&\small{}right&\small{}action separator\\
+\tt ::&\small{}1125&\small{}left&\small{}guard marker\\
+\tt ||&\small{}1060&\small{}infix&\small{}bag of constructor\\
+\tt ,&\small{}1000&\small{}right&\small{}tupling, conjunction\\
+\tt onerror&\small{}955&\small{}infix&\small{}error handler\\
+\tt <=&\small{}950&\small{}infix&\small{}class rule arrow\\
+\tt <\tilda{}&\small{}949&\small{}infix&\small{}implements interface\\
+\tt @&\small{}905&\small{}infix&\small{}tau pattern notation\\
+\tt @@&\small{}905&\small{}right&\small{}suspension variable\\
+\tt timeout&\small{}900&\small{}infix&\small{}timeout clause\\
+\tt =&\small{}900&\small{}infix&\small{}variable declaration\\
+\tt :=&\small{}900&\small{}infix&\small{}variable assignment\\
+\tt ==&\small{}900&\small{}infix&\small{}equality predicate\\
+\tt \char'134=&\small{}900&\small{}infix&\small{}not unifyable\\
+\tt !=&\small{}900&\small{}infix&\small{}not equal\\
+\tt <&\small{}900&\small{}infix&\small{}less than\\
+\tt =<&\small{}900&\small{}infix&\small{}less than or equal\\
+\tt >&\small{}900&\small{}infix&\small{}greater than\\
+\tt >=&\small{}900&\small{}infix&\small{}greater than or equal\\
+\tt .=&\small{}900&\small{}infix&\small{}match predicate\\
+\tt =.&\small{}900&\small{}infix&\small{}match predicate\\
+\tt ..&\small{}896&\small{}infix&\small{}list abstraction\\
+\tt in&\small{}895&\small{}infix&\small{}set membership\\
+\tt \char'134/&\small{}820&\small{}left&\small{}set union\\
+\tt \char'134&\small{}820&\small{}left&\small{}set difference\\
+\tt /\char'134&\small{}800&\small{}left&\small{}set intersection\\
+\tt <>&\small{}800&\small{}right&\small{}list append\\
+\tt \#&\small{}760&\small{}infix&\small{}package separator\\
+\tt :&\small{}750&\small{}infix&\small{}type annotation\\
+\tt \$=&\small{}731&\small{}infix&\small{}constructor type\\
+\tt @>&\small{}731&\small{}infix&\small{}constructor type\\
+\tt @=&\small{}731&\small{}infix&\small{}constructor type\\
+\tt +&\small{}720&\small{}left&\small{}addition\\
+\tt -&\small{}720&\small{}left&\small{}subtraction\\
+\tt *&\small{}700&\small{}left&\small{}multiplication\\
+\tt /&\small{}700&\small{}left&\small{}division\\
+\tt quot&\small{}700&\small{}left&\small{}integer quotient\\
+\tt rem&\small{}700&\small{}left&\small{}remainder function\\
+\tt **&\small{}600&\small{}left&\small{}exponentiation\\
+\tt \%\%&\small{}500&\small{}infix&\small{}grammar parse\\
+\tt \char`\^&\small{}500&\small{}infix&\small{}grammar iterator\\
+\tt \tilda{}&\small{}935&\small{}infix&\small{}grammar remainder\\
+\tt .&\small{}450&\small{}infix&\small{}object access\\
+\tt\small private&\small{}1700&\small{}prefix&\small{}private program\\
+\tt\small import&\small{}900&\small{}prefix&\small{}import module\\
+\tt\small case&\small{}950&\small{}prefix&\small{}case analysis\\
+\tt\small \char'134+&\small{}905&\small{}prefix&\small{}logical negation\\
+\tt\small @&\small{}905&\small{}prefix&\small{}tau pattern\\
+\tt\small raise&\small{}900&\small{}prefix&\small{}raise exception\\
+\tt\small valis&\small{}905&\small{}prefix&\small{}return value\\
+\tt\small istrue&\small{}905&\small{}prefix&\small{}return value\\
+\tt\small \$&\small{}897&\small{}prefix&\small{}initialization\\
+\tt\small :&\small{}750&\small{}prefix&\small{}type annotation\\
+\tt\small -&\small{}300&\small{}prefix&\small{}arithmetic negation\\
+\tt\small .\char`\ &\small{}1900&\small{}postfix&\small{}statement terminator\\
+\tt\small ;&\small{}1150&\small{}postfix&\small{}action terminator\\
+\tt\small !&\small{}905&\small{}postfix&\small{}one solution operator\\
+\tt\small +&\small{}760&\small{}postfix&\small{}input mode\\
+\tt\small -&\small{}760&\small{}postfix&\small{}output mode\\
+\tt\small -+&\small{}760&\small{}postfix&\small{}bidirectional mode\\
+\tt\small +-&\small{}760&\small{}postfix&\small{}bidirectional mode\\
+\tt\small ++&\small{}760&\small{}postfix&\small{}super input mode\\
+\tt\small *&\small{}700&\small{}postfix&\small{}action type\\
+\tt\small \char`\^&\small{}500&\small{}postfix&\small{}string convertion\\
+\end{longtable}

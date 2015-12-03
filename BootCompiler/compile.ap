@@ -1,0 +1,968 @@
+/*
+  Compile a go program
+  This had to be a single module, as we have a bunch of mutually recursive function
+  Platform module, gives access to the ACS communications infrastructure
+  (c) 2001 F.G. McCabe
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+  Contact: Francis McCabe <fgm@fla.fujitsu.com>
+ */
+
+#include "go.ah";                       -- standard header for the compiler
+#include "instr.ah";                    -- pick up the instruction definition
+
+module
+import {
+  interface "misc.af" and
+  interface "dict.af" and
+  interface "display.af" and
+  interface "types.af" and
+  interface "canon.af" and
+  interface "errors.af" and
+  interface "ground.af" and
+  interface "codegen.af" and
+  interface "mnem.af" and
+  interface "analyse.af" and
+  interface "ecode.af" and
+  interface "compvar.af" and
+  interface "index.af" and
+  interface "peephole.af" and
+  interface "estimate.af" and
+  interface "st-types.af" and
+  interface "debug.af" and
+  interface <stdio.af>
+} in
+{
+
+/* Generate unification code for the head of a clause */
+  unifyHead(Head,dict,Opts,Refs,Used,last) => valof { 
+    Arg : 1;
+    Code : [];
+    R : Refs;
+    Us : rmFreeReg(resetGc(Used),1..listlen(Head));
+    if dbgComp in Opts then
+      "Used matrix@0 = "++showUse(Us)++"\n">>stdout;
+      
+    Rg : 1;
+    for E in Head do{
+      if bild(_).=E then 
+	Code := Code<>[vrA(Rg)];
+
+      Rg := Rg+1;
+    };
+
+    for E in Head do{
+      (HC,Rf,Usd) = unifyTerm(aReg(Arg),vdel,E,true,dict,Opts,R,Us,last);
+      Code := Code<>HC; R := Rf; Us := Usd;
+      Arg := Arg+1;
+    };
+    
+    heapSize = estimateArgsSpace(Head,false,Opts);
+    hSze = gcPredict(Us);
+    
+    if hSze!=heapSize then{
+      "Discrepancy in heap calculation, hSze="++hSze^0++", heapSize="++heapSize^0++"\n">>stdout;
+      "When compiling head "++showCT(cons(strct("()",listlen(Head)),Head))++"\n">>stdout;
+    };
+    
+    if heapSize>0 then{
+      if dbgComp in Opts then
+        "estimated "++heapSize^0++" heap words required for heap\n">>stdout;
+      valis (heapSize,Code,R,Us)
+    }
+    else
+      valis (0,Code,R,Us)
+  };
+
+  unifyTerm(Dst,TNme,A,top,dict,Opts,Refs,Used,last)=> valof{
+    case A in {
+      idnt("_") -> {
+        case Dst in {
+          sReg -> valis ([clS],Refs,Used)
+        | aReg(Rg) :: top -> valis ([],Refs,freeAReg(Used,Rg))
+        | _ -> valis ([],Refs,Used)
+        }
+      }
+
+    | idnt(Nm) -> {
+    	(vLoc,i,s,_,_,iUsed) = lookupVar(Nm,dict,Used);
+    	
+        if vLoc==voidVar then{
+          if Dst==sReg then
+            valis ([clS],Refs,iUsed)
+          else
+            valis ([],Refs,iUsed)
+        };
+
+        if i() then
+          valis uVar(vLoc,Dst,Opts,Refs,iUsed,last)
+        else{
+          s(true);
+          valis mVar(vLoc,Dst,Opts,Refs,iUsed,last)
+        }
+      }
+
+    | mtch(T) ->
+        valis matchTerm(Dst,TNme,T,top,dict,Opts,Refs,Used,last)
+
+    | bild(T) -> 
+        valis unifyTerm(Dst,TNme,T,top,dict,Opts,Refs,Used,last)
+
+    | X::isGroundC(A) -> {
+        (lb,Rf) = valof{
+          if (Lbl,NN::sameLit(A,NN)) in Refs then 
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,A),..Refs])
+          }
+        };
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)       -- do nothing
+        | aReg(Reg)::top -> valis ([uAlit(Reg,lb)],Rf,freeAReg(Used,Reg))
+        | aReg(Reg) -> valis ([uAlit(Reg,lb)],Rf,Used)
+        | yReg(Lc,_) -> valis ([mAY(0,Lc),uAlit(0,lb)],Rf,Used)
+        | sReg -> valis ([uSlit(lb)],Rf,Used)
+        | notAlloc -> exception error("unallocated destination (unifyG)",'fail)
+        }
+      }
+
+    | cons(Nm,L) -> {
+        (lb,Rf) = valof{
+          if (Lbl,Nm) in Refs then
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Nm),..Refs])
+          }
+        };
+
+        (CCode,CRefs,CUsed) = valof{
+          case Dst in {
+            voidVar -> valis ([],Rf,Used)
+          | aReg(1)::top -> valis ([uAcns1(lb)],Rf,freeAReg(Used,1))
+          | aReg(1) -> valis ([uAcns1(lb)],Rf,Used)
+          | aReg(2)::top -> valis ([uAcns2(lb)],Rf,freeAReg(Used,2))
+          | aReg(2) -> valis ([uAcns2(lb)],Rf,Used)
+          | aReg(3)::top -> valis ([uAcns3(lb)],Rf,freeAReg(Used,3))
+          | aReg(3) -> valis ([uAcns3(lb)],Rf,Used)
+          | aReg(4)::top -> valis ([uAcns4(lb)],Rf,freeAReg(Used,4))
+          | aReg(4) -> valis ([uAcns4(lb)],Rf,Used)
+
+          | aReg(Reg)::top -> valis ([uAcns(Reg,lb)],Rf,freeAReg(Used,Reg))
+          | aReg(Reg) -> valis ([uAcns(Reg,lb)],Rf,Used)
+          | yReg(Lc,_) -> valis ([mAY(0,Lc),uAcns(0,lb)],Rf,Used)
+          | sReg -> valis ([uScns(lb)],Rf,Used)
+          | notAlloc -> exception error("unallocated destination (consU)",'fail)
+          }
+        };
+
+        (ACode,ARefs,AUs) = valof{
+          Code : [];
+          R : CRefs;
+          Us : lclGc({if top && aReg(Rg).=Dst then freeAReg(CUsed,Rg) else CUsed},listlen(L)+2);
+          HC : [];
+          for E in L do{
+            (HC,R,Us) := unifyTerm(sReg,vdel,E,false,dict,Opts,R,Us,last);
+            Code := Code<>HC; 
+          };
+          valis (Code,R,Us)
+        };
+
+        valis (CCode<>ACode,ARefs,AUs)
+      }
+    }
+  };
+  
+  matchTerm(Dst,TNme,A,top,dict,Opts,Refs,Used,last)=> valof{
+    case A in {
+      idnt(Nm) -> {
+    	(vLoc,i,s,_,_,iUsed) = lookupVar(Nm,dict,Used);
+    	
+        if vLoc==voidVar then{
+          if Dst==sReg then
+            valis ([clS],Refs,iUsed)
+          else
+            valis ([],Refs,iUsed)
+        };
+
+        if i() then
+          valis mtVar(Dst,vLoc,Opts,Refs,iUsed,last)
+        else{
+          s(true);
+          valis mVar(vLoc,Dst,Opts,Refs,iUsed,last)
+        }
+      }
+
+    | X::isGroundC(A) -> {
+        (lb,Rf) = valof{
+          if (Lbl,NN::sameLit(A,NN)) in Refs then 
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,A),..Refs])
+          }
+        };
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)       -- do nothing
+        | aReg(Reg)::top -> valis ([cAlit(Reg,lb)],Rf,freeAReg(Used,Reg))
+        | aReg(Reg) -> valis ([cAlit(Reg,lb)],Rf,Used)
+        | yReg(Lc,_) -> valis ([mAY(0,Lc),cAlit(0,lb)],Rf,Used)
+        | sReg -> valis ([cSlit(lb)],Rf,Used)
+        | notAlloc -> exception error("unallocated destination (matchGr)",'fail)
+        }
+      }
+
+    | cons(Nm,L) -> {
+        (lb,Rf) = valof{
+          if (Lbl,Nm) in Refs then
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Nm),..Refs])
+          }
+        };
+
+        (CCode,CRefs,CUsed) = valof{
+          case Dst in {
+            voidVar -> valis ([],Rf,Used)
+          | aReg(1)::top -> valis ([cAcns1(lb)],Rf,freeAReg(Used,1))
+          | aReg(1) -> valis ([cAcns1(lb)],Rf,Used)
+          | aReg(2)::top -> valis ([cAcns2(lb)],Rf,freeAReg(Used,2))
+          | aReg(2) -> valis ([cAcns2(lb)],Rf,Used)
+          | aReg(3)::top -> valis ([cAcns3(lb)],Rf,freeAReg(Used,3))
+          | aReg(3) -> valis ([cAcns3(lb)],Rf,Used)
+          | aReg(4)::top -> valis ([cAcns4(lb)],Rf,freeAReg(Used,4))
+          | aReg(4) -> valis ([cAcns4(lb)],Rf,Used)
+
+          | aReg(Reg)::top -> valis ([cAcns(Reg,lb)],Rf,freeAReg(Used,Reg))
+          | aReg(Reg) -> valis ([cAcns(Reg,lb)],Rf,Used)
+
+          | yReg(Lc,_) -> valis ([mAY(0,Lc),cAcns0(lb)],Rf,Used)
+          | sReg -> valis ([cScns(lb)],Rf,Used)
+          | notAlloc -> exception error("unallocated destination (consU)",'fail)
+          }
+        };
+
+        (ACode,ARefs,AUs) = valof{
+            Code : [];
+            R : CRefs;
+            Us : {if top && aReg(Rg).=Dst then freeAReg(CUsed,Rg) else CUsed};
+            HC : [];
+            for E in L do{
+              (HC,R,Us) := matchTerm(sReg,vdel,E,false,dict,Opts,R,Us,last);
+              Code := Code<>HC; 
+            };
+            valis (Code,R,Us)
+        };
+
+        valis (CCode<>ACode,ARefs,AUs)
+      }
+      
+    | mtch(T) ->
+        valis matchTerm(Dst,TNme,T,top,dict,Opts,Refs,Used,last)
+
+    | bild(T) ->
+        valis unifyTerm(Dst,TNme,T,top,dict,Opts,Refs,Used,last)
+    }
+  };
+
+  callArgs(Args,First,Gp,dict,Opts,Refs,Used,isLast) => valof {
+    Arg : First;
+    Code : [];
+    R : Refs;
+    Us : Used;
+--     "Used matrix@0 = "++showUse(Us)++"\n">>stdout;
+    HC : [];
+    Extra : [];
+
+    for E in Args do{
+      argVar = {
+      	if idnt(Vr).=E then Vr 
+      	else []
+      };
+      	  	
+      (Extra,Us) := resolveConflicts(Arg,Gp,Us,dict,argVar);
+      (HC,R,Us) := buildTerm(aReg(Arg),E,dict,Opts,R,Us,isLast);
+      Us := rmFreeReg(Us,[Arg]);
+      Code := Code<>Extra<>HC;
+      Arg := Arg+1;
+    };
+    
+    valis (Code,R,Us)
+  };
+
+  buildTerm(Dst,Trm,dict,Opts,Refs,Used,last)=>valof{
+    case Trm in {
+      idnt("_") ->            -- build a void term
+        valis clVar(Dst,Opts,Refs,Used,last)
+
+    | idnt(Nm) -> {           -- build an occurrence of a variable
+    	(vLoc,i,s,_,_,iUsed) = lookupVar(Nm,dict,Used);
+    	
+        if vLoc==voidVar then
+          valis clVar(Dst,Opts,Refs,iUsed,last);
+
+        if i() then
+          valis mVar(Dst,vLoc,Opts,Refs,iUsed,last)
+        else{
+          s(true);
+--          "Clear src="++vLoc^0++"dst="++Dst^0++"\n">>stdout;
+          valis cVar(Dst,vLoc,Opts,Refs,iUsed,last)
+        }
+      }
+
+    | X::isGroundC(Trm) -> {
+        (lb,Rf) = valof{
+          if (Lbl,NN::sameLit(Trm,NN)) in Refs then 
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Trm),..Refs])
+          }
+        };
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)
+        | aReg(Reg) -> valis ([mAlit(Reg,lb)],Rf,regUsed(Used,Reg))
+        | yReg(Lc,_) -> valis ([mAlit(0,lb),mYA(Lc,0)],Rf,locUsed(Used,Lc))
+        | sReg -> valis ([mSlit(lb)],Rf,Used)
+        | notAlloc -> exception error("unallocated destination (buildLt2)",'fail)
+        }
+      }
+
+    | cons(Nm,L) -> {
+        (lb,Rf) = valof{
+          if (Lbl,Nm) in Refs then
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Nm),..Refs])
+          }
+        };
+
+        (ACode,ARefs,AUs) = valof{
+          Code : [];
+          R : Rf;
+          Us : {case Dst in {
+              aReg(Reg) => regUsed(Used,Reg)
+            | yReg(Lc,_) => locUsed(Used,Lc)
+            | _ => Used
+            }
+          };
+          HC : [];
+          for E in L do{
+            (HC,R,Us) := buildTerm(sReg,E,dict,Opts,R,Us,last);
+            Code := Code<>HC; 
+          };
+          valis (Code,R,lclGc(Us,listlen(L)+2))
+        };
+
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)
+        | aReg(Reg) -> valis ([mAcns(Reg,lb),..ACode],ARefs,regUsed(AUs,Reg))
+        | yReg(Lc,_) -> valis ([mAcns(0,lb),mYA(Lc,0),..ACode],ARefs,locUsed(AUs,Lc))
+        | sReg -> valis ([mScns(lb),..ACode],ARefs,AUs)
+        | notAlloc -> exception error("unallocated destination (buildCons)",'fail)
+        };
+      }
+    }
+  };
+  
+  writeTerm(Dst,Trm,dict,Opts,Refs,Used,last)=>valof{
+    case Trm in {
+      idnt("_") -> {                              -- overwrite a void term
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)         -- nothing to do
+        | aReg(Reg) -> valis ([oAU(Reg)],Refs,regUsed(lclGc(Used,2),Reg))
+        | yReg(Loc,_) -> valis ([oYU(Loc)],Refs,locUsed(Used,Loc))
+        | _ -> exception error("invalid destination in variable overwrite "++Dst^0,'fail)
+        }
+      }
+
+    | idnt(Nm) -> {           -- build an occurrence of a variable
+    	(vLoc,i,s,_,_,iUsed) = lookupVar(Nm,dict,Used);
+    	
+        if vLoc==voidVar then
+          valis writeTerm(Dst,idnt("_"),dict,Opts,Refs,Used,last);
+
+        if i() then{
+          valis oVar(Dst,vLoc,Opts,Refs,iUsed,last)
+        }
+        else{
+          s(true);
+--          "Clear src="++vLoc^0++"dst="++Dst^0++"\n">>stdout;
+          valis cVar(Dst,vLoc,Opts,Refs,iUsed,last)
+        }
+      }
+
+    | X::isGroundC(Trm) -> {
+        (lb,Rf) = valof{
+          if (Lbl,NN::sameLit(Trm,NN)) in Refs then 
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Trm),..Refs])
+          }
+        };
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)
+        | aReg(Reg) -> valis ([mAlit(Reg,lb)],Rf,regUsed(Used,Reg))
+        | yReg(Lc,_) -> valis ([mAlit(0,lb),oYA(Lc,0)],Rf,locUsed(Used,Lc))
+        | notAlloc -> exception error("unallocated destination (buildLt2)",'fail)
+        | _ -> exception error("invalid destination for term overwrite",'fail)
+        }
+      }
+
+    | cons(Nm,L) -> {
+        (lb,Rf) = valof{
+          if (Lbl,Nm) in Refs then
+            valis (Lbl,Refs)
+          else{
+            Lbl = newLabel();
+            valis (Lbl,[(Lbl,Nm),..Refs])
+          }
+        };
+
+        (Spr,Us0) = spareAReg(Used);
+
+        (ACode,ARefs,AUs) = valof{
+          Code : [];
+          R : Rf;
+          Us : {case Dst in {
+              aReg(Reg) => regUsed(Us0,Reg)
+            | yReg(Lc,_) => locUsed(Us0,Lc)
+            | _ => Used
+            }
+          };
+          HC : [];
+          for E in L do{
+            (HC,R,Us) := buildTerm(sReg,E,dict,Opts,R,Us,last);
+            Code := Code<>HC; 
+          };
+          valis (Code,R,lclGc(Us,listlen(L)+2))
+        };
+
+        case Dst in {
+          voidVar -> valis ([],Refs,Used)
+        | aReg(Reg) -> 
+            valis ([mAcns(Spr,lb),..ACode]<>[mAA(Reg,0)],ARefs,
+                   freeAReg(regUsed(AUs,Reg),Spr))
+        | yReg(Lc,_) -> 
+            valis ([mAcns(Spr,lb),..ACode]<>[oYA(Lc,Spr)],ARefs,
+                   freeAReg(locUsed(AUs,Lc),Spr))
+        | notAlloc -> exception error("unallocated destination (overwriteCons)",'fail)
+        | _ -> exception error("invalid destination for term overwrite",'fail)
+        };
+      }
+    }
+  };
+  
+  resolveConflicts(Arg,Gp,Used,dict,Vr) => valof{
+    Extra : [];
+    Us : Used;
+    for de(Nm::Nm!=Vr,i,_,_,_,locn,reset,Usage) in dict do{
+      if aReg(Arg)==locn() && i() then{
+      	[_,_,[vG,vP],.._] .= Usage;
+      	
+      	if vG<Gp || vG==Gp&& vP<Arg then{
+--          "Discarding register variable "++string%%Nm++"\n">>stdout;
+          reset(aReg(-1));
+      	}
+        else{
+--      	  "Conflict over "++string%%Nm++" in reg "++Arg^0++"\n">>stdout;
+      	
+      	  reset(notAlloc);
+      	  (Loc,_,_,_,_,Us2) = lookupVar(Nm,dict,Us);
+      	  case Loc in {
+      	    aReg(Rg) -> {
+      	      Extra := [mAA(Rg,Arg),..Extra];
+      	      Us := regUsed(Us2,Rg);
+      	    }
+      	  | yReg(Lc,_) -> {
+      	      Extra := [mYA(Lc,Arg),..Extra];
+      	      Us := locUsed(Us2,Lc);
+      	    }
+      	  | _ -> exception error("problem in resolveConflicts",'fail)
+      	  };
+--      	  string%%Nm++" reallocated to "++Loc^0++"\n">>stdout;
+        }
+      }
+    };
+    
+    if Extra!=[] then{
+--      "Use matrix after conflict resolution is "++showUse(Us)++"\n">>stdout;
+--      "Extra code is "++showCodeSeq(Extra)++"\n">>stdout;
+    };
+    valis (Extra,Us)
+  };
+
+  compCl(Clause::clse(Q,H,B,Lcn).=Clause,Opts,Refs) => valof{
+    if dbgComp in Opts then{
+      "Compiling clause "++showCP(Clause)++"\n">>stdout;
+    };
+    parts = partition(B,[]);
+    
+    (dict,envSize,iUsed) = analyseCls(Q,H,parts);
+
+    if dbgComp in Opts then{
+      "Envsize= "++envSize^0++"\n">>stdout;
+      "no parts= "++listlen(parts)^0++"\n">>stdout;
+    };
+    allocating = envSize>0 || listlen(parts)>1 || trpBegin in B;
+
+    if dbgComp in Opts then{
+      "Clause dictionary is "++showDict(dict)++"\n">>stdout;
+      "Initial use matrix is "++showUse(iUsed)++"\n">>stdout;
+      "Unify head "++showCT(cons(strct("()",listlen(H)),H))++"\n">>stdout;
+    };
+    (hSize,hCode,xRefs,lUsed) = unifyHead(H,dict,[],Refs,iUsed,parts==[]);
+                                   
+    if dbgComp in Opts then{
+      "Head code "++showCodeSeq(hCode)++"\n">>stdout;
+      "dictionary after head is "++showDict(dict)++"\n">>stdout;
+      "use matrix after head is "++showUse(lUsed)++"\n">>stdout;
+    };
+    (bCode,bX,bU) = compBodyPartitions(parts,1,dict,Opts,xRefs,lUsed,allocating);
+
+    if dbgComp in Opts then{
+      "use matrix after body is "++showUse(bU)++"\n">>stdout;
+      "allocating = "<>allocating^0<>"\n">>stdout;
+      "max locals = "<>maxLocals(bU)^0<>"\n">>stdout;
+    };
+
+    lSize = {if allocating || maxLocals(bU)>0 then max(maxLocals(bU),envSize) else 0};
+
+    voidYs = collect{
+      usdRgs(_,Locs,_,_,_).=lUsed;
+      for i in 1..maxLocals(bU) do{
+	if !i in Locs then
+	  elemis clY(i);
+      }
+    };
+
+    arity = listlen(H);
+    clCode = {if hSize>0 then [gc(arity,hSize)] else []}<>
+    {if allocating || lSize>0 then [alloc(arity,lSize),gcmap(arity,lSize),..voidYs] else []}<>
+    hCode<>bCode;
+
+    if dbgComp in Opts then
+      "Code for clause "++showCP(Clause)++" is \n"++showCodeSeq(clCode)++"\n">>stdout;
+
+    valis (clCode,bX)
+  };
+
+  compBodyPartitions(B,Gp,dict,Opts,xRefs,Used,al) => case B in {
+    [] => ([succ],xRefs,Used)
+  | [P] => valof{
+      Mx=maxReg(Used);
+      (fcode,xr,us) = compPart(P,Gp,dict,Opts,xRefs,resetGc(Used),true,al);
+      lsize = gcPredict(us);
+
+      if lsize>0 then{
+        if al || maxLocals(us)>0 then{
+	  (Pre,_) = gcMap(Used,Mx);		  -- note we need the pre-used Used
+          valis (Pre<>[gc(Mx,lsize)]<>fcode,xr,us)
+	}
+        else{
+          gcode = collect{
+            usdRgs(Regs,_,_,_,_).=Used;
+            for i in 1..Mx do
+              if !i in Regs then
+              elemis vdA(i);
+            elemis gc(Mx,lsize);
+          };
+          valis (gcode<>fcode,xr,us)
+        }
+      }
+      else
+        valis (fcode,xr,us)
+    }
+        
+  | [P,..Arts] => valof{
+      if dbgComp in Opts then
+        showCCalls(P,"Partition:[","","]",[],[])<>"--"<>showUse(Used)<>"\n">>stdout;
+
+      (fcode,xr,us) = compPart(P,Gp,dict,Opts,xRefs,resetGc(Used),false,false);
+      lsize = gcPredict(us);
+      (PreGc,MapIns) = gcMap(Used,maxReg(Used));
+      gcode = {if lsize>0 then PreGc<>[gc(maxReg(Used),lsize)] else []};
+
+      if dbgComp in Opts then
+        "Gc code = "<>showCodeSeq(gcode)<>"after use: "<>showUse(Used)<>"\n">>stdout;
+
+      if dbgComp in Opts then
+        showCCalls(P,"","","",[],[])<>"-- P code "++showCodeSeq(gcode<>fcode)++"\n">>stdout;
+      
+      (bcode,nxr,nus)=compBodyPartitions(Arts,Gp+1,dict,Opts,xr,resetUsed(us),al);
+      
+      valis (gcode<>fcode<>bcode,nxr,nus)
+    }
+  };
+
+  compPart(Seq,Gp,dict,Opts,xRefs,Used,last,al) => case Seq in {
+    [] => ([],xRefs,Used)
+  | [G] => compGoal(G,Gp,dict,Opts,xRefs,Used,last,al)
+  | [G,G1,..R] => valof{
+      (gcode,gx,gu) = compGoal(G,Gp,dict,Opts,xRefs,Used,false,false);
+      (bcode,bx,bu) = compPart([G1,..R],Gp,dict,Opts,gx,gu,last,al);
+      valis (gcode<>bcode,bx,bu)
+    }
+  };   
+    
+  compGoal(Goal,Gp,dict,Opts,xRefs,Used,last,al) => case Goal in {
+    fail(_) => ([fayl],xRefs,Used)
+  | neck(Lc) => valof{
+      if last then {				  -- determine the exit code
+	if al || maxLocals(Used)>0 then 
+	  valis ([cut]<>[dealloc,gcmap(0,0)],xRefs,Used)
+	else
+	  valis ([cut,succ],xRefs,Used)
+      }
+      else
+	valis ([cut],xRefs,Used)
+    }
+    
+  | call(Pred,Args,Lcn) => valof{
+      if dbgComp in Opts then
+        "Compiling call "++showCC(Goal)++"\n">>stdout;
+      (Acode,R,Us) = callArgs(Args,1,Gp,dict,Opts,xRefs,Used,last);
+      Arity = listlen(Args);
+      (PC,PxRef,PU) = valof{
+	(Pre,MapIns) = gcMap(Us,Arity);
+	(lb,Rf) = valof{
+	  if (Lbl,NN::sameLit(Pred,NN)) in R then 
+	    valis (Lbl,R)
+	  else{
+	    Lbl = newLabel();
+	    valis (Lbl,[(Lbl,Pred),..R])
+	  }
+	};
+      
+	if last then{
+	  if al || maxLocals(Used)>0 then
+	    valis ([dlkawl(Arity,lb)],Rf,Us)
+	  else
+	    valis ([lkawl(Arity,lb),gcmap(Arity,0)],Rf,Us)
+	}
+	else{
+	  valis (Pre<>[kawl(Arity,lb),MapIns],Rf,Us)
+	}
+      };
+      
+      if dbgComp in Opts then
+        "Call code "++showCodeSeq(Acode<>PC)++"\n">>stdout;
+      
+      valis (Acode<>PC,PxRef,PU)
+    }
+    
+  | ecall(Pred,Args,Lcn) => valof{
+      if dbgComp in Opts then
+        "Compiling escape call "++showCC(Goal)++"\n">>stdout;
+      (Acode,R,Us) = callArgs(Args,1,Gp,dict,Opts,xRefs,Used,last);
+      Arity = listlen(Args);
+      (Pre,MapIns) = gcMap(Us,Arity);
+
+      (PC,PxRef,PU) = valof{
+	if last then{
+	  if al || maxLocals(Used)>0 then
+	    valis ([escape(Arity,Pred),MapIns,dealloc,gcmap(0,0)],R,Us)
+	  else
+	    valis ([alloc(Arity,0),gcmap(Arity,0)]<>Pre<>[escape(Arity,Pred),MapIns,dealloc,gcmap(0,0)],R,Us)
+	}
+	else
+	  valis (Pre<>[escape(Arity,Pred),MapIns],R,Us)
+      };
+      
+      if dbgComp in Opts then
+        "Escape code "++showCodeSeq(Acode<>PC)++"\n">>stdout;
+      
+      valis (Acode<>PC,PxRef,PU)
+    }
+    
+  | ocall(Gl,Obj,Ths,Lcn) => valof{
+      if dbgComp in Opts then
+        "Compiling call "++showCC(Goal)++"\n">>stdout;
+      (Acode,R,Us) = callArgs([Gl,Obj,Ths],1,Gp,dict,Opts,xRefs,Used,last);
+      (PreGc,MapIns)=gcMap(Us,3);
+      
+      if last then{
+        if al || maxLocals(Us)>0 then
+          valis (Acode<>[dlkawlO(3,2)],R,Us) -- call the object argument
+        else
+          valis (Acode<>[lkawlO(3,2)],R,Us)
+      }
+      else{
+        valis (Acode<>PreGc<>[kawlO(3,2),MapIns],R,Us)
+      }
+    }
+    
+  | defn(mtch(T),V,Lcn) => valof{
+      if idnt(Vr).=V then {
+        if dbgComp in Opts then{
+          "Compiling match call "++showCC(Goal)++"\n">>stdout;
+          -- "Current dictionary is "++showDict(dict)++"\n">>stdout;
+        };
+        
+        (vLoc,i,s,_,_,iUsed) = lookupVar(Vr,dict,Used);
+        if dbgComp in Opts then
+          "Location of "++string%%Vr++" is "++vLoc^0++{if i() then "" else " not inited"}++"\n">>stdout;
+    	
+        (pCode,ax,au) = {
+          if i() && vLoc!=voidVar then                        -- we have a unification task
+            matchTerm(vLoc,V,T,false,dict,Opts,xRefs,iUsed,last)
+          else valof{
+            reportError("tried to match against uninstantiated variable "++showCT(V),Lcn);
+            valis ([],xRefs,Used)
+          }
+        };
+        if last then{
+          if al || maxLocals(au)>0 then{
+            valis (pCode<>[dealloc,gcmap(0,0)],ax,au)
+	  }
+          else
+            valis (pCode<>[succ],ax,au)
+        }
+        else
+            valis (pCode,ax,au)
+      }
+      else{
+        (bCode,R,U) = buildTerm(aReg(0),V,dict,Opts,xRefs,Used,last);
+        (mCode,R1,U1) = matchTerm(aReg(0),V,T,true,dict,Opts,R,U,last);
+        
+        if last then{
+          if al || maxLocals(U1)>0 then{
+            valis (bCode<>mCode<>[dealloc,gcmap(0,0)],R1,U1)
+	  }
+          else
+            valis (bCode<>mCode<>[succ],R1,U1)
+        }
+        else
+          valis (bCode<>mCode,R1,U1)
+      }
+    }
+    
+  | defn(V,T,Lcn) => valof{
+      if dbgComp in Opts then{
+        "Compiling definition "++showCC(Goal)++"\n">>stdout;
+      };
+      
+      if idnt(Vr).=V then {
+        (vLoc,i,s,d,df,iUsed) = lookupVar(Vr,dict,Used);
+    	
+        (pCode,ax,au) = {
+          if i() && vLoc!=voidVar then          -- we have a unification task
+            unifyTerm(vLoc,V,T,false,dict,Opts,xRefs,iUsed,last)
+          else valof{
+            s(true); df(true);
+            valis buildTerm(vLoc,T,dict,Opts,xRefs,iUsed,last)
+          }
+        };
+        
+        if dbgComp in Opts then
+          "Definition code is "++showCodeSeq(pCode)++"\n">>stdout;
+        
+        if last then{
+          if al || maxLocals(au)>0 then{
+            valis (pCode<>[dealloc,gcmap(0,0)],ax,au)
+	  }
+          else
+            valis (pCode<>[succ],ax,au)
+        }
+        else
+          valis (pCode,ax,au)
+      }
+      else{
+        reportError("cant handle `"++showCC(Goal)++"' equality call",Lcn);
+        valis ([],xRefs,Used)
+      }
+    }
+
+  | trpBegin => ([trpblk],xRefs,Used)
+  | trpEnd => valof{
+      if last then{
+	if al || maxLocals(Used)>0 then
+	  valis ([trpend,dealloc,gcmap(0,0)],xRefs,Used)
+	else
+	  valis ([trpend,succ],xRefs,Used)
+      }
+      else
+	valis ([trpend],xRefs,Used)
+    }
+
+  | rais(E,Lcn) => valof{
+      (cd,xR,Us) = buildTerm(aReg(0),E,dict,Opts,xRefs,Used,last);
+      
+      valis (cd<>[except(0)],xR,Us)
+    }
+
+  | suspc(V,Lb,Lc) => valof{
+      (lc,lR,lUs) = buildTerm(aReg(2),Lb,dict,Opts,xRefs,Used,last);
+
+      if idnt(Nm).=V then{
+    	(vLoc,i,s,_,_,iUsed) = lookupVar(Nm,dict,lUs);
+    	
+        if !i() then{
+          reportError("May not suspend on variable: "<>Nm,Lc);
+          valis ([],lR,lUs)
+        }
+        else{
+          case vLoc in {
+            voidVar -> {
+              reportError("May not suspend on singleton variable: "<>Nm,Lc);
+              valis ([],lR,lUs)
+            }
+          | aReg(Rg) -> 
+              valis (lc<>[susp(Rg,2)],lR,lUs)
+          | yReg(Lc,_) ->
+              valis (lc<>[mAY(1,Lc),susp(1,Lc)],lR,lUs)
+          | sReg -> {
+              reportError("May not suspend on wierd variable: "<>Nm,Lc);
+              valis ([],lR,lUs)
+            }
+          }
+        }
+      }
+      else{
+        reportError("May not suspend on non-variable: "<>showCT(V),Lc);
+        valis ([],lR,lUs)
+      }
+    }
+  | _ => exception error("cant handle funny call "++showCC(Goal),'internal)
+  };
+
+  compProgram(mdle(Name,Vers,Imp,Exp,Progs),Opts) => valof{
+    if dbgComp in Opts then
+      "Compiling module "++Name++":\n"++showCP(mdle(Name,Vers,Imp,Exp,Progs))++"\n">>stdout;
+
+    valis (Name,Vers,Imp,Exp,collect{
+             for (pName,pRules) in Progs do{
+               elemis (pName,compProg(pName,pRules,Opts));
+             };
+           })
+  };
+
+  compProg(Name,Pr::(seqn(Clauses).=Pr),Opts) => valof{
+    if dbgComp in Opts then
+      "Compiling program "++showCT(Name)++":\n"++showCProg(Name,Pr)++"\n">>stdout;
+
+    (Lbls,dfCode,clRefs,Arity) = defSeq(Clauses,true,Opts,[]);
+
+    DefLbl = newLabel();
+
+    pCode = genIx(Lbls,DefLbl,Arity,Opts)<>[lbl(DefLbl),..dfCode];
+
+    if dbgComp in Opts then{
+      "Before peephole code "++showCT(Name)++"'\nis "++showCodeSeq(pCode)++"\n">>stdout;
+    };
+
+    clCode = peepHole(pCode);
+
+    prName = newLabel();
+    prRefs = [(prName,Name),..clRefs];
+
+    if dbgComp in Opts then{
+      "After peephole code "++showCT(Name)++"'\nis "++showCodeSeq(clCode)++"\n">>stdout;
+      "External references:\n">>stdout;
+      for (Lb,X) in prRefs do
+        Lb^0++": "++showCT(X)++"\n">>stdout;
+--    "Assembles to:"++mnem(clCode,clRfs)^0++"\n">>stdout;
+    };
+
+    valis code(mnem(clCode,prRefs),Arity,prRefs//((.(_,X).)=>X));
+  };
+
+
+  /* Compute a default sequence of clause trys, returning the code,
+  and a list of first term/labels that can be used for indexed access
+  */
+
+  defSeq(L,first,Opts,Refs) => valof{
+    if [Cl::(clse(_,H,_,_).=Cl)].=L then{
+      (cc,xRf) = compCl(Cl,Opts,Refs);
+      L0 = newLabel();
+
+      if first then
+        valis ([(L0,H)],[lbl(L0),..cc],xRf,listlen(H))
+      else
+        valis ([(L0,H)],[trustme,lbl(L0),..cc],xRf,listlen(H))
+    }
+    else if [Cl::clse(_,H,_,Lc).=Cl,Cl2,..NCl].=L then{
+      Lf = newLabel();
+      L0 = newLabel();
+      (cc,xRf) = compCl(Cl,Opts,Refs);
+      (Lbls,lCode,lRf,Ar1) = defSeq([Cl2,..NCl],false,Opts,xRf);
+
+      if Ar1!=listlen(H) then
+        reportError("inconsistent arities in clause: "<>showCP(Cl)<>", "<>Ar1^0<>" expected",Lc);
+
+      if first then
+        valis ([(L0,H),..Lbls],[tryme(Lf),lbl(L0),..cc]<>[lbl(Lf),..lCode],lRf,Ar1)
+      else
+        valis ([(L0,H),..Lbls],[retryme(Lf),lbl(L0),..cc]<>[lbl(Lf),..lCode],lRf,Ar1)
+    }
+    else
+      valis ([],[fayl],Refs,-1)
+  };
+
+  showUse(usdRgs(aU,lU,fr,E,lclG)) => 
+     showRange(aU)++":"++showRange(fr)++"/"++showRange(lU)++":"++E^0++
+        {if lclG>0 then "lclG="++lclG^0 else ""};
+        
+  showIns(E) => { case E in {
+      lbl(S) => string%%S++":"
+    | cmt(C) => "--"++C
+    | X => X^0
+    }
+  };
+
+  showCompiledModule(Name,Exp,Entries) {
+    "module "<>Name<>"\n">>stdout;
+    "Exported:\n">>stdout;
+    for (pName,pTp) in Exp do
+      pName<>":"<>showType(pTp)<>"\n">>stdout;
+
+    for (pName,pRules) in Entries do{
+      showCompCode(pName,pRules)<>"\n">>stdout;
+    }
+  };
+
+  showCompCode(Name,(Code,Refs)) => 
+    Name<>":\n"<>showCodeSeq(Code)<>showRefs(Refs);
+
+  showCodeSeq(IL) => IL//+(El=>showIns(El)++"\n");
+
+  showRefs(Refs) => valof{
+    out : "";
+    for (Lb,X) in Refs do
+      out := out<>Lb^0++": "++showCT(X)++"\n";
+    valis out
+  };
+
+  gContext(C) => case C in {
+    defn(_,_,Lc) => Lc
+  | call(_,_,Lc) => Lc
+  | ocall(_,_,_,Lc) => Lc
+  | ecall(_,_,Lc) => Lc
+  | rais(_,Lc)=>Lc
+  | neck(Lc) => Lc
+  | fail(Lc) => Lc
+  | trpBegin => noLoc
+  | trpEnd => noLoc
+  };
+
+  __debug_display__(any(X)) => X^0;
+
+} export {compProgram};

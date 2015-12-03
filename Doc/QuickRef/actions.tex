@@ -1,0 +1,270 @@
+\chapter{Procedures and Actions}
+\label{actions}
+
+\index{action}
+\index{program!procedure definition}
+\index{procedure definition}
+\index{action!action rule}
+\index{rule!action rule}
+\index{procedure}
+An \firstterm{action procedure}{A set of rules that defines a behavior in a program. Contrast, for example, with a \emph{predicate} program which defines a relation.}  consists of one of more action rules occurring contiguously:
+\begin{alltt}
+\emph{name}(\emph{P\sub1\sub1},\ldots,\emph{P\sub1\subn}) :: \emph{G\sub1} -> \emph{A\sub1}.
+\ldots
+\emph{name}(\emph{P\sub{k}\sub1},\ldots,\emph{P\sub{k}\subn}) :: \emph{G\sub{k}} -> \emph{A\sub{k}}.
+\end{alltt}
+where \emph{P\sub{i}} are pattern terms, \emph{G\subi} are optional guards  and \emph{A\subi} are actions.
+
+By default, the mode of use of an argument for an action rule in \emph{input}. This means that the corresponding pattern is matched. However, by setting the mode of an action procedure's type to bidirectional or output, then the action rule can return a result.
+
+\section{Basic actions}
+\label{action:basic}
+\index{action!basic}
+\index{basic actions}
+Apart from in action rules' bodies, actions can also be found in other kinds of rules -- for example, in the bodies of \q{valof} and \q{spawn} expressions.
+
+\subsection{Empty action}
+\label{action:empty}
+
+\index{empty action}
+\index{action!empty}
+The empty action is written:
+\begin{alltt}
+\{\}
+\end{alltt}
+The empty action has no effect.
+
+\subsection{Equality}
+\label{action:equality}
+
+\index{action!equality definition}
+\index{type inference!equality definition}
+An equality \emph{action} has no effect other than to ensure that two terms are equal:
+\index{\q{=} operator}
+\index{operator!\q{=}}
+\begin{alltt}
+\emph{Ex\sub1} = \emph{Ex\sub2}
+\end{alltt}
+\index{action rule!non failure}
+\index{error exception!in action rule}
+\index{eFAIL@\q{eFAIL} exception}
+Note that equality actions, cause a -- \q{'eFAIL'} -- \q{error} exception if they fail.
+
+\subsection{Variable assignment}
+\label{action:assignment}
+
+\index{action!assignment}
+\index{:=@\q{:=} operator}
+\index{operator!\q{:=}}
+A variable assignment action takes the form:
+\begin{alltt}
+\emph{V} := \emph{Ex}
+\end{alltt}
+Note that \emph{V} must be declared as a re-assignable variable in a package or class body; and that the assignment action must be \emph{inside} the scope of the variable.
+
+\index{\q{eINSUFARG} exception}
+In addition, \emph{Ex} must be \emph{ground}. 
+
+\subsection{Invoke procedure}
+\label{action:invoke}
+
+\index{action!invoke procedure}
+\index{procedure invocation}
+The procedure invoke action calls an action procedure -- which itself is defined by action rules. 
+
+In calling a procedure, only the first action rule in the procedure that matches is used.
+
+\subsection{Class relative invocation}
+\label{action:dot}
+\index{action!class relative action}
+An action of the form:
+\begin{alltt}
+\emph{O}.P(A\sub1,\ldots,A\subn)
+\end{alltt}
+denotes that the action:
+\begin{alltt}
+P(A\sub1,\ldots,A\subn)\end{alltt}
+is to be executed relative to the class identified by \q{\emph{O}}.
+
+\subsection{Action sequence}
+\label{action:sequence}
+
+\index{action!sequence}
+\index{sequence of actions}
+\index{\q{;} operator}
+\index{operator!\q{;}}
+A sequence of actions is written:
+\begin{alltt}
+\emph{A\sub1};\emph{A\sub2};\ldots;\emph{A\subn}
+\end{alltt}
+The actions \qe{A\subi} in a sequence are executed in order.
+
+\subsection{Query action}
+\label{action:goal}
+
+\index{action!query action}
+\index{goal action}
+\index{\pling\xspace{}operator}
+\index{operator!\pling}
+The query pseudo-action is written as a query surrounded by braces:
+\begin{alltt}
+\{ \emph{G} \}
+\end{alltt}
+This allows a predicate query to take the role of an action.  Only the first solution to \qe{G} is considered.
+
+\begin{aside}
+\index{\q{eFAIL} exception}
+The query \emph{G} is expected to \emph{succeed}; if it does not then an \q{'eFAIL'} error exception will be raised.
+\end{aside}
+
+\subsection{Conditional action}
+\label{action:conditional}
+\index{action!conditional action}
+\index{conditional action}
+A \firstterm{conditional}{A form of condition that applies a test to select one of two branches to apply.} action is written:
+\begin{alltt}
+(\emph{T}?\emph{I}|\emph{E})
+\end{alltt}
+or, if the else branch is empty, just:
+\begin{alltt}
+(\emph{T}?\emph{I})
+\end{alltt}
+Only one solution of \emph{T} is attempted.
+
+\subsection{Forall action}
+\label{action:forall}
+\index{action!forall action}
+\index{forall action}
+\index{\q{*>} operator}
+\index{operator!\q{*>}}
+The form of the forall action is:
+\begin{alltt}
+\emph{T}*>\emph{A}
+\end{alltt}
+For each way of satisfying \qe{T} action \qe{A} is executed.
+
+\subsection{Case analysis action}
+\label{action:case}
+\index{action!\q{case} action}
+\index{case@\q{case} action}
+\index{operator!case@\q{case}}
+The form of the \q{case} action is:
+\begin{alltt}
+case \emph{Exp} in (\emph{P\sub1} -> \emph{A\sub1} | \ldots| \emph{P\subn} -> \emph{A\subn})
+\end{alltt}
+The \q{case} action evaluates \emph{Exp} and then \emph{matches} the value against the patterns \emph{P\subi} in turn until one of them matches. The action \qe{A\subi} is then executed.
+
+\subsection{\q{valis} Action}
+\label{action:valis}
+
+\index{action!\q{valis} action}
+\index{\q{valis} action}
+\index{\q{valof} expression!returning a value}
+The \q{valis} action is used to `export' a value from an action sequence:
+\begin{alltt}
+valis \emph{Exp}
+\end{alltt}
+The \q{valis} action is only legal within a \q{valof} expression's action sequence.
+
+
+\subsection{\q{istrue} Action}
+\label{action:istrue}
+
+\index{action!\q{istrue} action}
+\index{\q{istrue} action}
+The \q{istrue} action is used to `export' a truth-value from an action sequence:
+\begin{alltt}
+istrue \emph{Query}
+\end{alltt}
+The \q{istrue} action is only permitted within an \q{action} query's action sequence.
+
+\subsection{error handler}
+\label{action:errorhandler}
+
+\index{action!error handling}
+\index{error handling!in actions}
+\index{\q{onerror} action}
+\index{operator!\q{onerror}}
+An \q{onerror} action takes the form:
+
+\begin{alltt}
+\emph{A} onerror (\emph{P\sub1} -> \emph{A\sub1} | \ldots{} | \emph{P\subn} -> \emph{A\subn})
+\end{alltt}
+An \q{onerror} action has the same meaning as \emph{A}; unless a run-time problem arises. In this case, the first rule in the handler that matches with the raised exception is the one that is used.
+
+\subsection{\q{raise} action}
+\label{action:raise}
+
+\index{raise exception action}
+\index{action!raise@\q{raise} an exception}
+\index{operator!\q{raise}}
+The \q{raise} action raises an exception which should be `caught' by an enclosing \q{onerror} form:
+\begin{alltt}
+raise \emph{Exp}
+\end{alltt}
+
+\section{Threads}
+\label{action:threads}
+
+Threads share program code and instances of classes; but do not share logical variables.
+
+\go supports thread synchronization and also supports thread \emph{coordination} using message passing.
+
+\subsection{\q{spawn} Sub-thread}
+\label{action:spawn}
+
+\index{\q{spawn} sub-thread}
+\index{action!\q{spawn} sub-thread}
+\index{operator!\q{spawn}}
+\index{multi-threaded programming}
+The form of a \q{spawn} action is:
+\begin{alltt}
+spawn \{ \emph{Action} \}
+\end{alltt}
+The sub-thread executes its action independently of the invoking thread; and terminates independently.
+
+\subsection{\q{sync} action}
+\label{action:sync}
+\index{Simple \q{sync} action}
+\index{action!\q{sync} action}
+\index{operator!\q{sync}}
+\index{Synchronized action}
+The simplest form of the \q{sync} action is:
+\begin{alltt}
+sync\{ \emph{Action} \}
+\end{alltt}
+or:
+\begin{alltt}
+sync(\meta{Object})\{ \emph{Action} \}
+\end{alltt}
+if synchronizing on a specific object.
+
+If another thread attempts to execute a \q{sync} action with the same object then it will be blocked until the \emph{Action} has either terminated.
+
+\subsection{Conditional \q{sync} action}
+\label{action:condsync}
+\index{Conditional \q{sync} action}
+\index{action!\q{sync} action}
+\index{operator!\q{sync}}
+\index{Synchronized action}
+The conditional \q{sync} takes the form:
+\begin{alltt}
+sync\{
+  \emph{G\sub1} -> \emph{A\sub1}
+| \ldots
+| \emph{G\subn} -> \emph{A\subn}
+\} timeout (\emph{timeExp} -> \emph{TimeoutAction})
+\end{alltt}
+or, when attempting to synchronize on a specific object, the form is:
+\begin{alltt}
+sync(\emph{O})\{
+  \emph{G\sub1} -> \emph{A\sub1}
+| \ldots
+| \emph{G\subn} -> \emph{A\subn}
+\} timeout (\emph{timeExp} -> \emph{TimeoutAction})
+\end{alltt}
+The \q{timeout} clause is optional.
+
+The conditional \q{sync} action enters a specific action \qe{A\subi} depending on both the availability of the lock and the associated guard \qe{G\subi} being satisfied.
+
+If none of the guards fire within the time of the optional \q{timeout} period, then the \q{timeout} action is executed. The timeout period is expressed as a relative time, in seconds, from the initial entry into the \q{sync} action.

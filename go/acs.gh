@@ -1,0 +1,54 @@
+/*
+  Public protocol type for accessing ACS services
+  (c) 2001 F.G. McCabe
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+  Contact: Francis McCabe <fgm@fla.fujitsu.com>
+*/
+hndl ::= hndl((symbol,any)[]).
+
+-- message QoS
+mQoS ::= leaseHold(number).
+
+-- Quality of Service type. Fundamentally a stub at this time
+QoS ::= killOnDisconnect | keepOnDisconnect | HoldUntil(number).
+
+-- A locator is an address structure
+locator ::= locator(symbol,string,QoS[]).
+
+acsProtocol ::= connectMe(QoS[])
+            | connected(string,QoS[])
+            | disconnectMe(string)
+            | disconnected(string)
+            | reconnectMe(string)
+            | terminateMe(string)
+            | postMsg(string,string,mQoS[],any)
+            | svrMsg(mQoS[],any)
+            .
+            
+
+dsProtocol ::= registerEntry(hndl,QoS[])
+            | reRegisterEntry(hndl,QoS[])
+            | entryRegistered(hndl,QoS[])
+            | queryEntry(hndl,QoS[])
+            | deleteEntry(hndl)
+            | duplicateEntry(hndl)
+            | invalidEntry(hndl)
+            | foundEntries(hndl[])
+            | dsOk
+            | dsInvalid(any)
+            .
+            

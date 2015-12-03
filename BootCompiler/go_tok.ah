@@ -1,0 +1,40 @@
+
+yyTokType ::= 
+   ID(string)
+ | IN(number)
+ | FT(number)
+ | STR(string)
+ | QUOTE(string)
+ | CH(char)
+ | LPAR -- round paren
+ | RPAR
+ | LBRA -- square bracket
+ | RBRA
+ | LBRCE -- breace
+ | RBRCE
+ | QBRA -- quine quote
+ | QKET
+ | COMMA
+ | CONS
+ | TERM
+ | EOF;
+
+yyToken ::= (yyTokType?yyTok,number?yyLine,number?yyPos,number?yyLPos);
+
+fileLoc ::= noLoc | loc(string,number,number,number);
+
+yyType ::= 
+  IDEN(fileLoc,string)
+| INT(fileLoc,number)
+| FLT(fileLoc,number)
+| ST(fileLoc,string)
+| SYM(fileLoc,string)
+| CHR(fileLoc,char)
+| APPLY(fileLoc,yyType,yyType[])
+| BRACE(fileLoc,yyType,yyType[])
+| SQUARE(fileLoc,yyType,yyType[])                         -- handle the name[t1,..,tk] form
+| TPL(fileLoc,yyType[])
+| VOID
+| END
+;
+

@@ -1,0 +1,95 @@
+/*
+ * process the contents of a URL and extract the file contents referenced
+ * Needs fixing, doesnt process URIs at the moment
+*/
+#include "go_tok.ah";
+#include "terms.ah";
+
+module
+  import (
+    interface <stdio.af> and
+    interface "golex.af"
+  )
+in{
+  grabText(fn) => valof {
+    try{
+      _file_stat(_,_,_,_,_,_,_,count.=size,_,_,_,_,_) = fstat(fn);
+      f = fopen(fn,_open_read);
+
+      t = inchars(f,count);
+      fclose(f);
+
+      valis t;
+    } onerror
+      _ -> exception error("Cant find "++fn,'fail)
+  };
+
+  grabData(fn) => valof {
+    try{
+      _file_stat(_,_,_,_,_,_,_,count.=size,_,_,_,_,_) = fstat(fn);
+      f = fopen(fn,_open_read);
+
+      t = inbytes(f,count);
+      fclose(f);
+
+      valis t;
+    } onerror
+      _ -> exception error("Cant find "++fn,'fail)
+  };
+
+  streamer(uri) => tokenize(grabText(uri),uri);
+  
+  tokenize(T,ref) => collect{
+    Txt : T;
+    iPos : 1;
+    iLine : 1;
+    iFile : ref;
+    tok : (yyTok=EOF,yyLine= -1,yyPos=0,yyLPos=0);
+
+    while Txt!=[] && Txt!=[''\+ffff] do{
+      ((Txt,iPos,iLine,iFile),tok) := yyNextToken(Txt,iPos,iLine,iFile);
+      elemis tok;
+    };
+    elemis (yyTok=EOF,yyLine= -1,yyPos= -1,yyLPos=0);
+  };
+  
+  mapURI(base,file) => valof{
+    if "file:///"++F.=file then		-- full file:// URI specifier
+      valis (file,F)
+    else if "/"++_.=file then		-- literal file name
+      valis (file,file)
+    else if "sys:"++F.=file then{
+      sys = getenv("GO_DIR");
+      
+      if "file://"++dir.=sys then
+        valis mapURI(sys,F)
+      else
+        valis mapURI(sys,F)
+    }
+    else if "http://"++URL .=file then	-- full http URI specifier
+      exception error("URL file access not yet implemented",'eprivileged)
+    else if _ ++"/".=base then
+      valis mapURI(base,base++file)
+    else valis mapURI(base,base++"/"++file);
+  };
+
+  chopTail(N) => valof{
+    valis chopAfterLast(N,''/,[],[])
+  };
+
+  chopAfterLast = {
+    ([],_,L,_) => L
+  | ([C,..S],!C,L,A) => chopAfterLast(S,C,A,A<>[C])
+  | ([X,..S],C,L,A) => chopAfterLast(S,C,L,A<>[X])
+  };
+
+  defaultSysIncludePath(inc) => valof{
+    try {
+      ap = expand(getenv("GO_DIR"),":");
+      valis ap<>[inc++"/include"]
+    } onerror
+      _ ->
+      valis [inc++"/include"]
+  };
+
+} export (mapURI,grabData,chopTail,streamer,tokenize);

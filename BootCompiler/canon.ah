@@ -1,0 +1,73 @@
+/* The canontree type is used to hold `canonicalized' representations of
+   programs. Many of the constructs available in the full Go! language
+   are not available in canonical form.
+*/
+
+canonTerm ::= idnt(string)
+ | symb(string)
+ | intgr(number)
+ | float(number)
+ | ch(char)
+ | strg(string)
+ | mtch(canonTerm)                                -- match, don't unify
+ | bild(canonTerm)                                -- an output-only mode
+ | strct(string,number)                      	  -- a constructor definition
+ | cons(canonTerm,canonTerm[])			  -- constructor must be a strct
+ | prg(string,number)				  -- identifier for a program
+ | code(number[],number,canonTerm[])	  -- chunk of compiled code
+ | vdel
+ ;
+
+canonCall ::= neck(fileLoc)                       -- A cut
+ | defn(canonTerm,canonTerm,fileLoc)              -- definition or unification test
+ | call(canonTerm,canonTerm[],fileLoc)               -- call program
+ | ecall(string,canonTerm[],fileLoc)               -- escape call
+ | ocall(canonTerm,canonTerm,canonTerm,fileLoc)   -- call object program
+ | suspc(canonTerm,canonTerm,fileLoc)             -- suspendable variable call
+ | rais(canonTerm,fileLoc)
+ | fail(fileLoc)
+ | trpBegin                                       -- Beginning of a trap
+ | trpEnd                                         -- End of trap region
+;
+
+
+canonCode ::=  mdle(string,string,(string,(string,typeBinding,type_tree)[],string)[],(string,typeBinding,type_tree)[],(canonTerm,canonCode)[]) -- A module
+ | clse(canonTerm[],canonTerm[],canonCall[],fileLoc)
+ | seqn(canonCode[]);
+
+
+  -- how to interpret a name ...
+
+  nameClass ::= localVar(canonTerm,canonTerm,canonTerm)
+  | localFun(canonTerm,canonTerm,canonTerm)
+  | localRel(canonTerm,canonTerm,canonTerm)
+  | localGrm(canonTerm,canonTerm,canonTerm)
+  | localPrc(canonTerm,canonTerm,canonTerm)
+  | localClass(canonTerm,canonTerm,canonTerm,canonTerm)
+  | localType(canonTerm)
+  | localAsgn(canonTerm,canonTerm,canonTerm)
+  | labelArg(string,canonTerm,canonTerm)
+  | moduleFun(string,canonTerm)
+  | moduleRel(string,canonTerm)
+  | moduleGrm(string,canonTerm)
+  | modulePrc(string,canonTerm)
+  | moduleClass(string,canonTerm,canonTerm)
+  | moduleType(string,canonTerm)
+  | moduleVar(string,canonTerm)
+  | moduleAsgn(string,canonTerm,canonTerm)
+  | inherit(canonTerm,canonTerm,canonTerm,canonTerm)
+  | inheritField(canonTerm,canonTerm,canonTerm)
+  | notInMap;
+
+dynInt(%S,%T) ::= dyn((%S=> %T),(%S,%T){},(%S){}, (()=>(%S,%T)[]));
+
+layer::=lyr(string,				  -- prefix string
+	    (string,nameClass)[],		  -- definitions
+	    fileLoc,
+	    canonTerm,				  -- label in force
+	    canonTerm,				  -- lbVar
+	    canonTerm);				  -- thVar
+
+mp(%S) ::= m(layer[],%S);
+
+

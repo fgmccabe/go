@@ -1,0 +1,30 @@
+\chapter{The Web library}
+\label{http}
+\libsynopsis{go.http}
+The \q{go.http} package implements some of the core functionality necessary to implement a simple Web server and also to access a web server using the HTTP protocol.
+
+
+\section{Types and classes}
+
+\subsection{The \q{url} class}
+\label{http:url}
+\synopsis{url}{[hostTp,string,string]\conarrow{}uriTp}
+
+The \q{url} class constructor encapsulates URLs. The first argument of the constructor is the host associated with the URL, the second is the resource path and the third argument is the query string.
+
+\section{REST verbs}
+\label{http:rest}
+REST stands for REpresentational Stateless Tranfer; but commonly refers to the main verbs in the HTTP protocol: GET, PUT, POST and DELETE.
+
+\subsection{\q{httpGet} -- GET a resource}
+\label{http:get}
+\synopsis{httpGet}{[string,string]\funarrow{}string}
+The \q{httpGet} function implements the HTTP GET action. The first argument is the url -- which may include a query -- and the second argument is the name of the user agent to pass to the remote Web server.
+
+The url may be a local file, in which case \q{httpGet} reverts to reading the local file system.
+
+\subsection{\q{httpPost} -- POST a message}
+\label{http:post}
+
+
+ 

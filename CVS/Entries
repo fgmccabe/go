@@ -1,0 +1,36 @@
+/.cvsignore/1.1.1.1/Sat Aug  2 22:15:50 2003//
+/AUTHORS/1.1.1.1/Sat Aug  2 22:15:50 2003//
+/COPYING/1.1.1.1/Sat Aug  2 22:15:52 2003//
+/ChangeLog/1.1.1.1/Sat Aug  2 22:15:50 2003//
+/INSTALL/1.1.1.1/Sat Aug  2 22:15:55 2003//
+/NEWS/1.1.1.1/Sat Aug  2 22:16:13 2003//
+/README/1.1.1.1/Sat Aug  2 22:16:13 2003//
+/acconfig.h/1.1.1.1/Sat Aug  2 22:15:50 2003//
+/depcomp/1.1.1.1/Sat Aug  2 22:15:53 2003//
+/elisp-comp/1.1.1.1/Sat Aug  2 22:15:53 2003//
+/go.spec.in/1.1.1.1/Sat Aug  2 22:15:54 2003//
+/install-sh/1.1.1.1/Sat Aug  2 22:15:55 2003//
+/ltmain.sh/1.1.1.1/Sat Aug  2 22:16:12 2003//
+/missing/1.1.1.1/Sat Aug  2 22:16:13 2003//
+/mkinstalldirs/1.1.1.1/Sat Aug  2 22:16:13 2003//
+/stamp-h.in/1.1.1.1/Sat Aug  2 22:16:13 2003//
+D/Agent////
+D/BootCompiler////
+D/Doc////
+D/Engine////
+D/GoCompiler////
+D/Headers////
+D/IoHeaders////
+D/IoLib////
+D/Tests////
+D/forOSX////
+D/go////
+D/include////
+D/Dx////
+D/ext////
+D/macros////
+/autogen.sh/1.2/Sat Sep 20 05:02:49 2003//
+/configure.in/1.9/Fri Dec  5 06:42:32 2003//
+/go.Make.in/1.2/Mon Nov 10 20:02:36 2003//
+/go.el/1.7/Sun Dec  7 01:58:28 2003//
+/Makefile.am/1.4/Mon Jun 28 18:31:39 2004//

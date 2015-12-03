@@ -1,0 +1,124 @@
+/*
+ * Lexical file for the DL language
+ */
+
+ import go.io.
+ import go.stdparse.
+
+ yyTokType ::= ID(symbol) | 
+	  IN(integer) | 
+	  FT(float) |
+	  ST(string) |
+	  QNAME(string,string) |
+	  LPAR |
+	  RPAR |
+	  LBRA | 
+	  RBRA |
+	  LBRCE |
+	  RBRCE |
+	  COMMA |
+          TERM |
+	  IS |
+	  SUB |
+	  AND |
+	  ROLE |
+	  EXISTS |
+	  ALL |
+	  PREFIX |
+	  EOF.
+
+%%
+
+ -- Comments and skippable stuff
+
+  [ \n\t\b\r]+ => skip     	-- ignore white space
+
+ "--"[^\n]*"\n"		       	-- line comment
+
+ "/*" => <comment>        	-- long comment
+
+  <comment> "*/" => <initial>
+  <comment> .	         	-- implies a skip
+
+-- Keywords and punctuation
+  ","	    =>		COMMA
+  "."[ \t\b\r\n]+ =>	TERM
+  "."eof =>             TERM
+  "(" => 		LPAR
+  ")" =>		RPAR
+  "{" =>		LBRCE
+  "}" =>		RBRCE
+  "==" =>		IS
+  "<=" =>		SUB
+  "&&" =>		AND
+  "=" =>		ROLE
+  "#" =>		EXISTS
+  "$" =>		ALL
+  "@" =>		PREFIX
+
+-- Numbers
+
+  [0-9]+ => IN(tok2int(yyTok))
+
+  [0-9]+("."[0-9]+([eE][-+]?[0-9]+)?) 	=> FT(tok2float(yyTok))
+
+  "0x"[0-9a-fA-F]+		      	=> IN(tok2int(yyTok))
+
+  "0c"([^\\\"]|"\\"(("+"[0-9a-fA-F]+";")|[^+])) =>   IN(tok2int(yyTok))
+
+-- Identifiers and strings
+
+  [a-zA-Z_][a-zA-Z_0-9]* => (ID(implode(yyTok)))
+
+-- String rule
+   "\""([^\\\"]|"\\"(("+"[0-9a-fA-F]+";")|[^+]))*"\"" => ST(tok2str(yyTok))
+
+   "'"([^\\']|"\\"(("+"[0-9a-fA-F]+";")|[^+]))*"'" => ID(tok2sym(yyTok))
+
+%%
+
+  private tok2str:[string]=>string.
+
+  tok2str([`",..X]) => dequoteStr(X,`").
+  tok2str([`',..X]) => dequoteStr(X,`').
+
+  private dequoteStr:[string,char]=>string.
+
+  dequoteStr([C],C)=>[].
+  dequoteStr([],_) =>[].
+  dequoteStr([`\\,`a,..L],C) => [`\a,..dequoteStr(L,C)].
+  dequoteStr([`\\,`b,..L],C) => [`\b,..dequoteStr(L,C)].
+  dequoteStr([`\\,`d,..L],C) => [`\d,..dequoteStr(L,C)].
+  dequoteStr([`\\,`e,..L],C) => [`\e,..dequoteStr(L,C)].
+  dequoteStr([`\\,`f,..L],C) => [`\f,..dequoteStr(L,C)].
+  dequoteStr([`\\,`n,..L],C) => [`\n,..dequoteStr(L,C)].
+  dequoteStr([`\\,`r,..L],C) => [`\r,..dequoteStr(L,C)].
+  dequoteStr([`\\,`t,..L],C) => [`\t,..dequoteStr(L,C)].
+  dequoteStr([`\\,`v,..L],C) => [`\v,..dequoteStr(L,C)].
+  dequoteStr([`\\,`+,..L],C) => 
+     valof{
+       extractUnicode(L,U,rL);
+       valis [__charOf(hexNum%%U),..dequoteStr(rL,C)]
+     }.
+  dequoteStr([`\\,X,..L],C) => [X,..dequoteStr(L,C)].
+  dequoteStr([X,..L],C) => [X,..dequoteStr(L,C)].
+
+  private extractUnicode:[string,string-,string-]*.
+  extractUnicode([],[],[])->{}.
+  extractUnicode([`;,..L],[],L)->{}.
+  extractUnicode([C,..L],[C,..U],rL) -> extractUnicode(L,U,rL).
+
+  private tok2int:[string]=>integer.
+  tok2int(L)=>integerOf%%L.
+
+  private tok2float:[string]=>float.
+  tok2float(L)=>floatOf%%L.
+
+  private tok2sym:[string]=>symbol.
+  tok2sym([`',..L])=>implode(dequoteStr(L,`')).
+
+  private tok2chr:[string]=>char.
+  tok2chr([``,..L]) => dequoteStr(L,`\+ffff;).head().
+
+   
+ 

@@ -1,0 +1,117 @@
+%
+% Header file for Frank McCabe's files
+%
+%\voffset-1in
+%\hoffset-0.5in
+%\textwidth 6in
+%\textheight 9in
+\catcode`\@=11\relax % @ signs are letters.
+
+\newcommand{\minsert}[1]
+	{{\ifmmode{{#1}}\else{\mbox{${#1}$}}\fi}}
+
+% A standard macro for use in including a publication version of a microMail
+\def\prog{\@ifnextchar [{\@prog}{\@prog[hbt]}}
+
+\def\@prog[#1]#2#3#4{
+\begin{program}[#1]\vspace{-1ex}
+\def\kw##1{{\mbox\rm\bf##1}}
+\tt\tabsin
+#2
+\tabsout
+\vspace{-4ex}
+\caption{\rm #3\label{#4}}
+\end{program}}
+
+\def\cmmnt#1{\mbox{{\tt /* }\rm #1 {\tt */}}}
+
+% provide standard ways of referencing chapters and appendices etc.
+% define a standard program reference string
+\newcommand{\prref}[1]{Program~\ref{#1}}
+\newcommand{\lngprref}[1]{Program~\ref{#1} on page~\pageref{#1}}
+
+% a page reference macro
+\newcommand{\pgref}[1]{page~\pageref{#1}}
+	
+\newcommand{\tbref}[1]{Table~\ref{#1}}
+\newcommand{\secref}[1]{Section~\ref{#1}}
+\newcommand{\chapref}[1]{Chapter~\ref{#1}}
+
+% set up a tabbing environment for programs...
+\newcommand{\tabsin}
+	{\begin{tabbing}
+12\=12\=12\=12\=12\=12\=12\=12\=12\=12\=12\=\kill}
+\newcommand{\tabsout}{\end{tabbing}\noindent\ignorespaces}
+
+% For one-line program...
+\newcommand{\stmt}[1]{\multi{#1}}
+
+% for some in-line multi-line quoted text
+\newcommand{\multi}[1]
+	{{\tt\tabsin#1\tabsout}\noindent\ignorespaces}
+
+% set up a tabbing environment for assembler programs...
+\newcommand{\assem}[1]{\begin{small}
+{\tt\begin{tabbing}
+symbolic  \=unlink.l\=foo(a0),d0)  \=\kill
+#1
+\end{tabbing}}\end{small}\noindent\ignorespaces}
+
+\newcounter{marqer}[section]
+
+\def\themarqer{(\Roman{section}.\roman{marqer})}
+
+% introduce a marker
+\def\marq#1
+  {\refstepcounter{marqer}
+   \protect{\label{#1}\rm{\themarqer}}}
+
+% introduce a meta-note
+\newcommand{\note}[1]{\footnote{{\bf Note:} #1}}
+
+% the keyword macro introduces a keyword into the text
+\newcommand{\kw}[1]
+	{\mbox{\tt #1}}
+
+% some commonly used symbols
+\newcommand{\nt}{\minsert{\neg}}
+\newcommand{\uphat}{\kw{\^\/}}
+\newcommand{\tilda}{\minsert{\sim}}
+\newcommand{\also}{\minsert{\wedge}}
+\newcommand{\lif}{\minsert{\leftarrow}}
+\def\usc{\kern-0.05em\_}
+
+% shortform for backslash
+\newcommand{\bsl}{\hbox{\tt\char`\\}}
+% double dots ...
+\def\ldt{\hbox{\char`.\char`.}}
+
+\def\ttqt#1{\hbox{\tt#1}}
+% a compact quotation
+\newcommand{\qt}[1]
+	{\begin{quote}#1\end{quote}}
+
+% a command for subscripting
+\newcommand{\sub}[1]{\minsert{{_{#1}}}}
+	
+\newcommand{\subn}{\minsert{{_{n}}}}
+\newcommand{\subi}{\minsert{{_{i}}}}
+
+% figure handling stuff to e used with psfig
+%\pssilent
+%\def\figurepath{Figures/}
+
+\def\fig{\@ifnextchar [{\@fig}{\@fig[hbt]}}
+
+\def\@fig[#1]#2#3#4{
+\begin{figure}[#1]
+#2
+\caption{#3\label{#4}}
+\end{figure}}
+
+% define a standard reference string to a figure
+\newcommand{\figref}[1]{Figure~\ref{#1}}
+
+\newcommand{\lngfigref}[1]{Figure~\ref{#1} on page~\pageref{#1}}
+
+%\catcode`@=12 % at signs are no longer letters

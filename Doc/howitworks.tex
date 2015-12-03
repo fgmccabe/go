@@ -1,0 +1,322 @@
+\chapter{How \go works}
+\label{howitworks}
+\newcommand{\goir}{\mbox{\tt Go!} reference implementation\xspace}
+
+In this chapter we take a tour of the internal operations and structure of the reference \go implementation.\footnote{Reference implementation, not necessarily the fastest possible implementation.} The \goir is composed of a compiler, a run-time engine and a library of \go modules.
+
+\section{The \go run-time engine}
+\label{howitworks:run-time}
+
+The run-time engine is a small WAM-style engine \cite{warD:83} written in "C". Although the \go run-time engine (GRTE) is based on the WAM, it sports a number of significant changes that reflect the differences between \prolog and \go:
+\begin{itemize}
+\item
+Although \go programs may have symbols in them, they are not used to link to any other properties -- such as program code. This is because \go programs are first class values and are bound to regular variables in the same way as other terms.
+
+In fact, program values are represented using \firstterm{closures}{A run-time value that encapsulates all the internal structures needed by the engine to evaluate a program. Typically consists of the executable code paired with a set of values for the \emph{free variables} in the program.}. A closure is a tuple, the first element of the tuple is the code `block' that has the compiled instructions of the program, the remainder of the elements of the closure tuple are the values of the program's \firstterm{free variables}{A variable that is referenced by a program but which is defined by an enclosing program.}.
+\item
+Since \go is based on a higher order formalism, the native register set for the GRTE is somewhat different to that in the WAM.
+\item
+The GRTE is internally multi-threaded. Note that we do not use Posix threads or some other thread library. This is because we have sufficient access to the \go program that we can implement pre-emptive multi-tasking more effectively without needing to employ techniques such as semaphores. However, a future implementation \emph{may} use Posix threads in order to gain the benefits of multi-processor architectures.
+\item
+The GRTE is verifyable.\footnote{Not yet implemented.} This means that it is possible to verify a \go object code file for operational safety and type safety.
+\end{itemize}
+
+\subsection{Memory architecture}
+\label{howitworks:memory}
+
+The most important fundamental structure in the GRTE is the \emph{memory cell}. This is the basic building block of all term values: whether they represent constructed terms during an evaluation, program literals or messages received from other \go systems.
+
+\subsubsection{Memory cell}
+\label{howitworks:memorycell}
+
+The memory cell is basically a memory pointer; except that there are several kinds of pointers that need to be considered: pointers to variables, pointers to literal data (such as symbols), pointers to structured data (such as lists and tuples), `raw data' and a final important case is pointers used during garbage collection. In the GRTE, we classify three kinds of pointer:
+\begin{itemize}
+\item
+A Variable. Variables are represented as pointers to memory cells. This has the effect of making all variables the same size, and also of allowing variable/variable binding to be efficiently implemented by pointers \emph{within} structures.
+
+Note that unbound variables are represented by memory cells whose contents is the address of the memory cells themselves. This is possible by arranging for the tag of a variable cell to be 0. It also has the convenient effect of making a variable-variable binding simply by assigning the contents of an unbound memory cell to another memory cell.
+
+\item
+An `other' value. All non-variable pointers address a standard object structure (see \vref{howitworks:object}). The first word in the standard object structure is a signature word that determines the kind of value (symbol, number, list pair etc.).
+\item
+A signature word. Since garbage collection requires a very low-level traversal of the memory, it is necessary for the collector to be able to unambiguously determine the beginning of a structure. The signature word at the beginning of the object structure is able to act as such a sentinel value.
+\end{itemize}
+
+Note that the three kinds of memory cell can be distinguished by two bits, and that all pointer valued memory cells always point to object structures (which are themselves made of integral numbers of memory cells). This means that we can assume that valid pointers are always aligned on 32bit boundaries -- i.e., that the bottom two bits of a pointer are always 0. This in turn allows us to hold full 32bit pointers in a 32bit pointer word and 2 bits of tag information without confusing either.
+
+\subsubsection{Object structure}
+\label{howitworks:object}
+
+All regular values in the GRTE are composed of a sequence of memory cells, with the first memory cell being the signature cell. The signature cell has a further standard structure:
+
+\begin{itemize}
+\item
+The memory cell tag for signature words.
+\item
+A 4 bit key value that indicates the type of the object structure
+\item
+A 24 bit value that indicates the size (in memory cells) of the object. Thus the largest single object in the GRTE is $2^24-1$ cells long, or about 64 megabytes.
+\end{itemize}
+
+There are ten object types currently defined within the GRTE, although there is room for more:
+\begin{description}
+\item[variable]
+An unbound variable is usually to be found within a list pair or tuple pair or within the stack of a process. However, on occasion, it is necessary to `globalize' an unbound variable. In this situation, a special object structure containing just the unbound variable is constructed.
+
+\item[frozen]
+A frozen variable. Frozen variables are variables which are not permitted to be further instantiated. In effect, frozen variables are really special symbols known of by the underlying engine. Any attempt to bind a frozen variable will fail.
+
+\item[integer]
+A 64 bit integer value. Note that the standard arithmetic functions all accept either floating point or integer values. Automatic coercion is applied to the result -- if a result can be represented using integer values then it is.
+
+Some \prolog systems represent an integer value within the pointer cell itself; however, this inevitably results in a compromise as it is not possible to represent a full 32 bit integer value \emph{and} a type tag in most modern computer architectures.
+
+\item[float]
+All floating point numbers in the GRTE are represented using at least double precision IEEE floating point numbers. 
+
+\item[char]
+A character value in the GRTE is represented by a Unicode value. 
+
+Characters are maintained in a central dictionary; in order to facilitate the re-use of character values. This requires that character values are stored in the `global heap'.
+
+\item[symbol]
+A symbol in the GRTE represented by a sequence of Unicode values, zero-padded up to the next memory cell boundary -- there is always at least 1 zero code following the last character code of the symbol.
+
+Note that the GRTE does employ a central dictionary of symbols. This is to allow symbol comparison to be achieved by pointer comparison: there is no other information stored about symbols.
+
+Symbols are garbage collected by the GRTE garbage collector. However, symbols are only stored in  the `global heap' -- not in the constructed term stacks of the individual processes. Of course, a memory cell in the latter's constructed term stack can just as easily point to a global object as to a local one. But, having symbols in the global stack means that they will not be garbage collected as often as regular object structures.
+
+\item[list pair]
+A list pair is represented with three memory cells: the first cell is the list pair signature word, the second is the head of the list and the third is the tail of the list. Thus, each list element occupies 12 bytes on a 32bit architecture (on a 64 bit architecture, it will occupy double that).
+
+\item[constructor]
+Constructors are used to represent constructor terms, including anonymous tuples.
+
+A constructor occupies N+1 memory cells: the signature cell which indicates that it is a constructor and gives the length of the constructor, followed by the function symnol of the constructor and the elements of the constructor.
+
+There are a few special cases of constructor to note: the code closure and the assigneable variable. A closure is denoted by a constructor term where the `function symbol' is actually the instruction block to execute; and an assignable variable is represented by a unary constructor where the function symbol is the empty symbol -- written \q{''}. In neither case is it possible for a legal \go program to have a constructor of either of these forms arising from the data structures within the program. 
+
+Anonymous tuples are represented by using constructor terms whose function symbol is the symbol \q{'()'}; and tuple types are represented with the \q{'\#()'} function symbol.
+
+\item[Object]
+Each object occupies 2N+1 memory cells: the signature cell and a sequence of N pairs of words. The first word is used to hold the field name -- represented as a symbol -- and the second holds the element value itself.
+
+Note that the \go compiler inserts additional elements to the object structure; based on the class definition. These additional elements have the same form -- at run-time -- as other elements but are predefined for all objects. 
+\begin{description}
+\item[\q{\$class}]
+The value associated with the \q{\$class} element is a list of all the object types supported by this class. The first element of the list is the type expression that denotes the class itself, and the other elements correspond to super classes and implemented interface types.
+
+For example, given the class definitions:
+\begin{alltt}
+person[](N:string)\{
+  name=N
+\}.
+student[](N,\_)<=person[](N).
+student[](\_,U)\{
+ school=U.
+\}
+\end{alltt}
+a \q{student} object would include the element:
+\begin{alltt}
+\$class = [student[],person[]].
+\end{alltt}
+in its representation.
+\item[\q{\$obj}]
+The \q{\$obj} element is an automatically generated symbol that uniquely identifies the object. This id is used, for example, when unifying two objects: they are considered equal when their \q{\$obj} fields are the same.
+\end{description}
+A complete representation of the \q{student} created from an expression such as \q{\new{}student[]("fred","IC")} would look like:
+\begin{alltt}
+\$class = [student[],person[]].
+\$obj = student2341123105678992.
+name="fred".
+school="IC".
+\end{alltt}
+The names \q{\$class} and \q{\$obj} are not valid identifiers; this is to prevent conflicts between these hidden elements and elements arising from the user's program:
+
+The GRTE sorts the elements in the object structure so that the fields are sorted in ascending order -- of field name. This permits a significant simplication in the representation of objects; albeit at some cost in accessing elements of the object.
+
+\item[code]
+A code fragment is a fairly complex structure that implements executable code. It is described more fully in Section~\vref{encoded:code}. Note that the code object structure is not the same as a closure. A closure is executable by the GRTE because it includes the free variables; whereas the code structure contains the instructions and literals but not the free variables.
+
+A closure is represented by an N+1 tuple: the first element of the tuple is the code structure, and the remaining elements are the free variables.
+
+\item[opaque pointer]
+The GRTE has a number of private data values that can be passed around by \go programs but not directly accessed by them: the opaque value is always passed to an internal function for processing.
+
+Having opaque values permits many of the higher-level aspects of the run-time library to be implemented in \go itself; whilst still giving access to the underlying operating system.
+
+The opaque structure's length indicates the size of the opaque value, and the signature is followed by that value. The opaque object also has a code which the GRTE uses to distinguish exactly what kind of value is embedded (such as an open file descriptor).
+
+The GRTE prevents certain operations on opaque values: such as writing them to files -- which has the effect of preventing processes from communicating opaque values outside the GRTE itself.
+\end{description}
+
+\subsection{Standard registers}
+\label{howitworks:registers}
+
+The GRTE has 21 standard registers:
+\begin{description}
+\item[currProc]
+This register identifies the currently active task within the GRTE. It is an address value, and point to the process descriptor for the active process.
+\item[PC]
+This register points to the currently executing instruction. All instructions are represented using 32 bit unsigned integer values
+\item[cPC]
+This register points to the continuation instruction: in the event that the current clause succeeds (using a \q{succ} instruction) then execution will continue at this location.
+\item[A]
+This register points to a vector of argument registers. This vector is embedded within the process descriptor of the current process.
+\item[S]
+This structure pointer points \emph{within} a list pair, apply pair or tuple, when unifying it.
+\item[writeMode]
+This boolean register is true if the \q{S} represents a location to write to rather than to unify with.
+\item[ENV]
+This register points to the closure containing the currently executing code fragment.
+\item[cENV]
+This register points to the continuation closure: the program to continue when the current clause succeeds.
+\item[C]
+This register points to the current call record. This serves both as a base address for the current local variables and as a source of stacked register values to be used when returning from a call. (Strictly, when \q{dealloc}ating before the last call in a clause.)
+\item[cC]
+The continuation current call record.
+\item[E]
+The vector of free variables accessable by the current program. This register is closely derived from the contents of the \q{ENV} register, since the free variables are bound into a closure.
+\item[Lits]
+The vector of literal values accessable by the current program. These are embedded within the object code itself; but are accessed via the Lits register to facilitate garbage collection of code.
+\item[B]
+The current choice point record. On a failure, the stacks and bound variables are reset to the state recorded within this choice point record.
+\item[SB]
+The current `slash back': where to trim the backtrack to on execution of a \q{cut} instruction.
+\item[cSB]
+Continuation slashback register.
+\item[EB]
+The current error recovery point. This is a regular choice point record, but it only activated in the case of an error exception being raised in the program. It gives enough information to restore the system state to a point before the error and execute an error recovery code fragment.
+\item[cEB]
+Continuation error recovery point.
+\item[H]
+Current top of the heap (constructed term stack) of the currently active process.
+\end{description}
+
+\subsection{Instructions}
+\label{howitworks:instructions}
+
+The GRTE has a large number of instructions for interpreting \go programs. However, they tend to follow a regular pattern: there are relatively few distinct operations available.
+
+The instruction set is modelled on a simple RISC-style architecture: each instruction is fixed size (32 bits), with a small number of possible instruction templates: there are 0-operand instructions, 1-operand and 2-operand instructions.
+
+Some operand values -- notably local variable and other kinds of offsets -- are represented with a 16bit operand. This constrains the available patterns of instructions; for example, a \q{mYY} (move from local register to local register) instruction is not possible in the GRTE since a local variable offset is represented with a 16bit value.
+
+In order to achieve the effect of \q{mYY}, the compiler must emit a sequence of instructions, typically involving arguments register 0:
+\begin{alltt}
+mAY(0,L\sub1)
+mYA(L\sub2,0)
+\end{alltt}
+Such sequences are clumsy; however they are also comparatively rare in practice.
+
+\input{mnem}
+
+\subsection{Built-in escape functions}
+\label{howitworks:escapes}
+
+To supplement the instructions -- which are oriented towards executing \go programs -- the GRTE also has a range of built-in functions and procedures which are collectively known as the \emph{escapes}. The function of the escapes is to support the \go application with specific access to the underlying operating system.
+
+The GRTE has two classes of escapes: privileged and non-privileged. The former escapes are not intended to be executed by normal user \go\ programs: they provide very specific access to the file system (typically) and are `wrapped' into higher-level services which can be accessed by \go programs. In addition to offering the higher-level access model, these wrapper services also often implement \emph{policy} (i.e., they can also limit access to the operating system resources).
+
+The instruction set of the GRTE is relatively fixed; whereas the escapes may vary across implementations. However, it is expected that the escapes in the reference implementation will mostly be available on all platforms.
+
+\input{esc}
+
+\subsection{Garbage collection}
+\label{howitworks:gc}
+
+The GRTE supports full garbage collection; this, together with tail recursion optimization and regular backtracking, means that the memory `footprint' of a continuously executing \go application is not destined to grow even if the active data does not.
+
+There are two kinds of heap in the GRTE: each thread has its own stack and heap where constructed terms are place, and there is a global heap where structures that may need to be shared across threads are typically kept.
+
+The GRTE uses a form of mark'n compact garbage collection algorithm. The semantic requirements on a \prolog-engine style garbage collection algorithm rule out a large number of attractive alternatives. For example, entries in the heap of a thread must be kept in historical order in order to support backtracking. However, this eliminates such algorithms as 2-space copying which are known to have an asymptotically low overhead.\footnote{See \cite{zhou:94} for a garbage collection scheme that attempts to use 2-space copying, with the restriction that only the part of the heap more recent than the current choice point are garbage collected.}
+
+It may be that future versions of the \go GRTE will use different GC algorithms; however, the requirements on any GC algorithm are strict.
+
+The system maintains the condition that no structure in the global heap `points' to any structure in a thread's heap; nor may a thread's heap point to a structure in another thread.  The result of this is that a thread's heap may be garbage collected independently of other thread's heaps. The only time that all threads are stopped is when the global heap itself has to be collected.
+
+\section{The \go compiler}
+\label{howitworks:compiler}
+
+The \go compiler is\footnote{will be} written in \go itself. Its function is to convert source texts of \go programs into loadable modules that the GRTE can directly execute.
+
+The \go compiler is split into a number of phases:
+\begin{description}
+\item[tokenizer]
+The tokenizer converts the stream of characters into a stream of tokens. 
+\item[parser]
+The parse constructs an abstract syntax representation (parse tree) of the \go source, using the stream of tokens as input. At this stage, no semantic analysis is performed.
+
+The parser is based on a operator precedence grammar; in much the same way as regular \prolog is also based on an operator precedence grammar. The grammar followed is very similar to that in \prolog; except for the handling of clause separators and operator terms. Clause separators become \emph{operators} when ocurring within braces and other bracketting characters, and operators are never allowed to be regular function symbols.
+
+The parser is also responsible for implementing the \q{include} expression: it replaces them by the parsed text of the referenced file.
+
+\item[well formed formedness]
+The wff checker traverses the parse tree looking for gross syntactic errors.
+
+\item[type checker]
+The type checker performs the first of the semantic analyses: it attempts to assign a valid type to the program (reporting errors when it cannot). It produces a new tree that mirrors the parse tree except that each node is decorated with a type expression and the elements of the node correspond to semantic elements of the \go language (such as a function application, or a theta expression node).
+
+\item[canonicalizer]
+The canonicalizer tranforms the output of the type checker into a simpler, more regular form of the language. It eliminates all theta expressions, function definitions, grammar rules, process rules, transforming them into a standard clause form.
+
+In addition, the canonicalizer is responsible for ensuring a constraint of the GRTE: that no constructor terms are more than one level deep. I.e., all constructor terms appear at the top level of a clause head or at the top level of a goal in a clause body. This has the effect of introducing a large number of intermediate variables and conditions to typical \go programs.
+
+\item[transformation]
+The program transformer takes canonical programs and attempts to perform source-to-source transformations to optimize the program; for example by constructing decision trees from simple sequences of clauses. It also attempts to remove redundant type variables from programs.\footnote{Not yet implemented.} 
+
+\item[variable analysis]
+The variable analysis phase is responsible for analysing the occurrence of variables and assigning a location for each: as a free variable, as a local variable or as an argument register. Generally, these are preferred in reverse order: argument registers are the `cheapest' location for a variable, free variables being the most expensive.
+
+\item[compilation]
+The compiler proper generates individual instructions that drive the GRTE to unify terms, evaluate functions as specified in the \go program.
+
+\item[code generation]
+The code generator takes the sequences of instructions and literal values and constructs a loadable module that may be executed.
+\end{description}
+
+\section{Run-time support libraries}
+\label{howitworks:libraries}
+
+The \goir comes with a selection of libraries that are required for proper functionality. The main libraries are the file management library and the communications library. The former gives access to the operating system's resources and the latter gives access to other agents via message communication.
+
+\section{Extending the \go system}
+\label{howitworks:extending}
+
+The \goir enables \go programs to invoke 'native' libraries in a way that is highly reminiscent of the way that a \go program can invoke a normal librariy written in \go. Recall that to invoke a \go library, the programmer typically \q{include}s an interface file (see Section~\vref{theta:link}):
+\begin{alltt}
+main .. \{
+  include "sys:go/stdlib.gof".
+
+  \ldots
+\}
+\end{alltt}
+where the interface file contains an expression of the form:
+\begin{alltt}
+(reverse,iota,\ldots,append) = ((.[\_t0]-((\_t0[]) => \_t0[]),
+  ((number,number) => number[]),
+  \ldots
+  [\_t3]-((\_t3[],\_t3[]) => \_t3[]),[\_t4]-(\_t4[],\_t4[],\_t4[]){}.))
+ from "sys:go/stdlib.goc"
+\end{alltt}
+A \q{native} interface is very similar, except that the interface file uses the \q{native} keyword. To incorporate a library of functions written in C, from the file "libtestdl.so" we might use:
+\begin{alltt}
+main .. \{
+  include "testdl.gof".
+
+  \ldots
+\}
+\end{alltt}
+where the \q{"testdl.gof"} interface file contains:
+\begin{alltt}
+(len, tail) = (native ([t]-((t[])=>number), [t]-((t[],number)=>t[]))
+               from "/opt/go/lib/libdltest.dylib")
+\end{alltt}
+The \q{native} keyword signals to the \go compiler that the code contained in \q{"/opt/go/lib/libdltest.dylib"} is not \go code, but is actually a dynamically loadable C library.
+
+Thus, using a dynamically loaded library of programs written in C is no more difficult than using a normal library. Of course, building such a library is not quite as simple!
+
+\subsection{Constructing native libraries}
+\label{howitworks:construct}
+
+

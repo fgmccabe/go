@@ -1,0 +1,118 @@
+/*
+ * Type definition for attributed parse tree
+ */
+-- Must be included in top-level module
+-- This is a mess, because April cannot handle mutual recursion at the top-level
+-- And this must be at the top-level :-(
+
+/*
+ * Type term definition for Go compiler
+ */
+
+typeBinding ::=
+  varBind |					  -- regular identifier
+  pkgBind |					  -- package import
+  tvarBind |					  -- type variable
+  typeBind;					  -- type interface
+
+flowMode ::= inpMode | outMode | biMode | superMode; -- data flow mode
+
+type_tree ::= bound(string)                       -- A bound variable
+ | typeVar(symbol)                                -- your basic type variable
+ | voidType                                       -- bottom of the type hierarchy
+ | topType                                        -- top of the type hierarchy
+ | typeType                                   -- a type value, only internal use
+ | tplType(type_tree[])                            -- tuple type
+ | enuType(type_tree)				   -- enumerated symbol type
+ | conType(type_tree[],type_tree)                  -- constructor function type
+ | sconType((type_tree,flowMode)[],type_tree)	   -- stateful constructor type
+ | funType((type_tree,flowMode)[],type_tree)       -- function type
+ | predType((type_tree,flowMode)[])                -- predicate type
+ | grType((type_tree,flowMode)[],type_tree)        -- grammar type
+ | actType((type_tree,flowMode)[])                 -- action type
+ | faceType((string,typeBinding,type_tree)[])      -- type interface
+ | allType(string,type_tree,type_tree)   -- bound variable, governing type, type
+ | uType(string,string,type_tree[])		  -- defined type
+ | varType((()=>type_tree),(type_tree){},         -- below, setB
+           (()=>type_tree),(type_tree){},         -- eq, setE,
+           (()=>type_tree),(type_tree){},string,symbol) -- above, setA, name, key
+ | typeDef(type_tree,type_tree[])		  -- used in definitions
+ ;
+
+att_tree(%tr) ::= node(%tr,type_tree,fileLoc);
+
+visibility ::= private | public | anonymous;
+
+attTree ::= flow(att_tree(attTree),flowMode)      -- for when explicit flow mode is generated
+ | iden(string)
+ | enu(string)
+ | int(number)
+ | flt(number)
+ | sym(string)
+ | chr(char)
+ | str(string)
+ | grd(att_tree(attTree),att_tree(attTree)[])
+ | lzy(att_tree(attTree),att_tree(attTree)[])
+ | dot(att_tree(attTree),string)
+ | onew(att_tree(attTree))
+ | cse(att_tree(attTree),att_tree(attTree)[])     -- case analysis
+ | bag((string,type_tree)[],att_tree(attTree),att_tree(attTree))
+ | bnd((string,type_tree)[],att_tree(attTree),(att_tree(attTree),att_tree(attTree))[]) -- bound set exp
+ | frk((string,type_tree)[],att_tree(attTree)[])  -- spawn
+
+ | def(string,visibility,att_tree(attTree))       -- definition
+ | asg(string,visibility,att_tree(attTree))       -- assignment
+ | mtc(att_tree(attTree),att_tree(attTree))       -- match test
+ | app(att_tree(attTree),att_tree(attTree)[])
+ | prd(att_tree(attTree),att_tree(attTree)[])
+ | con(att_tree(attTree),att_tree(attTree)[])	  -- term structure
+
+ | iff(att_tree(attTree),att_tree(attTree),att_tree(attTree))
+
+ | vlof((string,type_tree)[],att_tree(attTree)[]) -- valof
+ | vlis(att_tree(attTree))                        -- valis
+
+ | nt(att_tree(attTree),att_tree(attTree)[])
+ | itr((string,type_tree)[],att_tree(attTree),att_tree(attTree),att_tree(attTree)) -- iteration
+ | seq(att_tree(attTree)[])
+ | cnj(att_tree(attTree)[])
+ | frll((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | dsj(att_tree(attTree),att_tree(attTree))
+ | neg(att_tree(attTree)[])
+ | one(att_tree(attTree)[])
+ | act(att_tree(attTree),att_tree(attTree)[])
+ | tmout((string,type_tree)[],att_tree(attTree),att_tree(attTree)[])
+ | err(att_tree(attTree),att_tree(attTree)[])
+ | sync(att_tree(attTree),att_tree(attTree)[],att_tree(attTree))
+ | imp(att_tree(attTree)[])
+ | pkrf(string,att_tree(attTree))
+ | exc(att_tree(attTree))
+
+ | fun(string,visibility,number,att_tree(attTree)[])
+ | eqn(string,(string,type_tree)[],att_tree(attTree)[],att_tree(attTree),att_tree(attTree)[])
+ | rel(string,visibility,number,att_tree(attTree)[])
+ | cls(string,(string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | srel(string,visibility,number,att_tree(attTree)[])
+ | scls(string,(string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | grm(string,visibility,number,att_tree(attTree)[])
+ | grl((string,type_tree)[],att_tree(attTree)[],att_tree(attTree),att_tree(attTree))
+ | prc(string,visibility,number,att_tree(attTree)[])
+ | prl((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | class(string,visibility,number,att_tree(attTree)[])
+ | clss((string,type_tree)[],type_tree,att_tree(attTree),att_tree(attTree)[])
+ | crle((string,type_tree)[],att_tree(attTree),att_tree(attTree))
+ | tpe(string,visibility,type_tree)
+ | mdl(string[],(string[],(string,typeBinding,type_tree)[],string)[],
+       (string,typeBinding,att_tree(attTree))[]) -- module or top-level program
+ | vde        				                  -- nothing 
+ ;
+
+/* Assertions are attached to the elements of an interface type, 
+   which may also have one or more invariants associated with it.
+   These are hidden in the any[] of a type definition's list of assertions
+*/
+assertion ::= preCond(string,att_tree(attTree)) 
+  | postCond(string,att_tree(attTree))
+  | inVariant(string,att_tree(attTree))
+  ;
+

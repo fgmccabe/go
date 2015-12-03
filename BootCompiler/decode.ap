@@ -1,0 +1,521 @@
+/*
+ * A module to read an encoded term format file
+ */
+
+#include "go.ah";
+
+module
+ import {
+  interface "misc.af" and
+  interface "types.af" and
+  interface <stdio.af>  
+} in {
+  decInt(Len,Fl) => valof{
+    X : 0;
+
+    for i in 1..Len do{
+      [By] = inbytes(Fl,1);
+      X := bor(bleft(X,8),By);
+    };
+
+    valis X
+  };
+
+  decodeTerm(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    if band(B0,0xf0) == 0x60 then{
+      _ = decInt(band(B0,0xf),Fl);
+
+      valis decode(Fl)
+    }
+    else 
+      exception error("expecting string lead-in, not: "<>B0^0<>" in coding",'internal)
+  };
+
+  decode(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0x10 -> 
+        valis intgr(decInt(Len,Fl))                -- get the number itself
+
+    | 0x20-> {                                    -- A floating point number
+        (_,Exp) : decodeNum(Fl);                  -- get the exponent
+
+        Bf = rev(inbytes(Fl,Len));                -- collect the mantissa data
+
+        F : 0;
+        for B in Bf do
+          F := (F+band(B,0xff))/256;
+        valis float(ldexp(F,Exp))
+
+      }
+    | 0x30 -> {                                   -- negative floating point
+        (_,Exp) : decodeNum(Fl);                  -- get the exponent
+
+        Bf = rev(inbytes(Fl,Len));                -- collect the mantissa data
+
+        F : 0;
+        for B in Bf do
+          F := (F+band(B,0xff))/256;
+        valis float(-ldexp(F,Exp))
+      }
+    | 0x40 -> {                                   -- symbol
+        L : decInt(Len,Fl);                       -- the length of the symbol
+        Bf = utf2str(inbytes(Fl,L));
+
+        valis symb(Bf)
+      }
+    | 0x50 -> {                                   -- char
+        Ch = decInt(Len,Fl);                      -- get the character code
+        valis ch(charOf(Ch))
+      }
+    | 0x60 -> {                                   -- string
+        valis strg(utf2str(inbytes(Fl,decInt(Len,Fl))))
+      }
+    | 0x70 -> {                                   -- code
+        L = decInt(Len,Fl);                       -- The number of bytes of code
+
+        intgr(Arity) : decode(Fl);		  -- pick up the arity
+	intgr(litCount) : decode(Fl);		  -- and the number of literals
+        Bf = inbytes(Fl,L);                       -- the instruction stream
+
+	Lits = collect{				  -- the literal vector
+	  for i in 1..litCount do
+	    elemis decode(Fl);
+	};
+
+        valis code(Bf,Arity,Lits);                      -- the code object
+      }
+
+    | 0x80 -> {
+	arity = decInt(Len,Fl);			  -- a class structure
+	symb(Fn) = decode(Fl);			  -- The contructor name
+
+	valis strct(Fn,arity)
+      }
+
+    | 0x90 -> {                                   -- object structure
+        arity = decInt(Len,Fl);			  -- get the arity
+	symb(fn) = decode(Fl);
+	A = collect{
+	  for i in 1..arity do
+	    elemis decode(Fl);
+	};
+	valis cons(strct(fn,arity),A)
+      }
+    | 0xa0 -> {                                   -- program label definition
+	arity = decInt(Len,Fl);			  -- a class structure
+	symb(Fn) = decode(Fl);			  -- The contructor name
+
+	valis prg(Fn,arity)
+      }
+    | XX -> 
+        exception error("invalid byte: "<>XX^0<>" in coding",'internal)
+    }
+  };
+
+  decodeType(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    if band(B0,0xf0) == 0x60 then{
+      _ = decInt(band(B0,0xf),Fl);
+
+      valis decodeTp(Fl)
+    }
+    else 
+      exception error("expecting string lead-in, not: "<>B0^0<>" in type code",'internal)
+  };
+
+  decodeTp(Fl) => valof{
+    [B0] = inbytes(Fl,1);                           -- pick up the lead byte
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0 -> {
+        valis bound("_"<>decInt(Len,Fl)^0);
+      }
+    | 0x10 -> 
+        exception error("invalid type stream, number not permitted",'internal)
+
+    | 0x20->                                     -- A floating point number
+        exception error("invalid type stream, number not permitted",'internal)
+
+    | 0x30 ->                                    -- negative floating point
+        exception error("invalid type stream, number not permitted",'internal)
+
+    | 0x40 -> {                                   -- type symbol
+        L : decInt(Len,Fl);                      -- get the length of the symbol
+        Bf = utf2str(inbytes(Fl,L));
+
+        if Bf=="*#top" then
+          valis topType
+        else if Bf=="*#void" then
+          valis voidType
+        else if Bf=="*#type" then
+          valis typeType
+        else if Pkg<>[''#,..tpName].=Bf then
+          valis uType(Pkg,tpName,[])
+        else
+          valis bound(Bf)
+      }
+    | 0x50 ->                                     -- char
+        exception error("invalid type stream, char not permitted",'internal)
+    | 0x60 ->                                     -- string
+        exception error("invalid type stream, string not permitted",'internal)
+    | 0x70 ->                                     -- code
+        exception error("invalid type stream, code not permitted",'internal)
+    | 0x80 ->                                     -- nil, etc.
+        exception error("invalid type stream, not permitted",'internal)
+
+    | 0x90 -> {                                   -- cons structure
+        arity = decInt(Len,Fl);                -- get the arity of the cons term
+        symb(fn) = decode(Fl);                -- get the function symbol
+
+        if fn=="#$=" then{
+          tplType(Args) = decodeTp(Fl);
+	  if listlen(Args)==0 then
+	    valis enuType(decodeTp(Fl))
+	  else
+	    valis conType(Args,decodeTp(Fl))
+        }
+	else if fn=="#$:" && arity==1 then
+	  valis enuType(decodeTp(Fl))
+	else if fn=="#@>" then
+	  valis sconType(decodeArgTypes(Fl),decodeTp(Fl))
+        else if fn=="#=>" then
+          valis funType(decodeArgTypes(Fl),decodeTp(Fl))
+        else if "#()"<>Ar.=fn then{
+          valis tplType(collect{
+                          for i in 1..arity do{
+                            elemis decodeTp(Fl);
+                          }
+                        })
+        }
+        else if fn=="#{}" then
+          valis predType(decodeArgTypes(Fl))
+        else if fn=="#*" then
+          valis actType(decodeArgTypes(Fl))
+        else if fn=="#-->" then{
+          valis grType(decodeArgTypes(Fl),decodeTp(Fl))
+        }
+        else if fn=="#-" then{
+          symb(Bnd)=decode(Fl);
+
+          valis allType(Bnd,decodeTp(Fl),decodeTp(Fl))
+        }
+        else if "#<~"<>_.=fn then{			  -- type interface
+	  valis faceType(
+	    collect{
+	      for i in 1..arity do{
+		[BF] = inbytes(Fl,1);		  -- pick up the lead byte
+		Len : band(BF,15);		  -- lower nibble is the length
+                
+		    case band(BF,0xf0) in {
+		  0x90 -> {			  -- cons structure
+		    arity = decInt(Len,Fl);	-- get the arity of the cons term
+		    symb(fn) = decode(Fl);	  -- get the tuple marker
+                    
+		    if !("()"<>_.=fn) then
+		      exception error("invalid type stream, expecting tuple",'internal)
+		    else if arity!=3 then
+		      exception error("invalid arity "<>arity^0<>" expecting 3 elements",'internal)
+		    else{
+		      symb(Fld)=decode(Fl);     -- The field name
+		      symb(Mode) = decode(Fl);  -- the type assignment
+		      fTp = decodeTp(Fl);           -- the field type
+		      
+		      case Mode in {
+			"#var" -> elemis (Fld,varBind,fTp)
+		      | "#tvar" -> elemis (Fld,tvarBind,fTp)
+		      | "#tpe" -> elemis (Fld,typeBind,fTp)
+		      }
+		    }
+		  }
+		| _ ->
+		    exception error("invalid type stream, "
+				    "cant figure type defn",'internal)
+		}
+	      }
+	    });
+	}
+        else if fn=="#::=" then{
+          B=decodeTp(Fl);
+          tplType(T).=decodeTp(Fl);
+          valis typeDef(B,T)
+        }
+        else{
+          if Pkg<>[''#,..Tnm].=fn then
+            valis uType(Pkg,Tnm,collect{
+                          for i in 1..arity do{
+                            elemis decodeTp(Fl);
+                          }
+                      })
+          else
+            valis uType("",fn,collect{
+                          for i in 1..arity do{
+                            elemis decodeTp(Fl);
+                          }
+                        })
+        }
+      }
+    | _ ->
+        exception error("invalid type stream, not permitted",'internal)
+    }
+  };
+
+  decodeArgTypes(Fl) => collect{
+    [B0] = inbytes(Fl,1);                         -- pick up the lead byte
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    if band(B0,0xf0)==0x90 then{
+      arity = decInt(Len,Fl);                  -- get the arity of the cons term
+      symb(fn) = decode(Fl);                  -- get the tuple marker
+
+      if "#()"<>_.=fn then{
+        for i in 1..arity do{
+          [BT] = inbytes(Fl,1);                   -- pick up the lead byte
+          Ln = band(BT,15);                       -- lower nibble is the length
+
+          if band(BT,0xf0)==0x90 then{            -- looking for the mode decl
+            mAr = decInt(Ln,Fl);                  -- we should see ()/2 here
+
+            if decode(Fl)==symb("#()2") && mAr == 2 then{ -- get the function symbol
+              symb(Mode) = decode(Fl);
+                                 
+              if Mode=="#inpMode" then
+                elemis (decodeTp(Fl),inpMode)
+              else if Mode=="#outMode" then
+                elemis (decodeTp(Fl),outMode)
+              else if Mode=="#superMode" then
+                elemis (decodeTp(Fl),superMode)
+              else
+                elemis (decodeTp(Fl),biMode)
+            }
+            else
+              exception error("invalid type stream (), mode expected",'internal)
+          }
+          else
+            exception error("invalid type stream 0x90, mode expected",'internal)
+        }
+      }
+      else
+        exception error("invalid type stream, tuple expected",'internal)
+    }
+    else
+      exception error("invalid type stream, tuple expected",'internal)
+  };
+
+  decodeNum(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+      
+    Len = band(B0,15);
+    
+    X : 0;
+    for i in 1..Len do{
+      [By] = inbytes(Fl,1);
+      X := bor(bleft(X,8),By);
+    };
+
+    valis (B0,X)
+  };
+
+  decodeName(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0x40 -> {                                   -- symbol
+        L : decInt(Len,Fl);                       -- the length of the symbol
+        valis utf2str(inbytes(Fl,L));
+      }
+    | _ ->
+	exception error("expected a name in the code stream",'internal)
+    }
+  };
+
+  decodeNumber(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0x10 -> 
+        valis decInt(Len,Fl)			  -- get the number itself
+
+    | 0x20-> {                                    -- A floating point number
+        (_,Exp) : decodeNum(Fl);                  -- get the exponent
+
+        Bf = rev(inbytes(Fl,Len));                -- collect the mantissa data
+
+        F : 0;
+        for B in Bf do
+          F := (F+band(B,0xff))/256;
+        valis ldexp(F,Exp)
+
+      }
+    | 0x30 -> {                                   -- negative floating point
+        (_,Exp) : decodeNum(Fl);                  -- get the exponent
+
+        Bf = rev(inbytes(Fl,Len));                -- collect the mantissa data
+
+        F : 0;
+        for B in Bf do
+          F := (F+band(B,0xff))/256;
+        valis -ldexp(F,Exp)
+      }
+    | _ ->
+	exception error("expected a number in the code stream",'internal)
+    }
+  };
+
+  decodeChr(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0x50 -> {                                   -- char
+        valis charOf(decInt(Len,Fl));		  -- get the character code
+      }
+    | _ ->
+	exception error("expected a char in the code stream",'internal)
+    }
+  };
+
+  decodeString(Fl) => valof{
+    [B0] = inbytes(Fl,1);
+
+    Len : band(B0,15);                            -- lower nibble is the length
+
+    case band(B0,0xf0) in {
+      0x60 -> {                                   -- string
+        valis utf2str(inbytes(Fl,decInt(Len,Fl)))
+      }
+    | _ ->
+	exception error("expected a string in the code stream",'internal)
+    }
+  };
+
+  decodeAbstract(Fl) => valof{
+    [B0]=inbytes(Fl,1);
+
+    if band(B0,0xf0)==0x90 then{
+      Len : band(B0,15);                            -- lower nibble is the length
+      arity = decInt(Len,Fl);
+      fn = decodeName(Fl);			  -- get the abstract marker
+
+      if fn=="IDEN" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis IDEN(Lc,decodeName(Fl))
+      }
+      else if fn=="INT" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis INT(Lc,decodeNumber(Fl))
+      }
+      else if fn=="FLT" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis FLT(Lc,decodeNumber(Fl))
+      }
+      else if fn=="ST" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis ST(Lc,decodeString(Fl))
+      }
+      else if fn=="SYM" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis SYM(Lc,decodeName(Fl))
+      }
+      else if fn=="CHR" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis CHR(Lc,decodeChr(Fl))
+      }
+      else if fn=="APPLY" && arity==3 then{
+	Lc = decodeLoc(Fl);
+	H = decodeAbstract(Fl);
+	valis APPLY(Lc,H,decodeAbList(Fl))
+      }
+      else if fn=="BRACE" && arity==3 then{
+	Lc = decodeLoc(Fl);
+	H = decodeAbstract(Fl);
+	valis BRACE(Lc,H,decodeAbList(Fl))
+      }
+      else if fn=="SQUARE" && arity==3 then{
+	Lc = decodeLoc(Fl);
+	H = decodeAbstract(Fl);
+	valis SQUARE(Lc,H,decodeAbList(Fl))
+      }
+      else if fn=="TPL" && arity==2 then{
+	Lc = decodeLoc(Fl);
+	valis TPL(Lc,decodeAbList(Fl))
+      }
+      else
+	exception error("unexpected constructor: "<>fn<>" in code stream",'internal)
+    }
+    else if band(B0,0xf0)==0x40 then{
+      Len = band(B0,0xf);
+      L : decInt(Len,Fl);                       -- the length of the symbol
+      Fn = utf2str(inbytes(Fl,L));
+
+      if Fn=="VOID" then
+	valis VOID
+      else if Fn=="END" then
+	valis END
+      else
+	exception error("unexpected symbol: "<>Fn<>" in code stream",'internal)
+    }
+    else
+      exception error("unexpected code stream",'internal)
+  };
+
+  decodeAbList(Fl) => valof{
+    [B0]=inbytes(Fl,1);
+
+    if B0==0x80 then
+      valis []
+    else if B0==0x81 then{
+      H = decodeAbstract(Fl);
+      valis [H,..decodeAbList(Fl)]
+    }
+    else
+      exception error("unexpected code stream, expecting a list",'internal)
+  };
+
+  decodeLoc(Fl) => valof{
+    [B0]=inbytes(Fl,1);
+
+    if band(B0,0xf0)==0x90 then{
+      Len : band(B0,15);                            -- lower nibble is the length
+      arity = decInt(Len,Fl);
+      fn = decodeName(Fl);			  -- get the abstract marker
+
+      if fn=="loc" && arity==4 then{
+	File = decodeString(Fl);
+	Ln = decodeNumber(Fl);
+	P1 = decodeNumber(Fl);
+	P2 = decodeNumber(Fl);
+	valis loc(File,Ln,P1,P2)
+      }
+      else
+	exception error("unexpected constructor: "<>fn<>" in code stream",'internal)
+    }
+    else if band(B0,0xf0)==0x40 then{
+      Len = band(B0,0xf);
+      L : decInt(Len,Fl);                       -- the length of the symbol
+      Fn = utf2str(inbytes(Fl,L));
+
+      if Fn=="noLoc" then
+	valis noLoc
+      else
+	exception error("unexpected symbol: "<>Fn<>" in code stream",'internal)
+    }
+    else
+      exception error("unexpected code stream",'internal)
+  };
+            
+    
+
+} export {decodeTerm,decodeType,decodeAbstract};

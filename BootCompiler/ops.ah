@@ -1,0 +1,5 @@
+/*
+ * Type definition for operator types
+ */
+
+opmode ::= prefixO | aprefixO | leftO | rightO | infixO | postfixO | apostfixO;

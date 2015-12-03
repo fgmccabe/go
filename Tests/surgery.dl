@@ -1,0 +1,23 @@
+-- The surgery ontology example
+-- First example of Go's ontology DL language
+surgery{
+  import "individuals.dl".
+
+  Doctor <= thing.
+
+  Specialist == Doctor && #specialty.
+
+  AmericanSpecialist == Specialist && country=america.
+
+  AmericanDermatologist == AmericanSpecialist && specialty=dermatology.
+
+  AmericanSurgeon == AmericanSpecialist && specialty=surgery.
+
+  Surgeon == Doctor && specialty=surgery.
+
+  Dermatologist == Doctor && specialty=dermatology.
+
+  Specialty == { surgery, dermatology}.
+
+ 
+}

@@ -1,0 +1,107 @@
+/* Automatically generated, do not edit */
+module{
+  infops = [
+    (". ",1899,1900,1900),	-- statement separator
+    ("::=",1459,1460,1459),	-- user type definition
+    ("|",1249,1250,1250),	-- type union
+    ("?",1199,1200,1199),	-- conditional operator
+    ("=>",1199,1200,1199),	-- function arrow
+    (":-",1199,1200,1199),	-- clause arrow
+    (":--",1199,1200,1199),	-- strong clause
+    ("->",1199,1200,1199),	-- process rule
+    ("-->",1199,1200,1199),	-- grammar rule
+    ("*>",1151,1152,1151),	-- all solutions
+    (";",1149,1150,1150),	-- action separator
+    ("::",1129,1125,1129),	-- guard marker
+    ("||",1059,1060,1059),	-- bag of constructor
+    (",",999,1000,1000),	-- tupling, conjunction
+    ("onerror",954,955,954),	-- error handler
+    ("<=",949,950,949),	-- class rule arrow
+    ("<~",948,949,948),	-- implements interface
+    ("@",904,905,904),	-- tau pattern notation
+    ("@@",904,905,905),	-- suspension variable
+    ("timeout",899,900,899),	-- timeout clause
+    ("=",899,900,899),	-- variable declaration
+    (":=",899,900,899),	-- variable assignment
+    ("==",899,900,899),	-- equality predicate
+    ("\\=",899,900,899),	-- not unifyable
+    ("!=",899,900,899),	-- not equal
+    ("<",899,900,899),	-- less than
+    ("=<",899,900,899),	-- less than or equal
+    (">",899,900,899),	-- greater than
+    (">=",899,900,899),	-- greater than or equal
+    (".=",899,900,899),	-- match predicate
+    ("=.",899,900,899),	-- match predicate
+    ("..",895,896,895),	-- list abstraction
+    ("in",894,895,894),	-- set membership
+    ("\\/",820,820,819),	-- set union
+    ("\\",820,820,819),	-- set difference
+    ("/\\",800,800,799),	-- set intersection
+    ("<>",799,800,800),	-- list append
+    ("#",759,760,759),	-- package separator
+    (":",749,750,749),	-- type annotation
+    ("$=",730,731,730),	-- constructor type
+    ("@>",730,731,730),	-- constructor type
+    ("@=",730,731,730),	-- constructor type
+    ("+",720,720,719),	-- addition
+    ("-",720,720,719),	-- subtraction
+    ("*",700,700,699),	-- multiplication
+    ("/",700,700,699),	-- division
+    ("quot",700,700,699),	-- integer quotient
+    ("rem",700,700,699),	-- remainder function
+    ("**",600,600,599),	-- exponentiation
+    ("%%",499,500,499),	-- grammar parse
+    ("^",499,500,499),	-- grammar iterator
+    ("~",934,935,934),	-- grammar remainder
+    (".",449,450,449)		-- object access
+    ];
+    
+    prefops = [
+    ("private",1700,1699),	-- private program
+    ("import",900,899),	-- import module
+    ("case",950,949),	-- case analysis
+    ("\\+",905,904),	-- logical negation
+    ("@",905,904),	-- tau pattern
+    ("raise",900,899),	-- raise exception
+    ("valis",905,904),	-- return value
+    ("istrue",905,904),	-- return value
+    ("$",897,896),	-- initialization
+    (":",750,749),	-- type annotation
+    ("-",300,299)		-- arithmetic negation
+    ];
+
+    postops = [
+    (". ",1899,1900),	-- statement terminator
+    (";",1149,1150),	-- action terminator
+    ("!",904,905),	-- one solution operator
+    ("+",759,760),	-- input mode
+    ("-",759,760),	-- output mode
+    ("-+",759,760),	-- bidirectional mode
+    ("+-",759,760),	-- bidirectional mode
+    ("++",759,760),	-- super input mode
+    ("*",699,700),	-- action type
+    ("^",499,500)		-- string convertion
+    ];
+
+  isOperator(N) => (N,_,_,_) in infops || (N,_,_) in prefops || 
+                (N,_,_) in postops;
+prefixPr(N) => {
+ if (N,O,R) in prefops then
+   (O,R)
+ else
+   (10000,10000)
+};
+postfixPr(N) => {
+ if (N,L,O) in postops then
+   (L,O)
+ else
+   (10000,10000)
+};
+infixPr(N) => {
+  if (N,L,O,R) in infops then
+    (L,O,R)
+  else
+   (10000,10000,10000)
+};
+
+} export (isOperator, prefixPr, infixPr, postfixPr);  -- end of generated module

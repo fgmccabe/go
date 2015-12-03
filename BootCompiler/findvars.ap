@@ -1,0 +1,1035 @@
+/*
+ * Module to perform type inference and type check
+ * It also constructs an attributed tree from the original parse tree
+ */
+
+#include "go.ah";
+
+module
+ import {
+  interface <stdio.af> and
+  interface "abstract.af" and
+  interface "misc.af" and 
+  interface "errors.af" and 
+  interface "types.af" and
+  interface "display.af" and
+  interface "st-types.af"
+}
+in {
+
+  occ ::= occ((){},(()=>number),(()=>(string,typeBinding,type_tree)),fileLoc);
+  
+  occRc(Loc,T,Nm,Bn) => {
+    occCount : 0;
+    
+    inc(){
+      occCount+:=1;
+    };
+    
+    count()=>occCount;
+
+    Tp:T;
+  }.occ(inc,count,(()=>(Nm,Bn,Tp)),Loc);
+  
+  vCount(occ(_,C,_,_))=>C();
+  vInc(occ(I,_,_,_)){
+    I();
+  };
+  vCxt(occ(_,_,_,Loc))=>Loc;
+  vType(occ(_,_,S,_))=>S();
+        
+  extractVars(L,Outer) => collect{
+    for (Nm,O) in L do{
+      -- vCount(O)^0++" occurrences of "<>Nm<>"\n">>stdout;
+      if vCount(O)<=1 && ![''_,.._].=Nm && ![''$,.._].=Nm then
+        reportWarn("singleton occurrence of: "++Nm,vCxt(O));
+      elemis vType(O)
+    };
+  };
+  
+ findVarsInType(T,Outer) => valof{
+    E = findVarsInTp(T,[],Outer);
+    checkVarsInTrm(T,E);
+
+    safeType(T,E);				  -- check that the type is safe
+    
+    valis collect{
+      for (Nm,O) in E do
+        elemis vType(O)
+    }
+  };
+
+  safeType(T,E){
+    (I,O) = valof{
+      case T in {
+	APPLY(_,IDEN(_,"=>"),[Args,Reslt]) -> {
+	  O:varOccurrences(Reslt,E,[]);
+	  I:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		I := varOccurrences(a,E,I)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | APPLY(_,IDEN(_,"$="),[Args,Reslt]) -> {
+	  I:[];
+	  O:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		O := varOccurrences(a,E,O)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | APPLY(_,IDEN(_,"@="),[Args,Reslt]) -> {
+	  I:[];
+	  O:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		O := varOccurrences(a,E,O)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | APPLY(_,IDEN(_,"@>"),[Args,Reslt]) -> {
+	  I:[];
+	  O:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		O := varOccurrences(a,E,O)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | APPLY(_,IDEN(_,"-->"),[Args,Reslt]) -> {
+	  O:varOccurrences(Reslt,E,[]);
+	  I:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		O := varOccurrences(a,E,O)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | APPLY(_,IDEN(_,"*"),[Args]) -> {
+	  O:[];
+	  I:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		I := varOccurrences(a,E,I)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | BRACE(_,Args,[]) -> {
+	  O:[];
+	  I:[];
+	  if TPL(_,A).=Args then{
+	    for a in A do{
+	      if APPLY(_,IDEN(_,"-"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"-+"),[aT]).=a then
+		O := varOccurrences(aT,E,O)
+	      else if APPLY(_,IDEN(_,"+"),[aT]).=a then
+		I := varOccurrences(aT,E,I)
+	      else
+		I := varOccurrences(a,E,I)
+	    }
+	  }
+	  else
+	    "Should have been tuplized\n">>stdout;
+	  valis (I,O)
+	}
+      | _ -> valis ([],[])
+      };
+    };
+
+    for Nm in O do{
+      if !(Nm in I) then{
+	if (Nm,OO) in E then{
+	  if vCount(OO)<=1 && ![''_,.._].=Nm && ![''$,.._].=Nm then
+	    reportWarn("singleton occurrence of: "++Nm++
+		       " in type expression\n"++display(T),vCxt(OO));
+	}
+      }
+    }
+  };
+
+  varOccurrences(T,E,F) => case T in {
+    IDEN(_,Nm) :: (Nm,_) in E && !Nm in F => [Nm,..F]
+  | IDEN(_,_) => F
+  | TPL(_,L) => varOccList(L,E,F)
+  | APPLY(_,P,A) => varOccList(A,E,varOccurrences(P,E,F))
+  | BRACE(_,P,A) => varOccList(A,E,varOccurrences(P,E,F))
+  | SQUARE(_,P,A) => varOccList(A,E,varOccurrences(P,E,F))
+  | _ => F
+  };
+
+  varOccList(L,E,F) => valof{
+    fF : F;
+    for el in L do{
+      fF := varOccurrences(el,E,fF)
+    };
+    valis fF
+  };
+
+  findVarsInClassRule(APPLY(_,IDEN(_,"<="),[L,R]),Outer) => valof{
+    tOuter = [("this",varBind,voidType),..Outer];
+    E = findVarsInTrm(L,findVarsInTrm(R,[],tOuter),tOuter);
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(R,E);
+    valis extractVars(E,tOuter);
+  };
+
+  findVarsInClassBody(APPLY(_,IDEN(_,".."),[H,Defs]),Outer) => valof{
+    E = findVarsInTrm(H,[], [("this",varBind,voidType),..Outer]);
+    checkVarsInTrm(H,E);
+    checkVarsInTrm(Defs,E);
+
+    valis collect{
+      for (Nm,O) in E do
+        elemis vType(O)
+    }
+  };
+
+  findVarsInTerm(T,Env) => valof{
+    E = findVarsInTrm(T,[],Env);
+    checkVarsInTrm(T,E);
+    valis extractVars(E,Env);
+  };
+      
+  findVarsInRule(A,R,G,Outer) => valof{
+    E = findVarsInTrm(R,findVarsInTrm(A,findVarsInGoal(G,[],Outer),Outer),Outer);
+    checkVarsInTrm(A,E);
+    checkVarsInTrm(R,E);
+    checkVarsInTrm(G,E);
+    valis extractVars(E,Outer);
+  };
+
+  findVarsInEqn(Eqn,Outer) => case Eqn in {
+    APPLY(_,IDEN(_,"=>"),[APPLY(_,_,A),APPLY(_,IDEN(_,":-"),[R,G])]) => 
+      findVarsInRule(TPL(noLoc,A),R,G,Outer)
+  | APPLY(_,IDEN(_,"=>"),[APPLY(_,IDEN(_,"::"),[A,G]),R]) => 
+      findVarsInRule(A,R,G,Outer)
+  | APPLY(_,IDEN(_,"=>"),[A,R]) => 
+      findVarsInRule(A,R,IDEN(noLoc,"true"),Outer)
+  };
+
+  findVarsInClause(APPLY(_,IDEN(Lc,":-"),[APPLY(_,_,A),R]),Outer) => 
+    findVarsInRule(TPL(Lc,A),VOID,R,Outer);
+
+  findVarsInStrongClause(APPLY(_,IDEN(Lc,":--"),[H,R]),Outer) => case H in {
+    APPLY(_,IDEN(Lc,"::"),[APPLY(_,IDEN(_,_),A),G]) =>
+      findVarsInRule(TPL(Lc,A),VOID,TPL(Lc,[G,R]),Outer)
+  | APPLY(_,_,A) =>
+      findVarsInRule(TPL(Lc,A),VOID,R,Outer)
+  };
+
+  findVarsInGrammar(H,P,B,Outer) => valof{
+    E = findVarsInGrBody(B,findVarsInTrm(H,findVarsInGrBody(P,[],Outer),Outer),Outer);
+    checkVarsInTrm(H,E);
+    checkVarsInTrm(P,E);
+    checkVarsInTrm(B,E);
+    valis extractVars(E,Outer);
+  };
+
+  findVarsInProcessRule(Rl,Outer) => case Rl in {
+    APPLY(_,IDEN(_,"->"),[APPLY(_,IDEN(_,"::"),[H,G]),B]) => valof{
+      E = findVarsInAction(B,findVarsInGoal(G,findVarsInTrm(H,[],Outer),Outer),Outer);
+      checkVarsInTrm(H,E);
+      checkVarsInTrm(G,E);
+      checkVarsInTrm(B,E);
+      valis extractVars(E,Outer);
+    }
+  | APPLY(_,IDEN(_,"->"),[H,B]) => valof{
+      E = findVarsInAction(B,findVarsInTrm(H,[],Outer),Outer);
+      checkVarsInTrm(H,E);
+      checkVarsInTrm(B,E);
+      valis extractVars(E,Outer);
+    }
+  };
+  
+  findVarsInSyncRule(L,R,Outer) => valof{
+    E = findVarsInAction(R,findVarsInGoal(L,[],Outer),Outer);
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(R,E);
+    valis extractVars(E,Outer);
+  };
+  
+  findVarsInCaseRule(L,G,R,Outer) =>valof{
+    E = findVarsInAction(R,findVarsInGoal(G,findVarsInTrm(L,[],Outer),Outer),Outer);
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(G,E);
+    checkVarsInTrm(R,E);
+    valis extractVars(E,Outer);
+  };
+  
+  findVarsInBag(L,R,Outer) => valof{
+    E = findVarsInGoal(R,findVarsInTrm(L,[],Outer),Outer);
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(R,E);
+    valis extractVars(E,Outer);
+  };
+
+  findVarsInBound(L,Sets,Outer) => valof{
+    E : findVarsInTrm(L,[],Outer);
+    for APPLY(_,IDEN(_,"in"),[Pt,St]) in listIfy(Sets,",") do{
+      E := findVarsInTrm(Pt,findVarsInTrm(St,E,Outer),Outer);
+    };
+
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(Sets,E);
+    valis extractVars(E,Outer);
+  };
+
+  findVarsInForAll(L,R,Outer) => valof{
+    E = findVarsInAction(R,findVarsInGoal(L,[],Outer),Outer);
+    checkVarsInTrm(L,E);
+    checkVarsInTrm(R,E);
+    valis extractVars(E,Outer);
+  };
+
+  findVarsInIterator(NT,Ptn,Lst,Outer) => valof{
+    E = findVarsInGrBody(NT,findVarsInTrm(Ptn,findVarsInTrm(Lst,[],Outer),Outer),Outer);
+    checkVarsInTrm(NT,E);
+    checkVarsInTrm(Ptn,E);
+    checkVarsInTrm(Lst,E);
+    valis extractVars(E,Outer);
+  };
+  
+  findVarsInTrm(X,Env,Outer) => {case X in {
+      VOID => Env
+    | IDEN(_,"[]") => Env
+    | IDEN(_,"{}") => Env
+    | IDEN(_,"()") => Env
+    | IDEN(Loc,Nm) => valof {
+        if (Nm,varBind,_) in Outer then {
+	  valis Env
+	}
+	else if (Nm,_) in Env then{
+          valis Env;
+        }
+        else if (Nm,varBind,_) in standardTypes then
+          valis Env
+        else 
+	  valis [(Nm,occRc(Loc,newVr(uType("go.stdlib","thing",[]),Nm,false),
+			   Nm,varBind)),..Env]
+      }
+    | INT(_,Nm) => Env
+    | FLT(_,Nm) => Env
+    | ST(_,St) => Env
+    | CHR(_,_) => Env
+    | SYM(_,_) => Env
+    | TPL(_,L) => findVarsInTrmList(L,Env,Outer)
+    | APPLY(_,IDEN(_,":"),[L,Tp]) => findVarsInTp(Tp,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"{}"),[APPLY(_,IDEN(_,".."),[_,Sets])]) => valof{
+        EE = findVarsInSets(Sets,Env,Outer);
+
+	checkVarsInTrm(X,Env);
+
+	valis EE
+      }
+    | APPLY(_,IDEN(_,"{}"),[APPLY(_,IDEN(_,"||"),[T,G])]) => valof{
+        checkVarsInTrm(X,Env);
+        valis Env
+      }
+    | APPLY(_,IDEN(_,"::"),[L,R]) => findVarsInGoal(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"@@"),[L,R]) => findVarsInGoal(R,findVarsInTrm(L,Env,Outer),Outer)
+    | BRACE(_,IDEN(_,"spawn"),[P]) => valof{
+        checkVarsInTrm(P,Env);
+        valis Env;
+      }
+    | APPLY(_,IDEN(_,"%%"),[IDEN(_,_),R]) => findVarsInTrm(R,Env,Outer)
+    | APPLY(_,IDEN(_,",.."),[L,R]) => 
+        findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,","),[L,R]) => 
+        findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) =>
+        findVarsInGoal(G,findVarsInTrm(A,findVarsInTrm(B,Env,Outer),Outer),Outer)
+
+    | APPLY(_,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+        checkVarsInTrm(Cases,Env);
+        valis findVarsInTrm(Exp,Env,Outer);
+      }
+    | APPLY(_,IDEN(_,"|"),[L,R]) => 
+	findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"onerror"),[L,_]) => findVarsInTrm(L,Env,Outer)
+    | APPLY(_,IDEN(_,"raise"),[E]) => findVarsInTrm(E,Env,Outer)
+    | BRACE(_,IDEN(_,"valof"),[E]) => valof{
+        checkVarsInTrm(X,Env);
+        valis Env
+      }
+    | APPLY(_,APPLY(_,IDEN(_,"."),[E,_]),A) => 
+        findVarsInTrmList(A,findVarsInTrm(E,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"#"),_) => Env
+    | APPLY(_,IDEN(_,"."),[E,_]) => findVarsInTrm(E,Env,Outer)
+    | APPLY(_,IDEN(_,"@"),[E,APPLY(_,_,A)]) => 
+        findVarsInTrmList(A,findVarsInTrm(E,Env,Outer),Outer)
+    | APPLY(_,IDEN(Lc,"$"),[R]) => findVarsInTrm(R,Env,Outer)
+    | APPLY(_,IDEN(_,".."),[APPLY(_,IDEN(_,":"),[S,Tp]),Th]) => valof{
+        checkVarsInTrm(Th,Env);
+        valis findVarsInTp(Tp,findVarsInTrm(S,Env,Outer),Outer)
+      }
+    | APPLY(_,IDEN(_,".."),[APPLY(_,IDEN(_,":"),[Tp]),Th]) => valof{
+        checkVarsInTrm(Th,Env);
+        valis findVarsInTp(Tp,Env,Outer)
+      }
+    | APPLY(_,IDEN(_,".."),[S,Th]) => valof{
+        checkVarsInTrm(Th,Env);
+        valis findVarsInTrm(S,Env,Outer)
+      }
+    | SQUARE(_,F,A) => findVarsInTrm(TPL(noLoc,A),findVarsInTrm(F,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,_),A) => findVarsInTrmList(A,Env,Outer)
+    | APPLY(_,F,A) => findVarsInTrm(F,findVarsInTrmList(A,Env,Outer),Outer)
+    }
+  };
+
+  findVarsInSets(St,Env,Outer) => valof{
+    E : Env;
+    O : Outer;
+    for APPLY(_,IDEN(_,"in"),[P,S]) in listIfy(St,",") do{
+      E := findVarsInTrm(S,Env,O);
+      nO = (findVarsInTrm(P,Env,O)//((.(Nm,_).)=>(Nm,varBind,voidType)));
+      O := nO<>O;
+    };
+    valis E;
+  };
+
+  findVarsInTrmList(L,Env,Outer) => valof{
+    vL : Env;
+    for xX in L do{
+      vL := findVarsInTrm(xX,vL,Outer)
+    };
+    valis vL
+  };
+
+  findVarsInTp(T,Env,Outer) => case T in {
+    IDEN(_,"_") => Env
+  | IDEN(_,"number") => Env
+  | IDEN(_,"symbol") => Env
+  | IDEN(_,"char") => Env
+  | IDEN(_,"string") => Env			  -- A special hack
+  | IDEN(_,"logical") => Env
+  | IDEN(_,"top") => Env
+  | IDEN(_,"void") => Env
+  | IDEN(_,"opaque") => Env
+  | IDEN(_,"{}") => Env				  -- empty interface
+  | IDEN(Loc,Nm) => valof {
+      if (Nm,tvarBind,_) in Outer then{ 
+	valis Env
+      }
+      else if (Nm,typeBind,_) in Outer then{ 
+	valis Env
+      }
+      else if (Nm,_) in Env then{
+	valis Env;
+      }
+      else 
+	valis [(Nm,occRc(Loc,newVr(uType("go.stdlib","thing",[]),Nm,true),Nm,tvarBind)),..Env]
+    }
+
+  | TPL(_,L) => valof{
+      vL : Env;
+      
+      for X in L do
+	vL := findVarsInTp(X,vL,Outer);
+      
+      valis vL
+    }
+  | APPLY(_,IDEN(_,"$="),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"@>"),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"@="),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"=>"),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"-->"),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,","),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"*"),[A]) => 
+      findVarsInTp(A,Env,Outer)
+  | APPLY(_,IDEN(_,":"),[_,T]) =>
+      findVarsInTp(T,Env,Outer)
+  | APPLY(_,IDEN(_,"-"),[T]) =>                     -- output mode
+      findVarsInTp(T,Env,Outer)
+  | APPLY(_,IDEN(_,"+"),[T]) =>                     -- input mode
+      findVarsInTp(T,Env,Outer)
+  | APPLY(_,IDEN(_,"-+"),[T]) =>                    -- input/output mode
+      findVarsInTp(T,Env,Outer)
+  | APPLY(_,IDEN(_,"++"),[T]) =>			  -- super input mode
+      findVarsInTp(T,Env,Outer)
+  | BRACE(_,L,[]) => 
+      findVarsInTp(L,Env,Outer)
+  | APPLY(_,IDEN(_,"-"),[IDEN(_,N),TP]) => 
+      findVarsInTp(TP,Env,[(N,tvarBind,voidType),..Outer])
+  | APPLY(_,IDEN(Loc,"<~"),[IDEN(_,Nm),bTp]) => valof{
+      if (Nm,_,_) in Outer then
+	valis findVarsInTp(bTp,Env,Outer)
+      else if (Nm,_) in Env then{
+	valis findVarsInTp(bTp,Env,Outer)
+      }
+      else 
+	valis findVarsInTp(bTp,
+			   [(Nm,occRc(Loc,newVr(uType("go.stdlib","thing",[]),Nm,false),Nm,tvarBind)),..Env],Outer)
+    }
+
+  | APPLY(_,IDEN(_,"<~"),[L,R]) => 
+      findVarsInTp(R,findVarsInTp(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(Lc0,"-"),[V,TP]) => valof{
+      O : Outer;
+      Is : [];
+      Vrs : V;
+      while APPLY(_,IDEN(Lc,",.."),[I,RR]).=Vrs do{
+        if APPLY(_,IDEN(_,"<~"),[IDEN(_,N),II]).=I then{
+          Is := [II,..Is];       -- We are going to look inside here momentarily
+          O := [(N,tvarBind,voidType),..O]
+        }
+        else if IDEN(_,N).=I then
+          O := [(N,tvarBind,voidType),..O]
+        else
+          reportError("invalid type quantifier: "<>display(I),Lc);
+	Vrs := RR
+      };
+      
+      valis findVarsInTp(TP,findVarsInTp(TPL(Lc0,Is),Env,O),O)
+    }
+  | SQUARE(_,IDEN(Lc,N),R) => 
+      findVarsInTp(TPL(Lc,R),Env,Outer)
+  | _ => valof{
+      reportError("Funny type exp. `"++display(T)++"'",Context(T));
+      valis Env;
+    }
+  };
+  
+  /* Check the occurrences of variables, used only to increment occurrence counts */
+  
+  checkVarsInTrm(X,Env){
+    case X in {
+      IDEN(_,Nm) -> {
+        if (Nm,O) in Env then{
+          vInc(O);
+        }
+      }
+    | INT(_,Nm) -> {}
+    | FLT(_,Nm) -> {}
+    | ST(_,St)  -> {}
+    | CHR(_,_)  -> {}
+    | SYM(_,_)  -> {}
+    | TPL(_,L) ->{
+        for xX in L do{
+          checkVarsInTrm(xX,Env)
+        };
+      }
+      
+    | APPLY(_,IDEN(_,"@"),[L,R]) -> { checkVarsInTrm(L,Env); checkVarsInTrm(R,Env); }
+
+    | APPLY(_,IDEN(_,"@@"),[L,R]) -> { checkVarsInTrm(L,Env); checkVarsInTrm(R,Env); }
+
+    | APPLY(_,F,A) -> {
+        checkVarsInTrm(F,Env);
+        for x in A do
+          checkVarsInTrm(x,Env)
+      }
+    | BRACE(_,F,A) -> {
+        checkVarsInTrm(F,Env);
+        for x in A do
+          checkVarsInTrm(x,Env)
+      }
+    | SQUARE(_,F,A) -> {
+        checkVarsInTrm(F,Env);
+        for x in A do
+          checkVarsInTrm(x,Env)
+      }
+    | VOID -> {}
+    }
+  };
+  
+  findVarsInGoal(X,Env,Outer) => case X in {
+    IDEN(_,"{}") => Env
+  | IDEN(_,"true") => Env
+  | IDEN(_,"false") => Env
+  | IDEN(_,"fail") => Env
+  | IDEN(Loc,Nm) => valof{
+      if (Nm,_,_) in Outer then
+        valis Env
+      else if (Nm,_) in Env then{
+        valis Env;
+      }
+      else 
+        valis [(Nm,occRc(Loc,newVr(uType("go.stdlib","thing",[]),Nm,false),Nm,varBind)),..Env]
+    }
+  | INT(_,Nm) => Env
+  | FLT(_,Nm) => Env
+  | ST(_,St) => Env
+  | TPL(_,L) => valof{
+      vL : Env;
+      for xX in L do
+        vL := findVarsInGoal(xX,vL,Outer);
+      valis vL
+    }
+  | APPLY(_,IDEN(_,"@@"),[L,R]) => findVarsInGoal(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"!="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"\\="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"in"),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"-->"),[L,APPLY(_,IDEN(_,"~"),[S,R])]) => 
+      findVarsInTrm(S,findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer),Outer)
+  | APPLY(_,IDEN(_,"!"),[One]) => findVarsInGoal(One,Env,Outer)
+  | APPLY(_,IDEN(_,"\\+"),[Ng]) => findVarsInGoal(Ng,Env,Outer)
+  | APPLY(_,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) =>
+      findVarsInGoal(G,findVarsInGoal(A,findVarsInGoal(B,Env,Outer),Outer),Outer)
+  | APPLY(_,IDEN(_,"*>"),[A,B]) => valof{  -- foralls are locally quantified
+      checkVarsInTrm(A,Env); 
+      checkVarsInTrm(B,Env);
+      valis Env
+    } 
+  | APPLY(_,IDEN(_,","),[A,B]) =>
+      findVarsInGoal(A,findVarsInGoal(B,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"|"),[A,B]) =>
+      findVarsInGoal(A,findVarsInGoal(B,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"onerror"),[L,R]) => 
+      findVarsInGoal(L,Env,Outer)
+  | APPLY(_,IDEN(_,"raise"),[E]) => findVarsInTrm(E,Env,Outer)
+  | APPLY(_,IDEN(_,"{}"),[G]) => 
+      findVarsInGoal(G,Env,Outer)
+  | BRACE(_,IDEN(_,"action"),[E]) => 
+      findVarsInAction(E,Env,Outer)
+  | APPLY(_,IDEN(_,"."),[E,APPLY(_,_,A)]) => findVarsInTrmList(A,findVarsInTrm(E,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"."),[E,IDEN(_,_)]) => findVarsInTrm(E,Env,Outer)
+  | APPLY(_,IDEN(_,_),A) =>
+      findVarsInTrmList(A,Env,Outer)
+  | APPLY(_,F,A) => findVarsInTrm(F,findVarsInTrmList(A,Env,Outer),Outer)
+  | VOID => Env
+  | _ => exception error("Can't find variables in goal: "<>display(X),'fail)
+  };
+  
+  findVarsInAction(X,Env,Outer) => case X in {
+    IDEN(_,"{}") => Env
+  | APPLY(_,IDEN(_,";"),[L,R]) => findVarsInAction(R,findVarsInAction(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,";"),[One]) => findVarsInAction(One,Env,Outer)
+  | APPLY(_,IDEN(_,"@@"),[L,R]) => findVarsInAction(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,".="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,":="),[L,R]) => 
+      findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"!"),[One]) => findVarsInGoal(One,Env,Outer)
+  | APPLY(_,IDEN(_,"\\+"),[Ng]) => findVarsInGoal(Ng,Env,Outer)
+  | APPLY(_,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) =>
+      findVarsInGoal(G,findVarsInAction(A,findVarsInAction(B,Env,Outer),Outer),Outer)
+  | APPLY(_,IDEN(_,"valis"),[E]) => 
+      findVarsInTrm(E,Env,Outer)
+  | APPLY(_,IDEN(_,"istrue"),[E]) => 
+      findVarsInGoal(E,Env,Outer)
+  | APPLY(_,IDEN(_,"onerror"),[L,R]) => valof{
+      checkVarsInTrm(R,Env); 
+      valis findVarsInAction(L,Env,Outer);
+    }
+  | APPLY(_,IDEN(_,"raise"),[E]) => findVarsInTrm(E,Env,Outer)
+  | APPLY(_,IDEN(_,"|"),[L,R]) => 
+      findVarsInAction(R,findVarsInAction(L,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+      checkVarsInTrm(Cases,Env);
+      valis findVarsInTrm(Exp,Env,Outer);
+    }
+  | APPLY(_,IDEN(_,"timeout"),[L,APPLY(_,IDEN(_,"->"),[T,A])]) => valof{
+      checkVarsInTrm(L,Env); 
+      checkVarsInTrm(T,Env);
+      checkVarsInTrm(A,Env);
+
+      valis Env
+    }
+  | APPLY(_,IDEN(_,"->"),[L,A]) => valof{
+      checkVarsInTrm(L,Env); 
+      checkVarsInTrm(A,Env);
+
+      valis Env
+    }
+  | APPLY(_,IDEN(_,"{}"),[G]) => 
+      findVarsInGoal(G,Env,Outer)
+  | APPLY(_,IDEN(_,"*>"),[A,B]) => valof{  -- foralls are locally quantified
+        checkVarsInTrm(A,Env); 
+        checkVarsInTrm(B,Env);
+        valis Env
+      } 
+  | BRACE(_,APPLY(_,IDEN(_,"sync"),[R]),[S]) => valof{
+      checkVarsInTrm(R,Env); 
+      checkVarsInTrm(S,Env);
+
+      valis Env
+    }
+  | BRACE(_,IDEN(_,"spawn"),[A]) => valof{
+      checkVarsInTrm(A,Env); 
+
+      valis Env
+    }
+  | APPLY(_,IDEN(_,"."),[E,APPLY(_,_,A)]) => findVarsInTrmList(A,findVarsInTrm(E,Env,Outer),Outer)
+  | APPLY(_,IDEN(_,_),A) =>
+      findVarsInTrmList(A,Env,Outer)
+  | APPLY(_,F,A) => findVarsInTrm(F,findVarsInTrmList(A,Env,Outer),Outer)
+  | _ => 
+      exception error("invalid action:"<>X^0,'fail)
+  };
+
+  findVarsInGrBody(X,Env,Outer) => {case X in {
+      IDEN(_,"[]") => Env
+    | IDEN(_,"eof") => Env
+    | ST(_,St) => Env
+    | TPL(_,L) => valof{
+        vL : Env;
+        for xX in L do
+          vL := findVarsInGrBody(xX,vL,Outer);
+        valis vL;
+      }
+    | APPLY(_,IDEN(_,","),[L,R]) =>
+        findVarsInGrBody(R,findVarsInGrBody(L,Env,Outer),Outer) 
+    | APPLY(_,IDEN(_,",.."),[L,R]) => 
+	findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) =>
+        findVarsInGoal(G,findVarsInGrBody(A,findVarsInGrBody(B,Env,Outer),Outer),Outer)
+    | APPLY(_,IDEN(_,"|"),[L,R]) => 
+	findVarsInGrBody(R,findVarsInGrBody(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"::"),[T,G]) => 
+	findVarsInGrBody(T,findVarsInGoal(G,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"\\+"),[T]) => 
+	findVarsInGrBody(T,Env,Outer)
+    | APPLY(_,IDEN(_,"{}"),[G]) => 
+	findVarsInGoal(G,Env,Outer)
+    | APPLY(_,IDEN(_,"!"),[G]) => 
+	findVarsInGrBody(G,Env,Outer)
+    | APPLY(_,IDEN(_,"="),[L,R]) => 
+        findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"!="),[L,R]) => 
+        findVarsInTrm(R,findVarsInTrm(L,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,"onerror"),[L,_]) => 
+	findVarsInGrBody(L,Env,Outer)
+    | APPLY(_,IDEN(_,"raise"),[E]) => findVarsInTrm(E,Env,Outer)
+    | BRACE(_,IDEN(_,"action"),[A]) =>
+        findVarsInAction(A,Env,Outer)
+    | APPLY(_,IDEN(Lc,"*"),[NT,APPLY(_,IDEN(Lc1,"^"),[Ptn,Lst])]) =>
+        findVarsInTrm(Lst,Env,Outer)
+    | APPLY(_,IDEN(_,"."),[E,APPLY(_,_,A)]) => findVarsInTrmList(A,findVarsInTrm(E,Env,Outer),Outer)
+    | APPLY(_,IDEN(_,_),A) => findVarsInTrmList(A,Env,Outer)
+    | APPLY(_,F,A) => findVarsInTrm(F,findVarsInTrmList(A,Env,Outer),Outer)
+    | _ => Env
+    }
+  };
+
+/* Find all occurrences of free variables in an expression */
+
+  findFreeVars(node(Trm,Type,_),Local,Free,Found) => valof {
+    case Trm in {
+      iden(Nm) -> {
+        if idnt(Nm) in Free && !idnt(Nm) in Found && !(idnt(Nm) in Local) then
+          valis [idnt(Nm),..Found]
+        else
+          valis Found
+      }
+    | sym(_) -> valis Found
+    | enu(_) -> valis Found
+    | int(_) -> valis Found
+    | flt(_) -> valis Found
+    | chr(_) -> valis Found
+    | str(_) -> valis Found
+    | dot(node(iden(Cl),Tp,Lc),R) -> {
+        DtNm = idnt(Cl<>".");
+
+        if DtNm in Free then{
+          if !DtNm in Found && ! DtNm in Local then
+            valis [DtNm,..Found]
+          else
+            valis Found
+        }
+        else
+          valis findFreeVars(node(iden(Cl),Tp,Lc),Local,Free,Found)
+      }
+    | dot(R,_) -> valis findFreeVars(R,Local,Free,Found)
+
+    | pkrf(_,E) -> valis findFreeVars(E,Local,Free,Found)
+
+    | flow(E,_) -> valis findFreeVars(E,Local,Free,Found)
+
+    | fun(_,_,_,Eqs) -> valis findFreeVarsList(Eqs,Local,Free,Found)
+
+    | rel(_,_,_,Cls) -> valis findFreeVarsList(Cls,Local,Free,Found)
+
+    | srel(_,_,_,Cls) -> valis findFreeVarsList(Cls,Local,Free,Found)
+
+    | grm(_,_,_,Cls) -> valis findFreeVarsList(Cls,Local,Free,Found)
+
+    | prc(_,_,_,Cls) -> valis findFreeVarsList(Cls,Local,Free,Found)
+
+    | eqn(_,Q,H,R,B) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        F = findFreeVars(R,XLoc,Free,findFreeVarsList(H,XLoc,Free,Found));
+        valis findFreeVarsList(B,XLoc,Free,F);
+      }
+    | cls(_,Q,H,B) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        F = findFreeVarsList(H,XLoc,Free,Found);
+
+        valis findFreeVarsList(B,XLoc,Free,F);
+      }
+    | scls(_,Q,H,G,B) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        F = findFreeVarsList(H,XLoc,Free,Found);
+
+        valis findFreeVarsList(G,XLoc,Free,findFreeVarsList(B,XLoc,Free,F));
+      }
+    | grl(Q,H,PB,B) -> {                      -- grammar rule
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVars(B,XLoc,Free,
+                 findFreeVarsList(H,XLoc,Free,
+                      findFreeVars(PB,XLoc,Free,Found)))
+      }
+    | prl(Q,H,G,B) -> {                 -- process rule
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVarsList(G,XLoc,Free,findFreeVarsList(B,XLoc,Free,findFreeVarsList(H,XLoc,Free,Found)));
+      }
+
+    | cse(E,R) -> 
+        valis findFreeVars(E,Local,Free,
+                           findFreeVarsList(R,Local,Free,Found))
+
+    | tmout(Q,T,A) -> {                 -- timeout clause in message receive
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVarsList(A,XLoc,Free,findFreeVars(T,XLoc,Free,Found))
+      }
+    | class(_,_,_,Clss) -> {
+        valis findFreeVarsList(Clss,Local,Free,Found)
+      }
+    | crle(Q,H,S) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+        valis findFreeVars(S,XLoc,Free,findFreeVars(H,XLoc,Free,Found));
+      }
+      
+    | clss(Q,_,H,Th) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>collect{ 
+          for node(tEl,_,_) in Th do {
+            case tEl in {
+              asg(Nm,_,_) ->
+                elemis idnt(Nm)
+            | def(Nm,_,_) ->
+                elemis idnt(Nm)
+            | rel(Nm,_,_,_) ->
+                elemis idnt(Nm)
+            | srel(Nm,_,_,_) ->
+                elemis idnt(Nm)
+            | fun(Nm,_,_,_) ->
+                elemis idnt(Nm)
+            | grm(Nm,_,_,_) ->
+                elemis idnt(Nm)
+            | prc(Nm,_,_,_) ->
+                elemis idnt(Nm)
+            | class(Nm,_,_,_) -> 
+                elemis idnt(Nm)
+            | tpe(Nm,_,_) -> 
+                elemis idnt(Nm)
+            | _ -> {}
+            }
+          }
+        }<>Local;
+              
+        valis findFreeVars(H,XLoc,Free,findFreeVarsList(Th,XLoc,Free,Found));
+      }
+
+    | onew(C) -> {
+        valis findFreeVars(C,Local,Free,Found);
+      }
+
+    | bnd(Q,E,VS) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+        F : findFreeVars(E,Local,Free,Found);
+
+        for (V,S) in VS do
+          F := findFreeVars(S,Local,Free,findFreeVars(V,Local,Free,F));
+        valis F
+      }
+    | def(V,_,E) -> 
+        valis findFreeVars(node(iden(V),voidType,noLoc),Local,Free,findFreeVars(E,Local,Free,Found))
+    | asg(V,_,E) -> 
+        valis findFreeVars(node(iden(V),voidType,noLoc),Local,Free,findFreeVars(E,Local,Free,Found))
+    | mtc(V,E) -> 
+        valis findFreeVars(V,Local,Free,findFreeVars(E,Local,Free,Found))
+    | app(F,A) -> {
+        valis findFreeVars(F,Local,Free,findFreeVarsList(A,Local,Free,Found));
+      }
+      
+    | bag(Q,E,G) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVars(G,XLoc,Free,findFreeVars(E,XLoc,Free,Found))
+      }
+
+    | con(P,AL) -> {
+        F : findFreeVars(P,Local,Free,Found);
+        for E in AL do F := findFreeVars(E,Local,Free,F);
+        valis F
+      }
+
+    | prd(node(iden("in"),_,_),A) -> 
+        valis findFreeVarsList(A,Local,Free,Found)
+
+    | prd(F,A) -> 
+        valis findFreeVars(F,Local,Free,findFreeVarsList(A,Local,Free,Found))
+
+    | act(F,A) ->
+        valis findFreeVars(F,Local,Free,findFreeVarsList(A,Local,Free,Found))
+      
+    | sync(R,A,T) ->
+        valis findFreeVars(T,Local,Free,findFreeVars(R,Local,Free,findFreeVarsList(A,Local,Free,Found)))
+    
+    | nt(F,A) ->
+        valis findFreeVars(F,Local,Free,findFreeVarsList(A,Local,Free,Found))
+
+    | itr(Q,E,V,S) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+        valis findFreeVars(S,Local,Free,
+			   findFreeVars(E,XLoc,Free,
+					findFreeVars(V,XLoc,Free,Found)))
+      }
+    | grd(T,B) -> {
+        F = findFreeVars(T,Local,Free,Found);
+
+        valis findFreeVarsList(B,Local,Free,F);
+      }
+
+    | lzy(T,B) -> {
+        F = findFreeVars(T,Local,Free,Found);
+
+        valis findFreeVarsList(B,Local,Free,F);
+      }
+
+    | neg(NG) ->
+        valis findFreeVarsList(NG,Local,Free,Found)
+    | one(G) -> 
+        valis findFreeVarsList(G,Local,Free,Found)
+    | cnj(L) -> 
+        valis findFreeVarsList(L,Local,Free,Found)
+    | dsj(A,B) ->
+        valis findFreeVars(B,Local,Free,findFreeVars(A,Local,Free,Found))
+
+    | iff(A,B,C) ->
+        valis findFreeVars(C,Local,Free,findFreeVars(B,Local,Free,findFreeVars(A,Local,Free,Found)))
+
+    | frll(Q,A,B) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVarsList(B,XLoc,Free,findFreeVarsList(A,XLoc,Free,Found))
+      }
+
+    | seq(L) -> {
+         GV : Found;
+        for G in L do
+          GV := findFreeVars(G,Local,Free,GV);
+        valis GV;
+      }
+
+    | err(A,B) ->
+        valis findFreeVarsList(B,Local,Free,findFreeVars(A,Local,Free,Found))
+        
+    | exc(A) ->
+        valis findFreeVars(A,Local,Free,Found)
+
+    | tpe(_,_,Tp) -> exception error("trying to find free variables in a type definition",
+				     'internal)
+
+    | vlof(Q,NG) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+        valis findFreeVarsList(NG,XLoc,Free,Found)
+      }
+    | vlis(NG) -> valis findFreeVars(NG,Local,Free,Found)
+
+    | frk(Q,G) -> {
+        XLoc = (Q//((.(Nm,_).)=>idnt(Nm)))<>Local;
+
+        valis findFreeVarsList(G,XLoc,Free,Found)
+      }
+    | vde ->
+        valis Found
+    | imp(_) ->
+        valis Found
+    }
+  };
+  
+  findFreeVarsList(L,Local,Free,Found) => valof{
+    F : Found;
+    for E in L do
+      F := findFreeVars(E,Local,Free,F);
+    valis F;
+  };
+
+} export (findVarsInClassBody,findVarsInClassRule,findVarsInTerm,
+          findVarsInRule,findVarsInCaseRule,
+          findVarsInEqn,findVarsInClause,findVarsInStrongClause,findVarsInGrammar,
+	  findVarsInProcessRule,findVarsInSyncRule,findVarsInBag,findVarsInType,
+          findVarsInForAll,findVarsInIterator,findVarsInBound,
+	  findFreeVars,findFreeVarsList)

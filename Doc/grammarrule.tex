@@ -1,0 +1,330 @@
+\chapter{Grammar rules}
+\label{grammars}
+
+\go supports a form of definite clause grammar notation which we call \go grammars. The grammar notation can be used for parsing strings, but can equally be used for parsing (or generating) arbitrary streams of data.
+\index{logic grammars}
+\index{grammar rule}
+The most general form of a logic grammar takes the form:
+\begin{alltt}
+L\sub1,\ldots,L\subn --> R\sub1,\ldots,R\sub{k}
+\end{alltt}
+where the L\subi and R\sub{j} are either \firstterm{terminals}{An atomic element of a stream that a grammar is processing.} or \firstterm{non-terminals}{A part of a grammar that is itself defined by other grammar rules.}. The distinction is that terminal symbols may appear in the original input stream and non-terminal symbols may not.
+
+The effect of applying a rule such as this is to replace a stream of the form:
+\begin{alltt}
+S\sub1,\ldots,S\sub{i-1},R\sub1,\ldots,R\sub{k},S\sub{i+1},\ldots,S\sub{m}
+\end{alltt}
+with
+\begin{alltt}
+S\sub1,\ldots,S\sub{i-1},L\sub1,\ldots,L\subn,S\sub{i+1},\ldots,S\sub{m}
+\end{alltt}
+Normally we consider the parsing process one of deriving a stream containing a single non-terminal from the original stream.
+
+However, for a combination of pragmatic and utilitarian reasons, we normally restrict grammar rules to a more simplified form:
+\begin{alltt}
+N,T\sub1,\ldots,T\subn --> R\sub1,\ldots,R\sub{k}
+\end{alltt}
+where \emph{N} is a non-terminal, \emph{T\subi} are all terminal symbols and \emph{R\sub{j}} are either terminals or non-terminals. Either of or both \emph{n} and \emph{k} may be zero, but every grammar rule must be `about' a particular non-terminal.
+
+Like other forms of logic grammars, \go grammar's non-terminal symbols may take arguments, which are unified rather than simply input. This has great utility from a programmer's perspective as it allows a grammar to simultaneously parse a stream and to construct some kind of parse tree via `back substitution' of the variables in the grammar rules.
+
+The stream of data that is processed by a grammar rule is typically a \q{string} -- i.e., a list of \q{char}acters. However, in general, the stream may be represented by any kind of list, or indeed any kind of stream.
+
+Note that type inference applies to the bodies of grammar rules; generally, all the grammar rule conditions must agree on the type of the stream, as must the lookahead. The type of a grammar program is a term of the form:
+\begin{alltt}
+[T\sub1,\ldots{},T\subn] --> T\sub{stream}
+\end{alltt}
+where \q{T\subi} are the types of the arguments of the grammar program and \q{T\sub{stream}} is the type of the stream that the grammar can process.
+
+\section{Basic grammar conditions}
+\index{logic grammars!basic conditions}
+\subsection{Terminal grammar condition}
+\label{grammar:terminal}
+
+\index{logic grammars!terminal}
+A \emph{terminal grammar condition} represents a term that is expected in the input stream -- it corresponds to a terminal symbol; although \go grammars may parse streams other than symbol streams. The general form of a terminal grammar condition is a list of terms -- each of which represents a separate term that should appear in the input list for the grammar rule to be satisfied.
+
+For grammar rules over strings, a \q{string} literal may act as a terminal grammar condition. The special case of the empty list, or empty string, is often used to denote a grammar condition which does not consume any input:
+\begin{alltt}
+foo() --> [].
+\end{alltt}
+\index{type inference!terminal grammar condition}
+The type inference rule for a terminal grammar condition is:
+\begin{equation}
+\AxiomC{\typeprd{\emph{Env}}{\emph{L}}{\q{list[\emph{T}]}}}
+\UnaryInfC{\grammprd{Env}{L}{\q{list[\emph{T}]}}}
+\DisplayProof
+\end{equation}
+where the predicate $\grammprd{Env}{L}{\q{list[\emph{T}]}}$ means
+\begin{quote}
+In the environment \emph{Env} the symbol \emph{L} is a grammar defined over lists of \emph{T}
+\end{quote}
+
+\subsection{Non-terminal grammar call}
+\label{grammar:nonterminal}
+
+\index{logic grammars!non terminal}
+A \emph{non-terminal grammar call} is of the form \q{\emph{nt(Args)}} and consists of the application of a grammar program to some arguments. It represents a `call' to another grammar program (or even the same in the case of recursive grammars) and succeeds if the called grammar program can successfully parse the appropriate segment of the input stream.
+
+\index{type inference!non-terminal grammar condition}
+The type inference rule for a non-terminal grammar call is:
+\begin{equation}
+\AxiomC{\typeprd{E}{\emph{Nt}}{\q{[\emph{t\sub1},\ldots,\emph{t\subn}]-->\emph{T\sub{s}}}}}
+\AxiomC{\typeprd{E}{\q{(\emph{A\sub1},\ldots,\emph{A\subn})}}{(\emph{t\sub1},\ldots,\emph{t\subn})}}
+\insertBetweenHyps{\hskip-0.6pt}
+\BinaryInfC{\grammprd{E}{\q{Nt(\emph{A\sub1},\ldots,\emph{A\subn})}}{\emph{T\sub{s}}}}
+\DisplayProof
+\end{equation}
+
+The default mode for passing arguments to a grammar non-terminal is \emph{bidirectional} -- arguments are unified rather than matched. However, it is possible to specify modes in the type of the grammar procedure. In detail, the type rules for type checking individual arguments are the same as for actions, functions and predicates (for example, see Section~\vref{action:invoke}).
+
+\subsection{Class relative grammar call}
+\label{grammar:dot}
+\index{logic grammars!class relative non terminal}
+The class relative variant of the non-terminal invokes a grammar condition defined within a class.
+
+\begin{alltt}
+\emph{O}.Nt(A\sub1,\ldots,A\subn)
+\end{alltt}
+denotes a grammar condition where the grammar rules are defined within the class identified by the label term \q{\emph{O}}.
+
+The type inference for class relative grammar conditions is similar to a regular grammar call, generalized appropriately:
+\begin{equation}
+\AxiomC{\implements{Env}{\emph{O}}{\q{Nt:[\emph{t\sub1},..,\emph{t\subn}]-->\emph{T\sub{s}}}}}
+\AxiomC{\typeprd{Env}{\q{(\emph{A\sub1},..,\emph{A\subn})}}{\q{(\emph{t\sub1},..,\emph{t\subn})}}}
+\insertBetweenHyps{\hskip-0.5pt}
+\BinaryInfC{\grammprd{Env}{\q{O.Nt(\emph{A\sub1},..,\emph{A\subn})}}{\emph{T\sub{s}}}}
+\DisplayProof
+\end{equation}
+
+
+\subsection{Equality condition}
+\label{grammar:equality}
+
+\index{grammar!equality condition}
+\index{type inference!equality definition}
+An equality definition grammar condition has no effect other than to ensure that two terms are equal. Typically, this is done to establish the value of an intermediate variable:
+\index{\q{=} operator}
+\index{operator!\q{=}}
+\begin{alltt}
+\emph{Ex\sub1} = \emph{Ex\sub2}
+\end{alltt}
+As with equality goals, an equality grammar condition is type safe if the types of the two expressions are the same:
+\begin{equation}
+\AxiomC{\typeprd{Env}{E\sub1}{T\sub{E}}}
+\AxiomC{\typeprd{Env}{E\sub2}{T\sub{E}}}
+\BinaryInfC{\grammprd{Env}{\q{\emph{E\sub1} = \emph{E\sub2}}}{\emph{T\sub{new}}}}
+\DisplayProof
+\end{equation}
+where \emph{T\sub{new}} is a new type variable.
+
+\subsection{Inequality condition}
+\label{grammar:notequality}
+
+\index{inequality}
+\index{grammar!inequality}
+The \q{!=} grammar condition is satisfied if the two expressions are \emph{not} unifiable. The form of an inequality grammar condition is:
+\begin{alltt}
+\emph{T\sub1} != \emph{T\sub2}
+\end{alltt}
+
+Like equality conditions, an inequality is type safe if the two elements have the same type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{E\sub1}{T\sub{E}}}
+\AxiomC{\typeprd{Env}{E\sub2}{T\sub{E}}}
+\BinaryInfC{\grammprd{Env}{\q{\emph{E\sub1} != \emph{E\sub2}}}{\emph{T\sub{new}}}}
+\DisplayProof
+\end{equation}
+where \emph{T\sub{new}} is a new type variable.
+
+
+\subsection{Grammar predicate condition}
+\label{grammar:goal}
+
+\index{logic grammars!goal condition}
+A \emph{grammar predicate condition} is a query condition, enclosed in braces -- \q{\{\emph{Goal}\}} -- represents a predicate or condition to be applied as part of the parsing process. Grammar predicate conditions do not `consume' any of the string input; nor do they directly influence the type of stream that the grammar rule consumes.
+
+\index{type inference!goal grammar condition}
+The type inference rule for a grammar goal is:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\emph{Goal}}}
+\UnaryInfC{\grammprd{\emph{Env}}{\q{\{\emph{Goal}\}}}{\emph{T\sub{s}}}}
+\DisplayProof
+\end{equation}
+where \emph{T\sub{s}} is a new type variable not occurring elsewhere.
+
+\section{Combined grammar conditions}
+
+\subsection{Disjunction}
+\label{grammar:disjunction}
+
+A grammar \emph{disjunction} is a pair of grammar conditions, separated by \q{|}'s. The disjunction is required to be parenthesised; since the priority of the \q{|} operator is higher than the priority of the normal conjunction operator: \q{,}. 
+
+A grammar disjunction succeeds if either arm of the disjunction is able to parse the input stream.
+
+\index{type inference!disjunction grammar condition}
+The type inference rule for a grammar disjunction is similar to that for conjunction:
+\begin{equation}
+\AxiomC{\grammprd{\emph{Env}}{\q{G\sub1}}{T\sub{S}}}
+\AxiomC{\grammprd{\emph{Env}}{\q{G\sub2}}{T\sub{S}}}
+\BinaryInfC{\grammprd{\emph{Env}}{\q{(G\sub1|G\sub2)}}{T\sub{S}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Conditional grammar}
+\label{grammar:conditional}
+
+\index{logic grammars!conditional}
+A \emph{conditional} grammar condition is a triple of a three grammar conditions; the first is a test, depending on whether it succeeds either the `then' branch or the `else' branch is taken.  Conditionals are written: \q{\emph{T}?\emph{G\sub1}|\emph{G\sub2}} This can be read as:
+\begin{quote}
+if \emph{T} succeeds, then try \emph{G\sub1}, otherwise try \emph{G\sub2}.
+\end{quote}
+Only one solution of \emph{T} is attempted; i.e., it is as though \emph{T} were implicitly a one-of grammar condition.
+
+Note that the test may `consume' some of the input; the `then' branch of the conditional grammar only sees the input after the test. However, the else branch is expected to parse the entire input.
+
+\index{type inference!conditional grammar condition}
+The type inference rule for conditionals is:
+\begin{equation}
+\AxiomC{\grammprd{Env}{\q{T}}{T\sub{S}}}
+\AxiomC{\grammprd{Env}{\q{G\sub1}}{T\sub{S}}}
+\AxiomC{\grammprd{Env}{\q{G\sub2}}{T\sub{S}}}
+\TrinaryInfC{\grammprd{Env}{\q{T?G\sub1|G\sub2}}{T\sub{S}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Negated grammar condition}
+\label{grammar:negation}
+
+\index{logic grammars!negated condition}
+A \emph{negated} grammar condition is a grammar condition, prefixed by the \nasf operator (negation-as-failure). A negated grammar condition succeeds if the grammar condition is not able to parse the input stream.  The effect of a successful negated grammar condition is to parse none of the input stream; in effect, the negated grammar condition is a kind of negative look-ahead -- it succeeds if the input does \emph{not} start with the negated grammar.
+
+\go implements negation in terms of failure to prove positive -- i.e., it is negation-by-failure \cite{klc:78}.
+
+The type inference rule for a negated grammar condition is:
+\begin{equation}
+\AxiomC{\grammprd{\emph{Env}}{\q{G}}{T\sub{S}}}
+\UnaryInfC{\grammprd{\emph{Env}}{\q{\nasf{}G}}{T\sub{S}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Iterated grammar}
+\label{grammar:iterator}
+\index{Iterated grammar condition}
+\index{logic grammar!iteration}
+
+The iterator grammar condition adresses a common problem with logic grammars: how to encapsulate a sub-sequence; without the relatively tedious requirement of writing a special grammar non-terminal to handle it.
+
+For example, the common definition of a program identifier reads something like:
+\begin{quote}
+the first character must a letter, then followed by an arbitrary sequence of letters and digits
+\end{quote}
+Such a definition is hard to capture in regular logic grammars without an explicit recursion and worse, often requires a cut to get the correct semantics.
+
+A grammar iterator applies a grammar to the stream repeatedly, and returns the result as a list. It is written:
+\begin{alltt}
+\emph{Gr} * \emph{Exp} \uphat \emph{LstVar}
+\end{alltt}
+This grammar succeeds if the grammar \emph{Gr} -- which may be any combination of terminals and non-terminals -- successfully parses some portion of the stream any number of times. The `result' is returned in \emph{LstVar} -- which consists of a list constructed from \emph{Exp}.
+
+The meaning of a grammar iterator is:
+\begin{alltt}
+\ldots,iter\sub{new}(LstVar,\emph{F\sub1},..,\emph{F\subn}),\ldots
+\end{alltt}
+where \q{\emph{F\subi}} are the free variables of \q{\emph{Gr}} and \q{\emph{Exp}} and \q{iter\sub{new}} is a new program defined:
+\begin{alltt}
+iter\sub{new}([Exp,..L\sub{x}],\emph{F\sub1},..,\emph{F\subn}) --> \emph{Gr}!,iter\sub{new}(L\sub{x},\emph{F\sub1},..,\emph{F\subn}).
+iter\sub{new}([],\emph{F\sub1},..,\emph{F\subn}) --> [].
+\end{alltt}
+with the additional property that \q{\emph{LstVar}} will be bound to the list corresponding to the longest possible repetition of \q{\emph{Gr}}.
+
+The informal rule for identifiers we described above can be captured using the grammar iterator illustrated in program~\vref{grammar:iden}.
+\begin{program}
+\begin{boxed}
+\begin{alltt}
+identifier(ID([C,..L])) --> letter(C),
+      (letter(X)|digit(X))*X\uphat{}L
+\end{alltt}
+\end{boxed}
+\caption{\label{grammar:iden}A grammar for identifiers}
+\end{program}
+
+\begin{aside}
+The grammar iterator captures one of the key essentials of regular expression notation -- the star iterator. 
+\end{aside}
+Type inference for an iterated grammar condition is fairly straightforward:
+\begin{equation}
+\AxiomC{\grammprd{\emph{Env}}{\q{\emph{Gr}}}{T\sub{S}}}
+\AxiomC{\typeprd{\emph{Env}}{\q{\emph{Exp}}}{T\sub{E}}}
+\AxiomC{\typeprd{\emph{Env}}{\q{\emph{L}}}{\q{list[\emph{T\sub{E}}]}}}
+\TrinaryInfC{\grammprd{\emph{Env}}{\q{\emph{Gr} * \emph{Exp} \uphat \emph{L}}}{T\sub{S}}}
+\DisplayProof
+\end{equation}
+
+
+\section{Special grammar conditions}
+
+\subsection{error handler}
+\label{grammar:errorhandler}
+
+\index{error handling!in logic grammars}
+\index{logic grammars!error handling}
+A grammar condition may be protected by an error handler in a similar way to expressions and goals. An \q{onerror} grammar condition takes the form:
+
+\begin{alltt}
+\emph{G} onerror (\emph{P\sub1} --> \emph{G\sub1} | \ldots{} | \emph{P\subn} --> \emph{G\subn})
+\end{alltt}
+In such an expression, \emph{G}, \emph{G\subi} are all grammar conditions, and the types of \emph{P\subi} is of the standard error type \q{exception}:
+\begin{equation}
+\AxiomC{\grammprd{E}{\q{\emph{G}}}{\q{\emph{T\sub{S}}}}}
+\AxiomC{\grammprd{E}{\q{\emph{A\subi}}}{\q{\emph{T\sub{S}}}}}
+\AxiomC{\typeprd{\emph{E}}{\q{P\subi}}{\q{exception}}}
+\TrinaryInfC{\safeact{\emph{E}}{\q{\emph{G}}~\q{onerror (\emph{P\sub1} \q{-->} \emph{A\sub1}\q{|}\ldots\q{|}\emph{P\subn} \q{-->} \emph{A\subn})}}{\q{\emph{T\sub{S}}}}}
+\DisplayProof
+\end{equation}
+Semantically, an \q{onerror} grammar condition has the same meaning as the `protected' condition \emph{G}; unless a run-time problem arose in the evaluation of \emph{G}. In this case, an error exception would be raised (of type \q{exception}); and the parse of \emph{G} is terminated and one of the error handling clauses is used instead. The first clause in the handler that unifies with the raised error is the one that is used; and the success or failure of the protected grammar depends on the success or failure of the selected grammar rule in the error recovery clause.
+
+Error handler protected grammar conditions are especially useful in coping with errors in the source stream. I.e., when parsing a stream which may have syntax errors in it -- such as a programming language -- then the error protected grammar condition represents one way of recovering from syntax errors. However, error protecting a grammar does not itself handle the processing of the input stream -- the error handler's grammar conditions are processing the \emph{same} input as the protected condition itself.
+
+\subsection{Raise exception}
+\label{grammar:raise}
+
+\index{logic grammars!raise exception}
+\index{error handling!exceptions in logic grammars}
+The \q{raise} exception grammar condition does not parse any input; it terminates processing of the input and raises an exception. If the exception is caught by an \q{onerror} grammar condition then parsing is continued at that level; otherwise the entire parse is aborted and the exception is caught at a higher level.
+
+The argument of an \q{raise} grammar condition is a \q{exception} expression:
+\begin{equation}
+\AxiomC{\typeprd{\emph{Env}}{\emph{Er}}{\q{exception}}}
+\UnaryInfC{\grammprd{\emph{Env}}{\q{raise}~\emph{Er}}{T\sub{S}}}
+\DisplayProof
+\end{equation}
+where \emph{T\sub{s}} is a new type variable not occurring elsewhere.
+
+\begin{aside}
+Judicious use of the \q{onerror} grammar form can greatly ameliorate one of logic grammar's greatest practical difficulties: recovering from errors. Logic grammars are based on the normal backtracking behavior of clauses; and this can be a very powerful tool for expressing grammars in a high-level style.
+
+However, backtracking across `correct' input is perhaps legitimate, backtracking across erroneous input (as in the case of parsing a program with a syntax error in it) can cause a great deal of unnecessary backtracking. Adjusting a normal logic grammar to gracefully handle erroneous input is a tedious and ugly process: typically involving the use of cuts in a Prolog-based system.
+
+By explicitly raising an exception when erroneous input is detected, and by catching it with an appropriate \q{onerror} clause, we can add error handling and recovery to a \go grammar in a more accurate and succinct manner.
+\end{aside}
+
+\subsection{End of file}
+\label{grammar:eof}
+
+\index{logic grammars!end of file condition}
+The \q{eof} grammar condition is satisfied only at the end of the input. For example, the grammar rule:
+\begin{alltt}
+tok(TERM) --> ".", eof.
+\end{alltt}
+is satisfied only if the last character in the string being parsed is a period.
+
+The type inference rule for the \q{eof} test is:
+
+\begin{equation}
+\AxiomC{}
+\UnaryInfC{\grammprd{\emph{Env}}{\q{eof}}{\emph{T\sub{s}}}}
+\DisplayProof
+\end{equation}
+where \emph{T\sub{s}} is a new type variable not occurring elsewhere.
+

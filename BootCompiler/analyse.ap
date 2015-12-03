@@ -1,0 +1,333 @@
+/*
+ * Analyse the variables in a clause or equation
+ * separating out the head/first goal variables from the others.
+*/
+
+#include "go.ah";
+
+module
+  import
+{
+  interface "misc.af" and
+  interface "dict.af" and
+  interface "st-types.af" and
+  interface "canon.af" and
+  interface "ground.af" and
+  interface <stdio.af>
+} in
+{
+        
+  vOccEntry ::= occ(string,{()=>(vOcc,number,number)[]},(vOcc,number,number){});
+
+  /* Analyse a clause, classify variables to register, local, theta or free */
+  
+  analyseCls(Q,H,parts) => valof{
+    -- "Analyzing for variables: "++showCQuants(Q,false)++"\n">>stdout;
+    T = collect{		        -- construct initial occurrences table
+         for idnt(Nm) in Q do
+           elemis  { Os : []; Occs()=>Os; addOcc(V,X,Y){ Os := [(V,X,Y),..Os]}}.occ(Nm,Occs,addOcc);
+        -- Add in a special `variable' for ground terms
+        elemis  { Os : []; Occs()=>Os; addOcc(V,X,Y){ Os := Os\/[(V,X,Y)]}}.occ([],Occs,addOcc)
+    };
+
+    /* Compute all the occurrences of all the variables */
+    findArgOccs(H,T,hArg,hTerm,1);
+    findBodyOccs(parts,T);
+      
+    /* Compute the use, nouse and conflict table for register variables */
+    useTbl = collect{
+      for occ(Nm::Nm!=[],Occs,_) in T do{
+      	Ocs=Occs();
+      	
+--    	"Occurrences of "++string%%Nm++" are "++Ocs^0++"\n">>stdout;
+      	if aReg(_).=classifyVar(Ocs) then{
+      	  Gp = valof{                         -- pick up the group number for this variable
+      	    if (_,G,_) in Ocs then
+      	      valis G
+      	    else
+      	      exception error("no occ of "++string%%Nm,'fail)
+      	  };
+      	    
+      	  use = setof{
+            for (Tp::Tp in [hArg,lArg],_,Reg) in Ocs do
+              elemis Reg;
+          };
+      	    
+--      	  "Use registers for "++string%%Nm++" are "++use^0++"\n">>stdout;
+      	    
+      	  noUse = setof{
+      	    for occ(oN,oOccs,_) in T do{
+      	      for (h::h in [hArg,lArg],Gp,Rg) in oOccs() do{
+      	        if !Rg in use then
+      	          elemis Rg;
+      	      }
+      	    }
+      	  };
+      	    
+--          "noUse registers for "++string%%Nm++" are "++noUse^0++"\n">>stdout;
+      	    
+      	  conflict = setof{
+      	    if (lArg,_,_) in Ocs then{
+      	      for Rg in 1..argArity(last(parts#Gp)) do{
+      	        if !(lArg,_,Rg) in Ocs then
+      	          elemis Rg
+      	      }
+      	    };
+      	    for (lTerm,_,Rg) in Ocs do{
+      	      if (lTerm,_,GG::GG>=Rg) in Ocs then
+      	          elemis Rg
+      	    };
+      	    for (oTerm,_,Rg) in Ocs do{
+      	      if (oTerm,_,GG::GG>=Rg) in Ocs then
+      	          elemis Rg
+      	    }
+          };
+
+  --        "conflict registers for "++string%%Nm++" are "++conflict^0++"\n">>stdout;
+      	    
+      	  elemis (Nm,Gp,use,noUse,conflict)
+        }
+      }
+    };
+      
+    Table = collect{
+      for occ(Nm::Nm!=[],Occs,_) in T do{
+      	if (Nm,_,Use,noUse,Conflict) in useTbl then
+      	  elemis (Nm,Occs(),aReg(-1),Use,noUse,Conflict)
+      	else{
+      	  elemis (Nm,Occs(),classifyVar(Occs()),[],[],[])
+      	}
+      }
+    };
+    
+    valis allocateVars(Table);
+  };  	
+    
+  /* Allocate variables to registers or local variables */
+  allocateVars(Table) => valof{
+    Perms : [];                 -- list of permanent variables (allocated on stack)
+    NoP : 0;
+    frReg : 1..32;
+    uReg : [];
+
+    dict : collect {            -- initial table of register variables
+      for (Nm,occs,aReg(_),U,noU,C) in Table do{
+      	if (hArg,_,Rg) in occs then{
+      	  if Rg in frReg then{
+      	    elemis dictEntry(Nm,true,true,aReg(Rg),[U,noU,lastROcc(occs)]);
+      	    uReg := uReg\/[Rg];
+      	    frReg := frReg^\Rg;
+      	  }
+      	  else
+            elemis dictEntry(Nm,false,true,notAlloc,[U,noU,lastROcc(occs)])
+      	}
+        else
+          elemis dictEntry(Nm,false,((hTerm,_,_) in occs),notAlloc,[U,noU\/C,lastROcc(occs)])
+      }
+    };
+
+    for (Nm,occs,S,_,_,_) in Table do{
+      if (hArg,_,Rg) in occs then{
+      	if Rg in frReg then{
+      	  uReg := uReg\/[Rg];
+      	  frReg := frReg^\Rg;
+      	}
+      };
+
+      case S in {
+	yReg(_,safe) -> {                       -- collect a new permanent
+	  NoP := NoP+1;
+  	  Perms := [(Nm,lastEl(occs),yReg(0,safe),[],((hArg,_,_) in occs || (hTerm,_,_) in occs)),..Perms];
+	}
+      | voidVar -> 
+	  dict := [dictEntry(Nm,true,((hArg,_,_) in occs || (hArg,_,_) in occs),voidVar,[]),..dict]
+
+      | aReg(_) -> {}
+      }
+    };
+          
+    vNo : NoP;
+
+    for (Nm,_,S,_,D) in sort(Perms,(((_,(_,G1,I1),_,_,_),(_,(_,G2,I2),_,_,_)) => G1<G2 || 
+	(G1==G2 && I1<I2))) do {
+      case S in {
+	yReg(_,safe) -> 
+	  dict := [dictEntry(Nm,false,D,yReg(vNo,safe),[]),..dict]
+      | _ -> 
+	  exception error("We have a problem in allocating `"++string%%Nm++"'",'fail)
+      };
+      vNo := vNo-1;
+    };
+    
+    -- "Dictionary is "++showDict(dict)++"\n">>stdout;
+    
+    valis (dict,NoP,usdRgs(uReg,[],frReg,NoP,0))
+  };
+
+  safeGoal(Goal) => { case Goal in {
+      neck(_) => true
+    | fail(_) => true
+    | defn(_,_,_) => true
+    | _ => false
+    }
+  };
+
+  findBodyOccs(Parts,Table){
+    Gp : 1;
+    
+    for P in Parts do{
+      Gp := findPartOccs(P,Table,Gp)+1;
+    }
+  };
+
+  findPartOccs(B,Table,Gp) => valof{
+    Gn:Gp;
+    for G in B do{
+      Gn := findGoalOccs(G,Table,Gn);
+    };
+    valis Gn;
+  };
+ 
+  findGoalOccs(G,Table,Gp) => valof{
+    case G in {
+      defn(Vr,Val,_) -> {
+	findOccs(Vr,Table,oArg,oTerm,Gp,-1);
+	findOccs(Val,Table,oArg,oTerm,Gp,-2);
+	valis Gp;
+      }
+    | call(_,A,_) -> {
+	findArgOccs(A,Table,lArg,lTerm,Gp);
+	valis Gp;
+      }
+    | ecall(Nm,A,_) -> {
+	findArgOccs(A,Table,lArg,lTerm,Gp);
+	valis Gp;
+      }
+    | ocall(A1,A2,A3,_) -> {
+	findArgOccs([A1,A2,A3],Table,lArg,lTerm,Gp);
+	valis Gp;
+      }
+    | suspc(V,Lb,_) -> {
+	findOccs(V,Table,oArg,oTerm,Gp,1);
+	findOccs(Lb,Table,oArg,oTerm,Gp,2);
+	valis Gp;
+      }
+
+    | trpBegin -> { valis Gp }
+
+    | trpEnd -> { valis Gp }
+
+    | rais(A,_) ->{
+	findArgOccs([A],Table,lArg,lTerm,Gp);
+	valis Gp;
+      }
+
+    | neck(_) -> { valis Gp }
+    | fail(_) -> { valis Gp }
+    }
+  };
+
+  findArgOccs(Args,Table,Key,iKey,Gp){
+    I : 1;
+    for E in Args do{
+      findOccs(E,Table,Key,iKey,Gp,I);
+      I := I+1;
+    }
+  };
+
+  findOccs(Trm,Table,Key,iKey,Gp,Ix)
+  {
+    case Trm in {
+      idnt(Nm) -> {
+	if !isEscape(Nm) && occ(Nm,_,add) in Table then{
+	  add(Key,Gp,Ix);
+	}
+      }
+      /* These serve only to block access to a register */
+    | X::isGroundC(X) -> {
+          if occ([],_,add) in Table then
+            add(Key,Gp,Ix)
+        }
+        
+    | mtch(T) -> {
+        findOccs(T,Table,Key,iKey,Gp,Ix);
+      }
+
+    | bild(T) -> {
+        findOccs(T,Table,Key,iKey,Gp,Ix);
+      }
+
+    | cons(F,A) -> {
+	for E in A do findOccs(E,Table,iKey,iKey,Gp,Ix)
+      }
+    }
+  };
+    
+  /* partition a goal into a sequence of sub-sequences, each one of which
+  consists of a sequence of safe sub-goals, possibly terminated by an 
+  unsafe sub-goal. An unsafe sub-goal is one which requires its arguments
+  in well known places. This analysis is used when determining if a variable
+  can be allocated to a register or not.
+  */
+  partition = {
+    ([],[]) => []
+  | ([],P) => [rev(P)]
+--  | ([F::(errr(_,_).=F),..Rest],R) => [rev(R),[F],..partition(Rest,[])]
+  | ([F,..Rest],R)::safeGoal(F) => partition(Rest,[F,..R])
+  | ([Goal,..Rest],R) => [rev([Goal,..R]),..partition(Rest,[])]
+  };
+
+/* Sort out if the variable is a theta variable, void var, a register var, a safe permanent
+  or an unsafe permanent variable */
+  classifyVar = {
+    [_] => voidVar			-- single occurrence - void var
+  | [] => voidVar			-- doesnt actually occur!
+  | [F,..Rest] :: samePart(partNo(F),Rest) => aReg(-1)
+  | Occs :: {(hTerm,_,_) in Occs || (hArg,_,_) in Occs || 
+      (oTerm,_,_) in Occs || (lTerm,_,_) in Occs } => yReg(-1,true)
+  | _ => yReg(-1,false)
+  };
+
+  partNo((_,K,_)) => K;
+
+  samePart(N,L) => valof{
+    for G in L do
+      if partNo(G)!=N then
+      valis false;
+    valis true
+  };
+  
+  argArity(N) => case N in {
+    call(_,A,_) => listlen(A)
+  | ecall(_,A,_) => listlen(A)
+  | ocall(_,_,_,_) => 3
+  | suspc(_,_,_) => 2
+--  | errr(B,_) => listmax(B//argArity)
+  | defn(_,_,_) => 1
+  | neck(_) => 0
+  | fail(_) => 0
+  | trpBegin => 0
+  | trpEnd => 0
+  | rais(_,_) => 1
+  };
+  
+  compPerm((_,(_,G1,I1),_,_,_),(_,(_,G2,I2),_,_,_)) => G1<G2 || 
+	(G1==G2 && I1<I2);
+
+
+  lastEl = {
+    [X] => X
+  | [X,..Y] => lastEl(Y)
+  };
+
+  lastROcc(occs) => valof{
+    Gp : -1; R : -1;
+    for (Tp,G,P) in occs do{
+      if Gp!=G then
+        Gp := G;
+      if P>R then
+        R := P;
+    };
+    valis [Gp,R]
+  };
+} export (analyseCls,partition);

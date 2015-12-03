@@ -1,0 +1,5 @@
+*~
+*.goc
+*.gof
+Makefile
+Makefile.in

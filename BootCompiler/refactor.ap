@@ -1,0 +1,210 @@
+/*
+ * refactor a transformed program, eliminating any lingering deep structures.
+ */
+
+#include "go.ah";
+
+module
+  import
+{
+  interface "canon.af" and
+  interface "misc.af" and
+  interface "ground.af" and
+  interface <stdio.af>
+} in
+{
+      
+  reFactor(Prog) => {
+    case Prog in {
+      mdle(Nm,Vr,Imp,Exp,Cde) => mdle(Nm,Vr,Imp,Exp,Cde//((.(M,C).)=>(M,reFactor(C))))
+    | seqn(L) => seqn(L//reFactor)
+    | clse(Q,H,B,Lc) => valof{
+        (NH,Q1,Pr,Ps) = reFactArgs(H,Q,Lc);
+        (NB,QQ) = reFactBody(B,Q1);
+        valis clse(QQ,NH,Pr<>Ps<>NB,Lc)
+      }
+    | _ => exception error("Cannot refactor: "<>Prog^0,'failed)
+    }
+  };
+
+  reFactArgs(Args,Q,Lc) => valof{
+    QQ : Q;
+    Pr : []; Ps : [];
+    NL = collect{
+      for T in Args do{
+        (EL,EQ,EPr,EPs) = reFactArg(T,QQ,Lc);
+        Pr:=EPr<>Pr; Ps:=Ps<>EPs;
+        QQ := EQ;
+        elemis EL;
+      };
+    };
+    valis (NL,QQ,Pr,Ps)
+  };
+
+  reFactArg(Term,Q,Lc) => {
+    case Term in {
+      idnt(_) => (Term,Q,[],[])
+    | intgr(_) => (Term,Q,[],[])
+    | float(_) => (Term,Q,[],[])
+    | symb(_) => (Term,Q,[],[])
+    | ch(_) => (Term,Q,[],[])
+    | strg(_) => (Term,Q,[],[])
+    | mtch(T) => valof{
+        (nT,nQ,nP,nS) = reFactMatchArg(T,Q,Lc);
+        valis (mtch(nT),nQ,nP,nS)
+      }
+    | bild(T) => valof{
+        (nT,nQ,nP,nS) = reFactArg(T,Q,Lc);
+        valis (bild(nT),nQ,nP,nS)
+      }
+    | cons(F,A) => valof{       
+        QQ : Q;
+        Pr : []; Ps : [];
+        NL = collect{
+          for T in A do{
+            (EL,EQ,EPr,EPs) = reFactTerm(T,QQ,Lc);
+            Pr:=Pr<>EPr; Ps:=EPs<>Ps;
+            QQ := EQ;
+            elemis EL;
+          };
+        };
+        valis (cons(F,NL),QQ,Pr,Ps)
+      }
+    | vdel => (Term,Q,[],[])
+    }
+  };
+  
+  reFactTerm(Term,Q,Lc) => {
+    if isGroundC(Term) then
+      (Term,Q,[],[])
+    else{
+      case Term in {
+        idnt(_) => (Term,Q,[],[])
+      | intgr(_) => (Term,Q,[],[])
+      | float(_) => (Term,Q,[],[])
+      | symb(_) => (Term,Q,[],[])
+      | ch(_) => (Term,Q,[],[])
+      | strg(_) => (Term,Q,[],[])
+      | mtch(T) => valof{
+          (nT,nQ,nP,nS) = reFactMatchTerm(T,Q,Lc);
+          valis (mtch(nT),nQ,nP,nS)
+        }
+      | bild(T) => valof{
+          (nT,nQ,nP,nS) = reFactTerm(T,Q,Lc);
+          valis (bild(nT),nQ,nP,nS)
+        }
+      | cons(_,_) => valof{
+          VD = idnt(genNew("$%"));
+          (NT,NQ,NPr,NPs) = reFactArg(Term,Q,Lc);
+          valis (VD,[VD,..NQ],NPr,[defn(VD,NT,Lc)]<>NPs)
+        }
+      | T => (Term,Q,[],[])
+      }
+    }
+  };
+  
+  reFactMatchArg(Term,Q,Lc) => {
+    case Term in {
+      idnt(_) => (Term,Q,[],[])
+    | intgr(_) => (Term,Q,[],[])
+    | float(_) => (Term,Q,[],[])
+    | symb(_) => (Term,Q,[],[])
+    | ch(_) => (Term,Q,[],[])
+    | strg(_) => (Term,Q,[],[])
+    | cons(F,A) => valof{       
+        QQ : Q;
+        Pr : []; Ps : [];
+        NL = collect{
+          for T in A do{
+            (EL,EQ,EPr,EPs) = reFactMatchTerm(T,QQ,Lc);
+            Pr:=Pr<>EPr; Ps:=EPs<>Ps;
+            QQ := EQ;
+            elemis EL;
+          };
+        };
+        valis (cons(F,NL),QQ,Pr,Ps)
+      }
+    | vdel => (Term,Q,[],[])
+    }
+  };
+  
+  reFactMatchTerm(Term,Q,Lc) => {
+    if isGroundC(Term) then (Term,Q,[],[])
+    else{
+      case Term in {
+        idnt(_) => (Term,Q,[],[])
+      | intgr(_) => (Term,Q,[],[])
+      | float(_) => (Term,Q,[],[])
+      | symb(_) => (Term,Q,[],[])
+      | ch(_) => (Term,Q,[],[])
+      | strg(_) => (Term,Q,[],[])
+      | cons(_,_) => valof{
+          VD = idnt(genNew("$%"));
+          (NT,NQ,NPr,NPs) = reFactMatchArg(Term,Q,Lc);
+          valis (VD,[VD,..NQ],NPr,[defn(mtch(NT),VD,Lc)]<>NPs)
+        }
+      | vdel => (Term,Q,[],[])
+      }
+    }
+  };
+  
+  reFactBody(Body,Q) => valof{
+    QQ : Q;
+    NL = collect{
+      for G in Body do{
+        (EQ,Gls) = reFactGoal(G,QQ);
+        for GG in Gls do
+          elemis GG;
+        QQ := EQ;
+      };
+    };
+    valis (NL,QQ)
+  };
+
+  reFactGoal(G,Q) => case G in {
+    call(P,A,Lc) => valof{
+      (NT,TQ,TPr,TPs) = reFactArgs(A,Q,Lc);
+      valis (TQ,TPr<>TPs<>[call(P,NT,Lc)])
+    }
+  | ecall(P,A,Lc) => valof{
+      (NT,TQ,TPr,TPs) = reFactArgs(A,Q,Lc);
+      valis (TQ,TPr<>TPs<>[ecall(P,NT,Lc)])
+    }
+  | ocall(Gl,Ob,Th,Lc) => valof{
+      ([nG,nO,nT],TQ,Tpr,TPs) = reFactArgs([Gl,Ob,Th],Q,Lc);
+      valis (TQ,Tpr<>TPs<>[ocall(nG,nO,nT,Lc)])
+    }
+  | suspc(V,A,Lc) => valof{
+      (nV,Q1,vPr,vPs) = reFactArg(V,Q,Lc);
+      (nA,Q2,aPr,aPs) = reFactArg(A,Q1,Lc);
+      valis (Q2,vPr<>vPs<>aPr<>aPs<>[suspc(nV,nA,Lc)])
+    }
+  | defn(mtch(V),Val,Lc) => valof{
+      (nVal,Q1,Pr,Ps) = reFactArg(Val,Q,Lc);
+      (nV,Q2,mPr,mPs) = reFactMatchArg(V,Q1,Lc);
+      valis (Q2,Pr<>Ps<>[defn(mtch(nV),nVal,Lc)]<>mPr<>mPs)
+    }
+    
+  | defn(V,Val,Lc) => valof{
+      (nVal,Q1,Pr,Ps) = reFactArg(Val,Q,Lc);
+      (nV,QQ,vPr,vPs) = reFactArg(V,Q1,Lc);
+      valis (QQ,vPr<>Pr<>vPs<>Ps<>[defn(nV,nVal,Lc)])
+    }
+  | neck(_) => (Q,[G])
+  | fail(_) => (Q,[G])
+
+  | trpBegin => (Q,[G])
+  | trpEnd => (Q,[G])
+/*  | errr(E,Lc) => valof{
+      (nE,Q2) = reFactBody(E,Q);
+
+      valis (Q2,[errr(nE,Lc)])
+    }
+*/
+  | rais(A,Lc) => valof{
+      (nA,QQ,Pr,Ps) = reFactArg(A,Q,Lc);
+      valis (QQ,Pr<>Ps<>[rais(nA,Lc)])
+    }
+  };
+
+} export (reFactor)

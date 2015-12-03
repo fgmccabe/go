@@ -1,0 +1,5 @@
+surgery{
+  'Dr. ClearSkin' { Doctor && speciality=dermatology && country=america}.
+}
+
+	

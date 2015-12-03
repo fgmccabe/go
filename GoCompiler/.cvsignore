@@ -1,0 +1,12 @@
+.deps
+.libs
+esc.go
+ops.go
+esc
+ops
+*.goc
+*.gof
+Makefile.in
+Makefile
+.gdb_history
+.DS_Store

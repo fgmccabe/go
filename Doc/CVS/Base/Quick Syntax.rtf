@@ -1,0 +1,46 @@
+{\rtf1\mac\ansicpg10000\cocoartf100
+{\fonttbl\f0\froman\fcharset77 TimesNewRomanPSMT;\f1\froman\fcharset77 TimesNewRomanPS-BoldMT;\f2\froman\fcharset77 TimesNewRomanPS-ItalicMT;
+\f3\fmodern\fcharset77 Courier;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww9600\viewh14400\viewkind0
+\pard\tx1440\tx2880\tx4320\tx5760\tx7200\qc
+
+\f0\fs36 \cf0 Go! - a quick reference\
+F.G. McCabe\
+\pard\tx1440\tx2880\tx4320\tx5760\tx7200\qj
+\cf0 \
+
+\f1\b\fs28 Syntax\
+
+\f0\b0\fs24 \
+A Go! program consists of rules, expressions and cell expressions. A cell expression is analogous to a let...rec expression found in many functional programming languages.\
+\
+
+\f1\b Rules\
+
+\f0\b0 \
+The main catagories of rules are clauses, equations, grammar rules and process rules. These define predicates, functions, grammar non-terminals and processes respectively. In addition, there are strong clauses and message rules. Each kind of rule has two forms: an un-named form which can occur as an expression - but which may not be recursive - and a named form that may only appear in cell expressions.\
+\
+
+\f1\b Clause
+\f0\b0 \
+\
+An un-named clause takes the form:\
+
+\f2\i term
+\f3\i0  :-
+\f0  
+\f2\i goals
+\f0\i0 \
+where term is an expression and 
+\f2\i goals
+\f0\i0  is a comma separated sequence of goals. A clause is potentially useable to solve a goal if the argument of the goal unifies with 
+\f2\i term
+\f0\i0 . A strong clause is similar to a regular clause:\
+
+\f2\i term
+\f3\i0  :--
+\f0  
+\f2\i goals
+\f0\i0 \
+A strong clause implies that the various clauses in a predicate are mutually exclusive: if one clause head unifies with the arguments of a goal then no other will. Strong clauses any weak clauses may not be mixed in the same definition.}

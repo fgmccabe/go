@@ -1,0 +1,518 @@
+\chapter{Goals and Predicates}
+\label{goals}
+
+\index{goals}
+In this chapter we define the legal forms of relational programs and the various forms of predicate query conditions that may occur in \go programs.
+
+A relational program is defined in terms of clauses. \go has two forms of clauses: regular clauses and strong clauses. The latter carry an if-and-only-if interpretation; whereas regular clauses are normal horn clause-with-negation clauses.
+
+Predicate query conditions may occur in the bodies of clauses, guard conditions of rules (i.e., after a \q{::} operator) and in the tests of conditionals.
+
+\section{Predicates}
+\label{theta:predicate}
+
+\index{predicate definition}
+A \emph{predicate} definition within a package or class body takes the form a sequence of clauses, grouped together by predicate symbol, separated by \q{\dotspace}'s. A clause may be an assertion of the form: 
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn}).
+\end{alltt}
+a rule-clause of the form:
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn}):-\emph{Goal}.
+\end{alltt}
+or a \emph{strong clause} of the form:
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn})::\emph{Guard}:--\emph{Goal}.
+\end{alltt}
+It is not permitted to mix strong clauses with other forms of clauses within the same definition; i.e., a predicate is either defined using regular clauses or using strong clauses, but not both.
+
+\index{type inference!clause}
+The type inference rule for clauses is:
+\begin{equation}
+\AxiomC{\typeprd{\emph{E}}{\q{\emph{P}}}{\q{[\emph{T\sub1}},..,\q{\emph{T\subn}]\{\}}}}
+\AxiomC{\typeprd{\emph{E}}{(\emph{A\sub1},..,\emph{A\subn})}{(\emph{T\sub1},..,\emph{T\subn})}}
+\AxiomC{\safegoal{E}{G}}
+\insertBetweenHyps{\hskip-0.5pt}
+\TrinaryInfC{\typesafe{\emph{E}}{\q{\emph{P}(\emph{A\sub1},..,\emph{A\subn}):-\emph{G}}}}
+\DisplayProof
+\end{equation}
+I.e., a clause is type-safe if the argument patterns of the clause are the same as the type of the predicate and the body of the clause (if non-empty) is also type-safe.
+
+By default, the \emph{modes} of a predicate type are \emph{bidirectional}. This implies that the patterns in the head of the clause are unified with the arguments to a relational query and that the type of the arguments to a relational query must similarly unify with the types of the arguments of the predicate type.
+
+Predicate definitions may appear within a class or at the top-level within a package. In the latter case, the relation defined by the predicate definition is available to all other programs in the same package (or to \q{import}ing packages if the relation is exported).
+
+\subsection{Strong clauses}
+\label{clause:strong}
+
+\index{predicate!strong clause}
+\index{strong clause}
+The \firstterm{strong clause}{A form of clause that has an if-and-only-if semantics. All clauses in a predicate must be either regular or strong. In the latter case, the predicate is assumed to be formed of mutually exclusive cases -- each determined by a single strong clause.} is a variation on the clause form. Syntactically, strong clauses differ from regular clauses simply by using a `long arrow' instead of a normal clause arrow:
+
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots,\emph{A\subn}) :-- \emph{B}
+\end{alltt}
+or, if a guard is necessary,
+ \begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots,\emph{A\subn})::\emph{G} :-- \emph{B}
+\end{alltt}
+
+\index{type inference!strong clause}
+The type safety rule for strong clauses is the same as for regular clauses:
+\begin{equation}
+\AxiomC{\typeprd{\emph{E}}{\q{\emph{P}}}{\q{[\emph{T\sub1}},..,\q{\emph{T\subn}]\{\}}}}
+\AxiomC{\typeprd{\emph{E}}{(\emph{A\sub1},..,\emph{A\subn})}{(\emph{T\sub1},..,\emph{T\subn})}}
+\AxiomC{\safegoal{E}{G}}
+\insertBetweenHyps{\hskip-0.5pt}
+\TrinaryInfC{\typesafe{\emph{E}}{\q{\emph{P}(\emph{A\sub1},..,\emph{A\subn}):--\emph{G}}}}
+\DisplayProof
+\end{equation}
+Where strong clauses differ from regular clauses is in their semantics: a strong clause has an if and only if interpretation: if the head of a strong clause unifies with the call arguments -- and all embedded guards within the head are satisfied -- then no other clauses in the same program will be considered.  In effect, the `if and only' meaning of a strong clause means that if the head of the clause matches, and if any guards associated with the head are satisfied then no other strong clauses need to be considered.
+
+Operationaly, strong clauses offer shallow backtracking selection of the clauses in a program but do not offer deep backtracking once a clause has been committed to.
+
+It is not permitted to mix strong clauses and regular clauses in the same program. I.e., a predicate definition such as:
+\begin{alltt}
+p('foo') :-- true
+p('bar') :- true
+\end{alltt}
+is not permitted since the \q{foo} clause is a strong clause but the \q{bar} clause is a regular clause -- even though they may be type compatible.
+
+\index{strong clause}
+\index{clause!strong}
+Note that regular clauses can omit their body arrow (\q{:-}) if the body is empty:
+\begin{alltt}
+pater('john','julius').
+\end{alltt}
+is equivalent to
+\begin{alltt}
+pater('john','julius') :- true.
+\end{alltt}
+However, there is no equivalent assertional form for strong clauses. 
+
+
+\section{Basic goal queries}
+\label{goal:basic}
+
+There are several kinds of basic \emph{goal query}: true/false, predication and a \q{logical} variable holding one of \q{true} or \q{false}. In addition to the basic goal queries, there are the compound goal queries such as conjunction, disjunction, conditional, negation and one-of. These, and other goal queries, are outlined below in Section~\vref{goals:combination} and in Section~\vref{goals:special}.
+
+\index{goals!type inference}
+\index{type inference!goals}
+Unlike expressions, there often no obvious result -- and therefore result type -- associated with goal queries. Type inference rules for predicate queries are primarily rules about the \emph{safe\sub{P}} predicate: a goal query G, in a context E, is defined to be type safe if \safegoal{E}{G}.
+
+\subsection{True/false goal}
+\index{true/false goal}
+\index{goals!\q{true}}
+\index{goals!\q{false}}
+The \emph{true goal} (which always succeeds) is written as \q{true}; the \emph{false goal} (which never succeeds) is written \q{false}. The type inference rules for these goals is:
+\begin{equation}
+\frac{}
+{\safegoal{\emph{Env}}{\q{true}}}
+\end{equation}
+and
+\begin{equation}
+\frac{}
+{\safegoal{\emph{Env}}{\q{false}}}
+\end{equation}
+respectively.
+
+\subsection{Predication}
+\label{goal:predication}
+
+\index{predication}
+\index{goals!predication}
+A \firstterm{predication}{A syntax form that expresses a condition that must be satisfied.} consists of a predicate applied to an argument. Typically the argument is a tuple of arguments: \q{P(A\sub1,\ldots,A\subn)}. The type inference rule for predications is:
+\begin{equation}
+\AxiomC{\typeprd{Env}{P}{(t\sub1,\ldots,t\subn)\{\}}}
+\AxiomC{\typeprd{Env}{(A\sub1,\ldots,A\subn)}{(t\sub1,\ldots,t\subn)}}
+\BinaryInfC{\safegoal{\emph{Env}}{P(A\sub1,\ldots,A\subn)}}
+\DisplayProof
+\end{equation}
+
+\begin{aside}
+The normal mode of use for a predicate argument is bidirectional; as a result, the arguments of a predication are unified with the parameter patterns in the clause and the \emph{types} of the arguments of a predication must be equal to the types expected by the relational program.
+
+Where an argument of a predicate type is marked as \emph{input}, then the corresponding actual argument may be a subtype of the expected type. Input arguments to predications, like arguments to a function call, are matched rather than unified against.
+\end{aside}
+
+\subsection{Class relative predication}
+\label{goal:dot}
+\index{goals!class relative goal}
+A variation on the regular predication is the 'dot'-predication -- or class relative goal query. A goal of the form:
+\begin{alltt}
+\emph{O}.P(A\sub1,\ldots,A\subn)
+\end{alltt}
+denotes a goal that is to be evaluated relative to the class identified by \q{\emph{O}}. This object may be either a term denoting a state-free class or an object denoting a stateful entity: there is no distinction made between these two for a call.
+
+Such a condition can be viewed as proving \q{P(A\sub1,\ldots,A\subn)} relative to the theory identified by \q{\emph{O}}.
+
+Note that an explicit class relative goal like this is the point at which the \q{this} keyword is defined. Throughout the proof of \q{P(A\sub1,\ldots,A\subn)} the value of \q{this} is set to \emph{O} -- unless, of course, a sub-goal of the proof is also a class relative goal.
+
+The type inference for class relative goals is similar to a regular predication, generalized appropriately:
+\begin{equation}
+\AxiomC{\implements{Env}{O}{P:[t\sub1,\ldots,t\subn]\{\}}}
+\AxiomC{\typeprd{Env}{(A\sub1,\ldots,A\subn)}{(t\sub1,\ldots,t\subn)}}
+\BinaryInfC{\safegoal{Env}{O.P(A\sub1,\ldots,A\subn)}}
+\DisplayProof
+\end{equation}
+where $\implements{Env}{O}{P:[t\sub1,\ldots,t\subn]\{\}}$ means that we can infer from the context that the interface associated with the type of \emph{O} includes a predicate of type \q{(t\sub1,\ldots,t\subn)\{\}}.
+
+
+\subsection{Equality}
+\label{goal:equality}
+
+\index{equality}
+\index{goals!equality}
+The \q{=} predicate is a distinguished predicate that is also available as a goal condition. The form of an equality is:
+\begin{alltt}
+\emph{A} = \emph{B}
+\end{alltt}
+(We mention this here as the \q{=} operator is also part of \go's syntax.)
+
+An equality is type safe if the two elements have the same type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{A}{T}}
+\AxiomC{\typeprd{Env}{B}{T}}
+\BinaryInfC{\safegoal{Env}{\q{\emph{A} = \emph{B}}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Inequality}
+\label{goal:notequality}
+
+\index{inequality}
+\index{goals!inequality}
+The \q{!=} predicate is satisfied if the left hand side does not unify with the right hand side. The form of an inequality is:
+\begin{alltt}
+\emph{A} != \emph{B}
+\end{alltt}
+
+An inequality is type safe if the two elements have the same type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{A}{T}}
+\AxiomC{\typeprd{Env}{B}{T}}
+\BinaryInfC{\safegoal{Env}{\q{\emph{A} != \emph{B}}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Match test}
+\label{goal:match}
+
+\index{match test}
+\index{goals!match test}
+The \q{.=} predicate is a distinguished predicate that mirrors the kind of \emph{matching} that characterises the left hand sides of equations and other rules. The form of a match test is:
+\begin{alltt}
+\emph{P} .= \emph{T}
+\end{alltt}
+
+A match test is type safe if the right hand element's type is a subtype of the left hand side pattern:
+\begin{equation}
+\AxiomC{\typeprd{Env}{P}{T\sub{P}}}
+\AxiomC{\typeprd{Env}{E}{T\sub{E}}}
+\AxiomC{\subtype{T\sub{E}}{T\sub{P}}}
+\TrinaryInfC{\safegoal{Env}{\q{\emph{P} .= \emph{T}}}}
+\DisplayProof
+\end{equation}
+A match test is similar to a unifyability test with a crucial exception: the match test will \emph{fail} if unification of the pattern and expression would require that any unbound variables in the expression become bound. I.e., the match test may bind variables in the left hand side but not in the right hand side.
+
+This can be very useful in situations where it is known that the `input' data may have variables in it and it is not desireable to side-effect the input.
+
+\subsection{Identicality test}
+\label{goal:identical}
+
+\index{identicality test}
+\index{goals!identicality test}
+The \q{==} predicate is satisfied if the two terms are `already' equal -- without requiring any substitution of terms for variables. The form of a identicality test is:
+\begin{alltt}
+\emph{A} == \emph{B}
+\end{alltt}
+An identicality test will fail if unification of the pattern and expression would require that any unbound variables in either the pattern or the expression become bound. 
+
+An identicality test is type safe if the two elements have the same type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{A}{T}}
+\AxiomC{\typeprd{Env}{B}{T}}
+\BinaryInfC{\safegoal{Env}{\q{\emph{A} == \emph{B}}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Element of test}
+\label{goal:element}
+
+\index{element of test}
+\index{goals!element of test}
+\index{goals!in@\q{in} test}
+The \q{in} predicate is \go's list membership test. It is completely definable as a normal \go program:
+\begin{alltt}
+(in):[T,list[T]]\{\}.
+X in [X,.._].
+X in [_,..Y] :- X in Y.
+\end{alltt}
+but due to its importance in other aspects of \go (such as within the bounded set abstraction (see Section~\vref{expression:bounded})) it is defined to be part of the language.
+
+The \q{in} predicate is satisfied if the first argument term is unifiable with an element of the second argument list.
+
+The \q{in} test is type safe if the type of the second argument is a list of the type of the first argument:
+\begin{equation}
+\AxiomC{\typeprd{Env}{A}{T}}
+\AxiomC{\typeprd{Env}{B}{\q{list[}T\q{]}}}
+\BinaryInfC{\safegoal{Env}{\q{\emph{A} in \emph{B}}}}
+\DisplayProof
+\end{equation}
+
+
+\subsection{Sub-class of goal}
+\label{goal:subclass}
+\index{goal!sub class}
+\index{inherits goal}
+
+The \q{<=} goal condition is used to verify that a given object expression is an `instance of' a given label term:
+\begin{alltt}
+\emph{Ex} <= \emph{Lb}
+\end{alltt}
+This goal succeeds if the value of the expression \emph{Ex} is an object which is either already unifiable with \emph{Lb}, or is defined by a class that inherits from a class \emph{Sp} that satisfies the predicate
+\begin{alltt}
+\emph{Sp} <= \emph{Lb}
+\end{alltt}
+Otherwise, the goal fails.
+
+\section{Combination goals}
+\label{goals:combination}
+
+\subsection{Conjunction}
+\label{goal:conjunction}
+\index{goals!conjunction}
+\index{conjunction goal}
+
+A \emph{conjunction} is a sequence of goals, separated by \q{,}'s, possibly enclosed in parentheses.
+
+The type inference rule for conjunction is:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub1}}}
+\AxiomC{\ldots}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\subn}}}
+\TrinaryInfC{\safegoal{\emph{Env}}{\q{G\sub1,\ldots,G\subn}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Disjunction}
+\label{goal:disjunction}
+
+\index{goals!disjunction}
+\index{disjunction goal}
+A \emph{disjunction} is a pair of goals, separated by \q{|}'s. It is good practice to parenthesize a disjunction -- to surround the disjunction with parentheses. This is because the priority of the \q{|} operator is higher than the priority of the normal conjunction operator: \q{,}. 
+
+The type inference rule for disjunction is similar to that for conjunction:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub1}}}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub2}}}
+\BinaryInfC{\safegoal{\emph{Env}}{\q{(G\sub1|G\sub2)}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Conditional}
+\label{goal:conditional}
+
+\index{goals!conditional}
+\index{conditional goal}
+\index{goals!if-then-else goal}
+\index{if-then-else goal}
+A \emph{conditional} is a triple of goals; the first goal is a test, depending on whether it succeeds either the `then' branch or the `else' branch is taken.  Conditionals are written: 
+\begin{alltt}
+(\emph{T}?\emph{G\sub1}|\emph{G\sub2})
+\end{alltt}
+This can be read as:
+\begin{quote}
+if \emph{T} succeeds, then try \emph{G\sub1}, otherwise try \emph{G\sub2}.
+\end{quote}
+Only one solution of \emph{T} is attempted; i.e., it is as though \emph{T} were implicitly a one-of goal.
+
+The relative precedence of operators requires that the conditional is enclosed in parentheses.
+
+The type inference rule for conditionals is:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{T}}}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub1}}}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub2}}}
+\TrinaryInfC{\safegoal{\emph{Env}}{\q{T?G\sub1|G\sub2}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Negation}
+\label{goal:negation}
+
+\index{goals!negated}
+\index{negated goal}
+\index{negation as failure}
+A \firstterm{negation}{A predication which is satisfied iff its embedded predication is \emph{not} satisfied. \go uses negation-as-failure semantics negation.} for is a negated goal, prefixed by the operator \nasf. \go implements negation in terms of failure to prove positive -- i.e., it is negation-by-failure \cite{klc:78}.
+
+The type inference rule for negation is straightforward:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G}}}
+\UnaryInfC{\safegoal{\emph{Env}}{\q{\nasf{}G}}}
+\DisplayProof
+\end{equation}
+
+\subsection{One-of}
+\label{goal:oneof}
+
+\index{goals!one-of}
+\index{one-of goal}
+\index{single solution goal}
+A \firstterm{one-of}{A predicate condition that may only be satisfied once -- the evaluation will not seek alternate solutions to a one-of condition once a successful solution has been found.} goal is a goal for which only one solution is required. A one-of goal suffixed by the operator \q{!}. 
+
+The type inference rule for one-of is similar to that for negation:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G}}}
+\UnaryInfC{\safegoal{\emph{Env}}{\q{G!}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Forall}
+\label{goal:forall}
+
+\index{goals!forall}
+\index{forall goal}
+\index{universally true condition}
+A \firstterm{forall}{A condition that is satisfied if a dependent goal is satisfied whenever the governing goal is satisfied. For example, all the children of someone are male, is a typical forall condition.} goal takes the form:
+\begin{alltt}
+(\emph{G\sub1} *> \emph{G\sub2})
+\end{alltt}
+Such a goal is satisfied if every solution of \emph{G\sub1} implies that \emph{G\sub2} is satisfied also. For example, the condition:
+\begin{alltt}
+(X in L1 *> X in L2)
+\end{alltt}
+tests that for every possible solution to \q{X in L1} leads to \q{X in L2} being true also: i.e., that the list \q{L1} is a subset of the list \q{L2}
+
+The relative precedences of operators requires that \q{*>} goals are enclosed in parentheses -- particularly if they are surrounded by other goals in a clause.
+
+The type inference rule for \q{*>} is also straightforward:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub1}}}
+\AxiomC{\safegoal{\emph{Env}}{\q{G\sub2}}}
+\BinaryInfC{\safegoal{\emph{Env}}{\q{G\sub1*>G\sub2}}}
+\DisplayProof
+\end{equation}
+
+\section{Special goals}
+\label{goals:special}
+
+As with expressions (see Section~\vref{expression:special}), there are a number of special forms of goal. These allow a goal to be determined as a result of performing an action, a parse of a stream and allow goals to include exception recovery.
+
+\subsection{Action goal}
+\label{goal:special:action}
+
+\index{action goal}
+\index{goals!action}
+An action goal is one which involves the execution of an action to succeed. It is analogous to the \q{valof} expression (see Section~\vref{expression:valof}). The form of an \q{action} goal is:
+\begin{alltt}
+action\{ \emph{A\sub1};\ldots;\emph{A\sub{i-1}};valis \emph{Ex};\emph{A\sub{i+1}};\ldots;\emph{A\subn}\}
+\end{alltt}
+where \emph{Ex} is one of \q{true} or \q{false}. If \q{false} then the \q{action} goal is also false, if \q{true} then it is true.
+
+Typically, if present, the \q{valis} action is placed at the end of the action sequence. There may be more than one \q{valis} action in a \q{action} body; however, all \emph{executed} \q{valis} actions must all agree on their value as well as their type. In all cases, the \q{action} expression terminates when the last action has completed.
+
+If there is no \q{valis} action within the sequence, then the \q{action} goal \emph{succeeds} -- i.e., as though there were a \q{valis true} action at the end of the action sequence.
+
+The type derivation rule for the \q{action} goal is:
+\begin{equation}
+\AxiomC{\typeprd{\emph{Env}}{\emph{Ex}}{\q{logical}}}
+\AxiomC{\safeact{\emph{Env}}{\q{G\sub1}}\ \ldots\ 
+\safeact{\emph{Env}}{\q{G\subn}}}
+\BinaryInfC{\safegoal{\emph{Env}}{\q{action\{G\sub1;\ldots;valis \emph{Ex};\ldots;G\subn\}}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Delayed goal}
+\label{goal:delayed}
+\index{delayed goal}
+\index{goals!delayed}
+\index{trigger goal}
+A delay goal is associated with a variable that must be instantiated before the goal condition may be attempted. If the variable is not instantiated then the condition is suspended, and remaining conditions are attempted. If the variable becomes instantiated then the delayed goal will be attempted.
+
+The form of the delayed goal is:
+\begin{alltt}
+\emph{Var} @@ \emph{Condition}
+\end{alltt}
+
+The type inference rule for delayed goals is straightforward
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\q{G}}}
+\AxiomC{\typeprd{\emph{Env}}{\emph{V}}{\emph{T\sub{V}}}}
+\BinaryInfC{\safegoal{\emph{Env}}{\q{V@@G}}}
+\DisplayProof
+\end{equation}
+Note that if the variable is never instantiated, then the delayed goal will not be attempted.
+
+Delayed goals are an effective means of implementing constraint propagation.
+
+
+\subsection{Exception handler}
+\label{goal:errorhandler}
+
+\index{goals!error protected}
+\index{exception handler!goal}
+\index{handling exceptions in goals}
+A goal may be protected by an exception handler in a similar way to expressions. An \q{onerror} goal takes the form:
+
+\begin{alltt}
+\emph{Goal} onerror
+ (\emph{P\sub1} :- \emph{G\sub1}
+ | \ldots{}
+ | \emph{P\subn} :- \emph{G\subn})
+\end{alltt}
+In such an expression, \emph{Goal}, \emph{G\subi} are all goals, and the types of \emph{P\subi} is of the standard error type \q{exception}:
+\begin{equation}
+\AxiomC{\safegoal{\emph{Env}}{\emph{Goal}}}
+\AxiomC{\safegoal{\emph{Env}}{\emph{G\subi}}}
+\AxiomC{\typeprd{\emph{Env}}{\emph{P\subi}}{\q{exception}}}
+\TrinaryInfC{\safegoal{\emph{Env}}{\emph{Goal}\ \q{onerror} (\emph{P\sub1} \q{:-} \emph{G\sub1} \q{|} \ldots{} \q{|} \emph{P\subn} \q{:-} \emph{G\subn}})}
+\DisplayProof
+\end{equation}
+Semantically, an \q{onerror} goal has the same meaning as \emph{Goal}; unless a run-time problem arose in the evaluation. In this case, an exception would be raised (of type \q{exception[]} -- see section~\vref{error:exception}); and the evaluation of \emph{Goal} is terminated and one of the error handling clauses is used instead. The first clause in the handler that unifies with the raised exception is the one that is used; and the success or failure of the protected goal depends on the success or failure of the goal in the error recovery clause.
+
+\subsection{Raise exception goal}
+\label{goal:special:exception}
+
+\index{raise exception goal}
+\index{goals!raise exception}
+\index{raising an exception}
+The \q{raise} goal neither succeeds nor fails. Instead it raises an error which should be `caught' by an enclosing \q{onerror} form.
+
+The argument of an \q{raise} goal is a \q{exception} expression:
+\begin{equation}
+\AxiomC{\typeprd{\emph{Env}}{\emph{Er}}{\q{exception}}}
+\UnaryInfC{\safegoal{\emph{Env}}{\q{raise}~\emph{Er}}}
+\DisplayProof
+\end{equation}
+The effect of a \q{raise} goal is to terminate the current computation and to send the \emph{Er} exception to the nearest enclosing exception handler -- which may be an exception handling goal (see section~\vref{goal:errorhandler}), but is not required to be.
+
+\subsection{Grammar goal}
+\label{goal:grammar}
+
+\index{grammar condition goal}
+\index{goals!grammar goal}
+\index{parsing goal}
+A grammar goal is an invocation of a grammar rule. There are two forms of the grammar goal, the simple form denotes a request to parse an entire stream:
+\begin{alltt}
+(\emph{Grammar} --> \emph{Stream})
+\end{alltt}
+This goal succeeds if the \emph{Grammar} completely parses the \emph{Stream}. Note that it is the responsibility of the \emph{Grammar} to consume any leading and trailing `spaces' (if the stream is a \q{string}). The \emph{Grammar} may be a single call to a grammar non-terminal; or it may be a sequence of grammar non-terminals and terminals. In the latter case the sequence will need to be enclosed in parentheses.
+
+The second form of grammar goal allows for a partial parse of the stream:
+\begin{alltt}
+(\emph{Grammar} --> \emph{Stream} \tilda \emph{Remainder})
+\end{alltt}
+This form of grammar goal succeeds if \emph{Grammar} parses the \emph{Stream} up to -- but not including -- the \emph{Remainder} stream. \emph{Remainder} must be a proper tail segment of the \emph{Stream}. The simple form of grammar goal is equivalent to:
+\begin{alltt}
+(\emph{Grammar} --> \emph{Stream} \tilda [])
+\end{alltt}
+
+A grammar goal is type safe if the grammar is a grammar of the appropriate type:
+\begin{equation}
+\AxiomC{\grammprd{E}{G}{S}}
+\AxiomC{\typeprd{E}{Ex}{S}}
+\AxiomC{\typeprd{E}{R}{S}}
+\TrinaryInfC{\safegoal{E}{\q{(\emph{G} --> \emph{Ex} \tilda \emph{R})}}}
+\DisplayProof
+\end{equation}

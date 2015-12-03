@@ -1,0 +1,36 @@
+# Note that this is a partially relocatable package (IYKWYAD)
+%define prefix   @prefix@
+
+Summary:	The Go! programming language system
+Name:		go
+Version:	@VERSION@
+Release:	1
+Copyright:	GPL
+Group:		Development/Languages
+Source:		http://www.nar.fujitsulabs.com/downloads/
+Obsoletes:	april
+Requires:	icm
+
+Vendor:		Francis G. McCabe 
+Packager:	Francis G. McCabe <fgm@fla.fujitsu.com>
+URL:		http://www.nar.fujitsulabs.com/go/
+Docdir:		@prefix@/doc
+
+%description
+Go! is a logic programming language that has been
+designed to be effective for developing multi-agent systems that are
+distributed, especally Internet based.  
+
+%changelog
+* Tue Feb 29 2000 F.G.McCabe <fgm@fla.fujitsu.com>
+
+%packages
+
+%files
+%defattr(-, root, root)
+
+@prefix@
+
+# %doc AUTHORS COPYING ChangeLog NEWS README
+
+

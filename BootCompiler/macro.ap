@@ -1,0 +1,46 @@
+/*
+ * Module to implement text-style substitution of abstract syntax level
+ */
+
+#include "go_tok.ah";
+
+module
+import {
+  interface "abstract.af" and
+  interface <stdio.af>
+}
+in{
+  replace(Ex,Env) => case Ex in {
+    IDEN(Lc,Nm)::(IDEN(_,!Nm),R) in Env => R
+  | IDEN(_,_) => Ex
+  | INT(_,_) => Ex
+  | FLT(_,_) => Ex
+  | ST(_,_) => Ex
+  | SYM(_,_) => Ex
+  | CHR(_,_) => Ex
+  | APPLY(_,IDEN(Lc,Nm),A)::(APPLY(_,IDEN(_,!Nm),P),R) in Env && listlen(P)==listlen(A) => 
+      replace(R,macroEnv(P,A,Env))
+  | APPLY(Lc,F,A) => APPLY(Lc,replace(F,Env),macroList(A,Env))
+  | BRACE(Lc,F,A) => BRACE(Lc,replace(F,Env),macroList(A,Env))
+  | SQUARE(Lc,F,A) => SQUARE(Lc,replace(F,Env),macroList(A,Env))
+  | TPL(Lc,A) => TPL(Lc,macroList(A,Env))
+  | VOID => VOID
+  | END => END
+  };
+
+  macroEnv(P,A,Env) => valof{
+    sE : Env;
+    xP : P; xA : A;
+    while [p,..xxP].=xP && [a,..xxA].=xA do{
+      sE := [(p,a),..sE];
+      xP := xxP; xA := xxA;
+    };
+    valis sE
+  };
+
+  macroList(A,Env) => collect{
+    for a in A do
+      elemis replace(a,Env)
+  };
+    
+} export (replace,macroList,macroEnv)

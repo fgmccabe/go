@@ -1,0 +1,93 @@
+% Automatically generated, do not edit 
+\setlongtables
+\begin{longtable}{|llll|}
+\caption{\go standard operators}\label{grammar:operators}\\ 
+\hline
+Operator&Priority&Assoc.&Description\\
+\hline
+\endfirsthead
+\multicolumn{4}{c}{
+{Table \ref{grammar:operators} \go standard operators (cont.)}}\\
+\hline
+Operator&Priority&Assoc.&Description\\
+\hline
+\endhead
+\hline\multicolumn{4}{r}{\small\emph{continued\ldots}}\
+\endfoot
+\hline
+\endlastfoot
+\tt .\char`\ &1900&right&statement separator\\
+\tt ::=&1460&infix&user type definition\\
+\tt |&1250&right&type union\\
+\tt ?&1200&infix&conditional operator\\
+\tt =>&1200&infix&function arrow\\
+\tt :-&1200&infix&clause arrow\\
+\tt :--&1200&infix&strong clause\\
+\tt ->&1200&infix&process rule\\
+\tt -->&1200&infix&grammar rule\\
+\tt *>&1152&infix&all solutions\\
+\tt ;&1150&right&action separator\\
+\tt ::&1125&left&guard marker\\
+\tt ||&1060&infix&bag of constructor\\
+\tt ,&1000&right&tupling, conjunction\\
+\tt onerror&955&infix&error handler\\
+\tt <=&950&infix&class rule arrow\\
+\tt <\tilda{}&949&infix&implements interface\\
+\tt @&905&infix&tau pattern notation\\
+\tt @@&905&right&suspension variable\\
+\tt timeout&900&infix&timeout clause\\
+\tt =&900&infix&variable declaration\\
+\tt :=&900&infix&variable assignment\\
+\tt ==&900&infix&equality predicate\\
+\tt \char'134=&900&infix&not unifyable\\
+\tt !=&900&infix&not equal\\
+\tt <&900&infix&less than\\
+\tt =<&900&infix&less than or equal\\
+\tt >&900&infix&greater than\\
+\tt >=&900&infix&greater than or equal\\
+\tt .=&900&infix&match predicate\\
+\tt =.&900&infix&match predicate\\
+\tt ..&896&infix&list abstraction\\
+\tt in&895&infix&set membership\\
+\tt \char'134/&820&left&set union\\
+\tt \char'134&820&left&set difference\\
+\tt /\char'134&800&left&set intersection\\
+\tt <>&800&right&list append\\
+\tt \#&760&infix&package separator\\
+\tt :&750&infix&type annotation\\
+\tt \$=&731&infix&constructor type\\
+\tt @>&731&infix&constructor type\\
+\tt @=&731&infix&constructor type\\
+\tt +&720&left&addition\\
+\tt -&720&left&subtraction\\
+\tt *&700&left&multiplication\\
+\tt /&700&left&division\\
+\tt quot&700&left&integer quotient\\
+\tt rem&700&left&remainder function\\
+\tt **&600&left&exponentiation\\
+\tt \%\%&500&infix&grammar parse\\
+\tt \char`\^&500&infix&grammar iterator\\
+\tt \tilda{}&935&infix&grammar remainder\\
+\tt .&450&infix&object access\\
+\tt private&1700&prefix&private program\\
+\tt import&900&prefix&import module\\
+\tt case&950&prefix&case analysis\\
+\tt \char'134+&905&prefix&logical negation\\
+\tt @&905&prefix&tau pattern\\
+\tt raise&900&prefix&raise exception\\
+\tt valis&905&prefix&return value\\
+\tt istrue&905&prefix&return value\\
+\tt \$&897&prefix&initialization\\
+\tt :&750&prefix&type annotation\\
+\tt -&300&prefix&arithmetic negation\\
+\tt .\char`\ &1900&postfix&statement terminator\\
+\tt ;&1150&postfix&action terminator\\
+\tt !&905&postfix&one solution operator\\
+\tt +&760&postfix&input mode\\
+\tt -&760&postfix&output mode\\
+\tt -+&760&postfix&bidirectional mode\\
+\tt +-&760&postfix&bidirectional mode\\
+\tt ++&760&postfix&super input mode\\
+\tt *&700&postfix&action type\\
+\tt \char`\^&500&postfix&string convertion\\
+\end{longtable}

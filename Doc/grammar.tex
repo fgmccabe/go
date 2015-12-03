@@ -1,0 +1,875 @@
+\chapter{Language Syntax}
+\label{grammar}
+\index{syntax of \go}
+We take a layered approach to understanding \go's syntax. The lowest level is the character level; then there is the lexical or token level, the parse level and finally the well typed formulae level. Each of these levels identifies a different `level of abstraction'; each focusses on a different aspect of a well formed \go program.
+
+This chapter is concerned with the lower three of these abstractions: characters, tokens and parse trees. This progressively moves up from the physical character of files containing \go programs to a tree-like representation of the contents of a \go source file. In later chapters, we focus on the subset of parse trees that can be given a well defined meaning: i.e., are well typed and form coherent units of execution.
+
+\section{Characters and lexical syntax}
+\subsection{Unicode characters}
+
+\index{syntax!lexical}
+\index{UNICODE}
+\go\ uses the Unicode character encoding system \cite{unicode:30}. More specifically, the \go\ run-time uses Unicode characters internally to represent symbols and the \go\ compiler and run-time engine interpret streams of UTF-8 bytes and UTF-16 words as Unicode. Identifiers in \go programs as well as data processed by \go programs are assumed to be Unicode based.
+
+\index{UNICODE!byte mark}
+A \go\ language processor is free to determine the encoding used in a given source text file. However, if the first two bytes in the file are \constant{\bsl{}+feff;} or \constant{\bsl{}+fffe;} then the processor must interpret the source text as being encoded using UTF-16, or byte-swapped UTF-16 respectively. In addition, if no external indication of the character encoding is supplied, then the language processor \textbf{must} default to the UTF-8 encoding scheme.
+    
+Although \go\ is a Unicode-based language, all of the the characters used within the language definition of \go\ -- such as the built-in operators and syntactic features -- are contained within the ASCII subset of the Unicode character set. Thus, \go can be used in an ASCII-based environment.
+
+\subsubsection{Character Categories}
+
+\index{character categories}
+The Unicode consortium has identified a number of \firstterm{char\-act\-er cat\-ago\-ries}{A classification of characters introduced by the Unicode consortium to abstract common roles of character glyphs.}. A character category distinguishes the typical role of a character -- numeric digit, punctuation mark, regular text -- in a language independent way.
+
+\go\ uses these character categories to classify characters for the the purposes of discriminating identifiers and number values occurring in the program source text. The purpose of this is to permit non-English programmers to use non-English identifiers in the text of the program.
+
+The character categories used by \go are:
+
+\setlongtables
+\begin{longtable}{|lllr|}
+\caption{Unicode character categories}\label{char:categories}\\
+\hline
+Cat&Description&\go predicate&Page\\
+\hline
+\endfirsthead
+\multicolumn{4}{c}{
+{Table \ref{char:categories} Unicode character categories (cont.)}}\\
+\hline
+Cat&Description&\go predicate&Page\\
+\hline
+\endhead
+\hline\multicolumn{4}{r}{\small\emph{continued\ldots}}\
+\endfoot
+\hline
+\endlastfoot
+Cc&Other, Control&\q{\_\_isCcChar}&\pageref{chars:isCcChar}\\
+Cf&Other, Format&\q{\_\_isCfChar}&\pageref{chars:isCfChar}\\
+Cn&Other, Not assigned&\q{\_\_isCnChar}&\pageref{chars:isCnChar}\\
+Co&Other, Private&\q{\_\_isCoChar}&\pageref{chars:isCoChar}\\
+Cs&Other, Surrogate&\q{\_\_isCsChar}&\pageref{chars:isCsChar}\\
+Ll&Letter, Lowercase&\q{\_\_isLlChar}&\pageref{chars:isLlChar}\\
+Lm&Letter, Modifier&\q{\_\_isLmChar}&\pageref{chars:isLmChar}\\
+Lo&Letter, Other&\q{\_\_isLoChar}&\pageref{chars:isLoChar}\\
+Lt&Letter, Titlecase&\q{\_\_isLtChar}&\pageref{chars:isLtChar}\\
+Lu&Letter, Uppercase&\q{\_\_isLuChar}&\pageref{chars:isLuChar}\\
+Mc&Mark, Spacing Combining&\q{\_\_isMcChar}&\pageref{chars:isMcChar}\\
+Me&Mark, Enclosing&\q{\_\_isMeChar}&\pageref{chars:isMeChar}\\
+Mn&Mark, Non spacing&\q{\_\_isMnChar}&\pageref{chars:isMnChar}\\
+Nd&Number, Numerical digit&\q{\_\_isNdChar}&\pageref{chars:isNdChar}\\
+Nl&Number, Letter&\q{\_\_isNlChar}&\pageref{chars:isNlChar}\\
+No&Number, Other&\q{\_\_isNoChar}&\pageref{chars:isNoChar}\\
+Pc&Punctuation, Connector&\q{\_\_isPcChar}&\pageref{chars:isPcChar}\\
+Pd&Punctuation, Dash&\q{\_\_isPdChar}&\pageref{chars:isPdChar}\\
+Pe&Punctuation, Close&\q{\_\_isPeChar}&\pageref{chars:isPeChar}\\
+Pf&Punctuation, Final Quote&\q{\_\_isPfChar}&\pageref{chars:isPfChar}\\
+Pi&Punctuation, Initial Quote&\q{\_\_isPiChar}&\pageref{chars:isPiChar}\\
+Po&Punctuation, Other&\q{\_\_isPoChar}&\pageref{chars:isPoChar}\\
+Ps&Punctuation, Open&\q{\_\_isPsChar}&\pageref{chars:isPsChar}\\
+Sc&Symbol, Currency&\q{\_\_isScChar}&\pageref{chars:isScChar}\\
+Sk&Symbol, Modifier&\q{\_\_isSkChar}&\pageref{chars:isSkChar}\\
+Sm&Symbol, Math&\q{\_\_isSmChar}&\pageref{chars:isSmChar}\\
+So&Symbol, Other&\q{\_\_isSoChar}&\pageref{chars:isSoChar}\\
+Zl&Separator, Line&\q{\_\_isZlChar}&\pageref{chars:isZlChar}\\
+Zp&Separator, Paragraph&\q{\_\_isZpChar}&\pageref{chars:isZpChar}\\
+Zs&Separator, Space&\q{\_\_isZsChar}&\pageref{chars:isZsChar}\\
+\end{longtable}
+
+\section{Tokens}
+\index{syntax!tokens}
+It is required that the input of a \go\ language processor is first partitioned into contiguous sequences of characters called \emph{tokens}. There are several different kinds of tokens; corresponding to the identifiers, symbols, character literals, string literals and punctuation marks necessary to correctly parse a \go\ program.
+
+\begin{aside}
+We use \go's own grammar notation to describe the tokenization and parsing rules for \go. Apart from demonstrating the power of \go's grammar notation -- which is modelled on \prolog's DCG grammars -- it also demonstrates that we can eat our own dog food!
+\end{aside}
+
+In the productions for the tokenizer listed below we assume that, in an actual tokenizer, all the productions for a given non-terminal are collected together -- as is required by \go's grammar. However, for explanatory purposes, the grammar rules for some of the non-terminals are distributed thoughout the text below.
+\label{token:toktype}
+The tokenizer rules depend on the \type{token} type defined below:
+\begin{alltt}
+tokType ::= ID(symbol)             -- Identifier
+  | IN(integer)                    -- Integer literal
+  | FT(float)                      -- Floating point literal
+  | ST(string)                     -- String literal
+  | SY(string)                     -- Symbol
+  | CH(char)                       -- Character literal
+  | LPAR | RPAR | LBRA | RBRA
+  | LBRCE | RBRCE                  -- Punctuation
+  | COMMA | CONS | TERM
+  | EOF.                           -- End of file
+\end{alltt}
+This type definition defines the legal kinds of tokens that can be expected; and also forms the basis of the stream processed at the next higher level in the \go\ language specification: namely the syntactic grammar.
+
+\subsection{Comments and whitespace}
+\label{token:comments}
+Tokens in a \go\ source text may separated by zero or more \emph{comments} and/or white space text -- some pairs of tokens \emph{require} some intervening space or comments for proper recognition. For example, a number following an identifier requires at least one white space character; otherwise the rules for identifier would `swallow' the number token.  White space characters and comments may be used for the purposes of recognizing tokens; but must otherwise be discarded by a language processor.
+
+There are two styles of comment in \go\ source texts -- \emph{line} comments and \emph{block} comments.
+
+\subsubsection{Line comment}
+\label{token:linecomment}
+\index{syntax!line comment}
+A line comment consists of the characters \constant{--\spce} i.e., two hyphen characters and a whitespace character, followed by all the characters up to the next new-line character or end-of-file which ever is first.
+
+\subsubsection{Block comment}
+\label{token:blockcomment}
+\index{syntax!block comment}
+\index{\q{/*}\ldots\q{*/} comments}
+A block comment consists of the characters \constant{/*} followed by any characters and is terminated by the characters \constant{*/}
+
+The \go\ tokeniser rules for white space and comments are:
+\begin{alltt}
+whiteSpace:[char]\{\}.
+whiteSpace(X):-__isZsChar(X).
+whiteSpace(X):-__isZlChar(X).
+whiteSpace(X):-__isZpChar(X).
+
+comments:[integer+,integer-]-->string.
+comments(Lno,Lx) --> comment(Lno,Ly)!, comments(Ly,Lx).
+comments(Lno,Lno) --> "".
+
+comment:[integer+,integer-]-->string.
+comment(Lno,Lx) --> "-- ",lineComment(Lno,Lx).
+comment(Lno,Lx) --> "--\bsl{}t",lineComment(Lno,Lx).
+comment(Lno,Lx) --> "/*",bodyComment(Lno,Lx).
+comment(Lno,Lno+1) --> "\bsl{}n".
+comment(Lno,Lno) --> [X],\{\_\_isZsChar(X)\}. -- ignore space
+
+lineComment:[integer+,integer-]-->string.
+lineComment(Lno,Lno+1) --> [X],\{\_\_isZlChar(X)\}. -- new line
+lineComment(Lno,Lx) --> [X],\{\nasf{}\_\_isZlChar(X)\},
+        lineComment(Lno,Lx).
+
+bodyComment:[integer+,integer-]-->string.
+bodyComment(Lno,Lno) --> "*/".
+bodyComment(Lno,Lx) --> [X],\{\_\_isZlChar(X)\},
+        bodyComment(Lno+1,Lx).
+bodyComment(Lno,Lx) --> [X],bodyComment(Lno,Lx).
+\end{alltt}
+
+\subsection{Identifiers}
+\label{token:identifier}
+\index{syntax!identifiers}
+Identifiers serve many purposes within a \go program: to identify variables and parameters, to identify types, even to identify syntactic operators.
+
+\index{UNICODE!identifiers}
+\go identifiers are modelled on the standard Unicode identifier syntax; which in turn is a generalization of the common notation for identifier syntax found in many programming languages.
+
+The basic rule for identifiers is that they have an initial start letter -- which is either a letter character, or a character which could be used in a word or an underscore character -- followed by a sequence of zero or more characters from a somewhat extended set -- including the digit characters. 
+
+\begin{aside}
+What makes this style of identifier `different' is that the Unicode standard defines many thousands of `letter' character; this allows identifiers to be written in non roman scripts -- such as Kanji for example.
+\end{aside}
+
+The following \go\ grammar rules capture the definition of an identifier:
+\begin{alltt}
+tok:[tokType-]-->string.		-- a grammar that returns a token
+
+/* An identifier is an idStart character, 
+   followed by a sequence of idChar */
+tok(ID(I)) --> idStart(X), idChar(C)*C\uphat{}N, I=implode([X,..N]).
+\dots
+idStart:[char-]-->string.
+idStart(X) --> [X],\{\_\_isLetterChar(X)\}.
+idStart(`\_) --> "\_".
+idStart(`\bsl{}+ff3f;) --> "\bsl{}+ff3f;".		-- full width low line
+  
+idChar:[char-]-->string.
+idChar(X) --> idStart(X).
+idChar(X) --> [X],\{\_\_isNdChar(X)\}.
+idChar(X) --> [X],\{\_\_isMnChar(X)\}.
+idChar(X) --> [X],\{\_\_isMcChar(X)\}.
+idChar(X) --> [X],\{\_\_isPcChar(X)\}.
+idChar(X) --> [X],\{\_\_isCfChar(X)\}.
+\dots
+\end{alltt}
+
+The \function{idStart} rule defines those characters that may start an identifier, and the \function{idChar} rule identifies those characters that may continue an identifier. Together, these rules state that any `letter' character may start an identifier, and letters and numbers may follow this initial letter. 
+
+\begin{aside}
+The grammar condition
+\begin{alltt}
+idChar(C)*C\uphat{}N
+\end{alltt}
+matches a sequence of zero or more \q{idChar}s, and puts the resulting list in the variable \q{N}. See Section~\vref{grammar:iterator} for a more complete explanation.
+\end{aside}
+
+\subsection{Characters}
+\label{token:char}
+
+\index{syntax!character literal}
+\index{syntax!string character}
+An individual character literal value is written as a back-tick character \q{`} followed by a \emph{string character}. A string character consists of any character except new-line, paragraph separator, \constant{'}, or the double quote character \constant{"}; or the \constant{\bsl} character followed by a \emph{character} reference.
+
+For example, the new-line character is written:
+\begin{alltt}
+`\bsl{}n
+\end{alltt}
+
+The grammar rule for character literals is:
+
+\begin{alltt}
+tok(CH(ch)) --> "\bsl{}`", strChar(ch).
+\end{alltt}
+where \function{strChar} is the production to defines a legal character that may occur in a \q{char} value, or a quoted \q{symbol} or a string.
+
+\subsubsection{Character reference}
+\label{token:stringcharacter}
+  
+\index{syntax!character reference}
+\index{character reference}
+Character references are used in several places in \go's syntax: within string literals, symbols and character literals. There are also several special forms of character reference. The common Unix names for characters such as \constant{\bsl{}n} for new-line are recognized, as is a special notation for entering arbitrary Unicode characters.
+
+There are roughly three categories of character references: characters which do not need escaping, characters that are represented using a backslash escape, and characters denoted by their hexadecimal character code.
+
+For example the string \q{"string"} is equivalent to the list:
+\begin{alltt}
+[`s,`t,`r,`i,`n,`g]
+\end{alltt}
+A string containing just a new-line character is:
+\begin{alltt}
+"\bsl{}n"
+\end{alltt}
+and a string containing the Unicode sentinel character would be denoted:
+\begin{alltt}
+"\bsl{}+fffe;"
+\end{alltt}
+
+The rules for character references are:
+\begin{alltt}
+/* Special character sequence following a back-slash
+*  in a symbol or literal string
+*/
+strChar:[char-]-->string.
+strChar(`\bsl{}a) --> "\bsl{}\bsl{}a".
+strChar(`\bsl{}b) --> "\bsl{}\bsl{}b".
+strChar(`\bsl{}d) --> "\bsl{}\bsl{}d".
+strChar(`\bsl{}e) --> "\bsl{}\bsl{}e".
+strChar(`\bsl{}f) --> "\bsl{}\bsl{}t".
+strChar(`\bsl{}n) --> "\bsl{}\bsl{}n".
+strChar(`\bsl{}r) --> "\bsl{}\bsl{}r".
+strChar(`\bsl{}t) --> "\bsl{}\bsl{}t".
+strChar(`\bsl{}v) --> "\bsl{}\bsl{}v".
+strChar(`\bsl{}') --> "\bsl{}\bsl{}'".
+strChar(`\bsl{}") --> "\bsl{}\bsl{}"".
+strChar(`\bsl{}`) --> "\bsl{}\bsl{}`".
+strChar(`\bsl{}\bsl{}) --> "\bsl{}\bsl{}\bsl{}\bsl{}".
+strChar(Cr) --> "\bsl{}\bsl{}+",hexSeq(0,C),";",Cr=__charOf(C).
+strChar(X) --> "\bsl{}\bsl{}", [X].
+strChar(X) --> [X],\{\nasf{}\_\_isCcChar(X)\}.
+\dots
+hexDig:[integer-]-->string.
+hexDig(__digitCode(X)) --> [X],\{\_\_isNdChar(X)\}.
+hexDig(10) --> "a".  hexDig(10) --> "A".
+hexDig(11) --> "b".  hexDig(11) --> "B".
+hexDig(12) --> "c".  hexDig(12) --> "C".
+hexDig(13) --> "d".  hexDig(13) --> "D".
+hexDig(14) --> "e".  hexDig(14) --> "E".
+hexDig(15) --> "f".  hexDig(15) --> "F".
+
+hexSeq:[integer+,integer-]-->string.
+hexSeq(I,N) --> hexDig(X)!,hexSeq(N*16+X,N).
+hexSeq(N,N) --> "".
+\end{alltt}
+\begin{aside}
+The rules for \q{strChar} above may be a little confusing, because of the rules for quoting characters in strings. The required sequence of characters to represent a new-line character is a back-slash followed by an \q{n}: \q{"\bsl{}n"}. The string that denotes this in the grammar rule requires two backslashes -- since a backslash in a string must itself be represented by two backslash characters. This is especially spectacular in the case of the \q{strChar} rule for the backslash character: this requires two backslashes in sequence and the string that denotes this sequence in the grammar rule consists of four backslash characters!
+\end{aside}
+
+\subsection{Symbols}
+\label{token:symbol}
+
+\index{syntax!symbols}
+\index{symbol syntax}
+Symbols are written as a sequence of characters -- not including new-line or other control characters -- surrounded by \constant{'} marks. More specifically, symbols are written as a sequence of string characters (see Section~\ref{token:stringcharacter} above) surrounded by \constant{'} characters.
+
+For example,
+\begin{alltt}
+'a symbol'
+\end{alltt}
+is a \q{symbol}, as is
+\begin{alltt}
+'#\$'
+\end{alltt}
+The grammar rule for \q{symbol} tokens is
+\begin{alltt}
+\ldots
+tok(SY(L)) --> "\bsl{}'", strChar(C)*C\uphat{}L,"\bsl{}'".
+\ldots{}
+\end{alltt}
+
+\subsection{String literals}
+\label{token:string}
+
+\index{syntax!strings}
+\index{string syntax}
+String literals are written as a sequence of string characters (see \ref{token:stringcharacter}) -- not including new-line or paragraph separator characters -- surrounded by \constant{"} marks.
+
+\begin{aside}
+The reason for not permitting new-lines to occur in string literals is that that enables a particularly silly kind of syntax error to be picked up easily: a missing string quote will always generate a syntax error at the end of the line. The restriction does not affect the possible string literals, as it is always possible to use \q{\bsl{}n} to indicate a new-line character, and the \go compiler concatenates sequences of string literals into a single string literal.
+
+One benefit of the automatic string merge feature is that when a program has a lengthy string embedded in it it can be formatted both for display and for program tidiness.
+\end{aside}
+
+The grammar rule for string literals is very similar to the production for symbols. Note however, that string literals are interpreted as synonyms for lists of \q{char}s.
+
+\begin{alltt}
+tok(ST(L)) --> "\bsl{}"", strChar(C)*C\uphat{}L,"\bsl{}"".
+\end{alltt}
+
+\subsubsection{Numbers}
+\label{token:number}
+
+\index{syntax!numbers}
+\index{number syntax}
+\go\ numbers are built from the \function{\_\_isNdChar} character class. This class of characters includes many digit characters; all of which share the semantic property that they can be interpreted as decimal digits.
+
+\go distinguishes integer literals (and values) from floating point literals and values. Due to the sometimes complex rules for sub-typing, these are not generally substitutable for each other.
+
+\begin{alltt}
+tok(Nm) --> [X],\{__isNdChar(X)\},
+    numberSeq(__digitCode(X),I),
+    ( fraction(F),exponent(E),
+      Nm = FT(n2float(I)+F)*n2float(E)
+    | Nm = IN(I)).
+
+tok(IN(N)) --> "0x", hexSeq(0,N).
+tok(IN(C)) --> "0c", strChar(C), \{ C = __charCode(c)\}.
+\dots
+numberSeq:[integer+,integer-]-->string.
+numberSeq(I,N) --> [D],\{\_\_isNdChar(D)!\},
+        numberSeq(I*10+__digitCode(D),N).
+numberSeq(N,N) --> "".
+
+fraction:[float-]-->string.
+fraction(F) --> ".", [C],\{\_\_isNdChar(C)\},
+        frSeq(10,1/\_\_digitCode(C),F).
+fraction(0) --> "".
+
+frSeq:[float+,float+,float-]-->string.
+frSeq(X,F,R) --> [C],\{\_\_isNdChar(C)\},
+        frSeq(X*10,F+__digitCode(C)/X,R).
+frSeq(X,F,F) --> "".
+
+exponent:[float-]-->string.
+exponent(Ex) --> "E-", numberSeq(0,X),Ex = 10 ** (-X).
+exponent(Ex) --> "e-", numberSeq(0,X),Ex=10 ** (-X).
+exponent(Ex) --> "E", numberSeq(0,X),Ex=10 ** X.
+exponent(Ex) --> "e", numberSeq(0,X),Ex=10 ** X.
+exponent(1) --> "".
+\end{alltt}
+Apart from the normal decimal notation for numbers, \go supports two additional notations: the hexadecimal notation and the character code notation. The hexadecimal number notation simply consists of a leading \q{0x} followed by the hexadecimal digits of the number. All hexadecimal numbers are integral.
+
+\index{Character!numeric value of}
+The character code notation is used to construct numbers that correspond to particular characters. A sequence of characters of the form:
+\begin{alltt}
+0c\emph{<StrChar>}
+\end{alltt}
+denotes not a \q{char}acter literal but the Unicode value corresponding to that character. For example, the sequence
+\begin{alltt}
+0c\bsl{}n
+\end{alltt}
+is an \q{integer} literal -- valued as 10 because the new-line character has a Unicode value of 10.
+
+\begin{aside}
+\index{syntax!negative numbers}
+Notice that there is no definition of a negative numeric literal as a single token. Literal negative numbers are handled at a slightly higher level in the \go\ language processing: the leading \q{-} character is interpreted as a prefix unary operator signifying arithmetic negation.
+\end{aside}
+
+\subsection{Operators and punctuation marks}
+\index{syntax!standard operators}
+
+\go\ uses a number of special punctuation marks to signify specific syntactic features -- such as lists, theta expressions and so on.
+\begin{alltt}
+tok(LPAR) --> "(".
+tok(RPAR) --> ")".
+tok(LBRA) --> "[".
+tok(RBRA) --> "]".
+tok(LBRCE) --> "\{".
+tok(RBRCE) --> "\}".
+tok(CONS) --> ",..".
+tok(COMMA) --> ",".
+tok(ID('\dotspace{}')) --> ".", [X],\{ \_\_isZsChar(X)
+                        | \_\_isZlChar(X)
+                        | \_\_isZsChar(X)
+                        | \_\_isCcChar(X)\}.
+\end{alltt}
+
+\index{|dotspace operator}
+\index{operator!|dotspace}
+\noindent
+Note that the \dotspace symbol consists of a period followed by any kind of white space character. This distinguishes it from other uses of the period; such as class body definition operator \q{..} or within a floating point number.
+
+\index{syntax!graphic operators}
+In addition to these punctuation marks, \go\ uses a number of symbols for the prefined operators:
+\begin{alltt}
+tok(ID('||') --> "||".
+tok(ID('|') --> "|".
+tok(ID('::') --> "::".
+tok(ID('::=') --> "::=".
+tok(ID(':=') --> ":=".
+tok(ID(':-') --> ":-".
+tok(ID(':--') --> ":--".
+tok(ID(':') --> ":".
+tok(ID('-->') --> "-->".
+tok(ID('->') --> "->".
+tok(ID('~') --> "~".
+tok(ID('<~') --> "<~".
+tok(ID('\uphat{}') --> "\uphat{}".
+tok(ID('..') --> "..".
+tok(ID('.')) --> ".".
+tok(ID('?') --> "?".
+tok(ID('!') --> "!".
+tok(ID('==') --> "==".
+tok(ID('=') --> "=".
+tok(ID('\bsl\bsl=') --> "\bsl\bsl=".
+tok(ID('!=') --> "!=".
+tok(ID('\$') --> "\$".
+tok(ID('\bsl\bsl+') --> "\bsl\bsl+".
+tok(ID('+') --> "+".
+tok(ID('-+')) --> "-+".
+tok(ID('++')) --> "++".
+tok(ID('*>') --> "*>".
+tok(ID('**') --> "**".
+tok(ID('*') --> "*".
+tok(ID('/') --> "/".
+tok(ID('\bsl\bsl/') --> "\bsl\bsl/".
+tok(ID('/\bsl\bsl') --> "/\bsl\bsl".
+tok(ID('\bsl\bsl') --> "\bsl\bsl".
+tok(ID('<>') --> "<>".
+tok(ID('=>') --> "=>".
+tok(ID('<=') --> "<=".
+tok(ID('>=') --> ">=".
+tok(ID('=<') --> "=<".
+tok(ID('.=') --> ".=".
+tok(ID('\%\%') --> "\%\%".
+tok(ID('\hash') --> "\hash".
+tok(ID('@') --> "@".
+tok(ID('@=') --> "@=".
+tok(ID('@>') --> "@>".
+tok(ID('@@') --> "@@".
+tok(ID('>') --> ">".
+tok(ID('<') --> "<".
+tok(ID('-') --> "-".
+tok(ID(';') --> ";".
+\end{alltt}
+Note that all the graphic identifiers are `spelled out' here. This is indicative of one of the more subtle difference between \go and \prolog. The reason that we can do so is that \go does not permit the addition of so-called user-defined operators; and hence we know already all the operators in the language. In turn, explicitly enumerating all the possible graphical tokens significantly improves the programmer's experience of writing \go programs -- it is not necessary to separate sequences of characters such as:
+\begin{alltt}
+A*-B
+\end{alltt}
+as the \go parser can correctly parse this as:
+\begin{alltt}
+*(A,-(B))
+\end{alltt}
+without requiring an explicit space between the \q{*} and \q{-} characters.
+
+Any character not referred to explicitly here, and not referred to in any of the token rules above is not considered a legal character in a \go\ program.
+
+\subsection{A Standard Tokenizer}
+
+\index{syntax!tokenizer}
+Based on the productions for the \function{tok} introduces above, we can define a complete \go\ tokenizer that consumes a string (i.e., a list of characters) and produces a list of tokens.
+
+Note that (as used in a compiler) a realistic tokenizer would collect additional information as it tokenizes the stream; in particular, the line number where each token occurs.
+
+Our tokenizer rules can be easily extended to count line numbers and associate a line number and source file with each token. We use an auxilliary constructor to wrap each token with this information:
+\begin{alltt}
+TokenType ::= tk(tokType,number).
+\end{alltt}
+The production below for \function{goTokens} also show how the treatment of white space and comments meshes with the treatment of the individual types of token:
+\begin{alltt}
+goTokens:[list[(tokType,integer)-]]-->string.
+goTokens([tk(Tok,Ln),..L],Lno) -->
+    comment(Lno,Ln), tok(Tok), goTokens(L,Ln).
+goTokens([],Lno) --> comment(Lno,_).
+\end{alltt}
+
+This requires a slight modification to the rules for comment handling, and furthermore assumes (correctly) that a \go\ token cannot span across multiple lines of input.
+
+\section{Operator Grammar}
+\label{parser:grammar}
+The grammar of \go specifies the rules for sequencing tokens into syntactically reasonable structures. However, a grammar parser is not itself capable of determining \emph{semantically} meaningful program structures -- that analysis requires the type inferencing system and other phases of a language processor.
+
+The grammar of \go\ is based on an \emph{operator precedence grammar}. Although they might not be aware of it, most programmers are quite familiar with operator precedence grammars -- it is typically the grammar used for arithmetic expressions in regular programming languages. In \go\ -- as in \prolog\ -- we extend the use of operator-style grammars to cover the whole language.
+
+An operator grammar allows us to write expressions like:
+\begin{alltt}
+X * Y + X / Y
+\end{alltt}
+and to know that this means the equivalent of:
+\begin{alltt}
+(X * Y) + (X / Y)
+\end{alltt}
+or more specifically:
+\begin{alltt}
++(*(X, Y), /(X, Y))
+\end{alltt}
+I.e., an operator grammar allows us to write operators between arguments instead of before them, and an operator precedence grammar allows us to avoid using parentheses in many common situations.
+
+It is not necessary to restrict the scope of an operator grammar to arithmetic expressions -- a fact used by the early originators of the \application{POP-2} and \prolog\ programming languages. We can also use an operator grammar for the whole of a programming language. For example, in \go, an equation such as:
+\begin{alltt}
+app([E,..X],Y) => [E,..app(X,Y)]
+\end{alltt}
+can be interpreted -- by treating \function{=>} as an operator -- as:
+\begin{alltt}
+=>(app([E,..X],Y),[E,..app(X,Y)])
+\end{alltt}
+A somewhat more complicated example allows us to interpret a conditional equation in terms of operators:
+\begin{alltt}
+sort([E,..X])::split(E,X,A,B) => sort(A)<>[E]<>sort(B) 
+\end{alltt}
+as
+\begin{alltt}
+=>(::(sort([E,..X]),split(E,X,A,B)),:-(<>(sort(A),<>([E],sort(B)))))
+
+\end{alltt}
+Here, we have relied on the fact that \function{=>}, \function{<>} and \function{::} are {\em infix} operators, in addition to the `normal' infix operators: \function{+} and \function{-} operators. 
+
+\begin{aside}
+The major benefit of this sleight of hand is simplicity -- it allows us to focus on the logical structure of a program fragment rather than the inessential details.
+
+The major demerit is that, occasionally, syntax errors can be somewhat harder to interpret. Furthermore, a syntax error at this level tends to create a cascade of spurious error messages as the parser attempts to recover from the incorrect input.
+\end{aside}
+
+The output of parsing a \go\ text using the operator precedence grammar is a \emph{parse tree}. This parse tree represents the syntactic structure of the program text in an abstract way.
+
+
+\subsection{Standard operators}   
+The standard operators in \go\ are listed in order of priority below in Section~\ref{grammar:operators}. Each operator has a priority, associativity and a role.
+
+The priority of an operator is the indication of the `importance' of the operator: the higher the priority the nearer the top of the abstract syntax tree the corresponding structure will be. Priorities are numbers in the range 1..2000; by convention, priorities in the range 1..899 refer to entities that normally take the role of expressions, priorities in the range 900..1000 refer to predicates and predicate-level connectives and priorities in the range 1001..2000 refer to entries that have a statement or program level interpretation. The comma and the semi-colon operators are the only one with a priority of exactly 1000.
+
+\input{ops}
+
+\paragraph{Representing operators}
+In our standard definition of \go\ grammar, we represent the different operators as clauses in the \function{preOp}, \function{infOp} and \function{postOp} relations. Each clause in the \function{infOp} predicate takes the form:
+\begin{alltt}
+infOp:[string,integer,integer,integer]\{\}.
+\ldots
+infOp("*",720,720,719).
+\end{alltt}
+where \q{"*"} is a left associative infix operator of priority 720. This is encoded in the three numbers: the first number represents the priority of the term expected on the left of the \function{*} expression, the second represents the priority of the \function{*} expression itself and the third number represents the expected priority of expressions to the right of the \function{*} operator. Since \function{*} is left associative, this implies that a \function{*} expression can appear to the left, i.e., the expected priority on the left is the same as the actual priority of the \function{*} operator. For example, an expression such as 
+\begin{alltt}
+A*B*C
+\end{alltt}
+is parsed as though it were
+\begin{alltt}
+(A*B)*C
+\end{alltt}
+
+A non-associative operator, such as \function{!=}, is represented by a clause such as:
+\begin{alltt}
+infOp("!=",899,900,899).		-- not equal predicate
+\end{alltt}
+The Left and Right expected priorities are both less than the priority of \function{!=} itself; which implies that multiple occurrences of them must be correctly parenthesized. An expression such as
+\begin{alltt}
+a != b != c
+\end{alltt}
+occuring in the program text would not be valid.
+
+Prefix operators are represented in a similar way. The prefix operator \function{-} which is not associative and has priority 300 is represented by a clause in the \function{preOp} relation:
+\begin{alltt}
+preOp:[string,integer,integer]\{\}.
+\ldots
+preOp("-",300,299).
+\end{alltt}
+The first number is the priority of the \function{-} operator as a prefix operator, and the second number is the priority of the expected term that follows the operator.  Note that the {\em prefix} priority of an operator can be different to its {\em infix} priority; however, if an operator's postfix priority is different to its infix priority then this may cause ambiguities. All of \go's operators have consistent infix and postfix priorities.
+
+Postfix operators are represented as instances of the \function{postOp} relation. The postfix operator \function{!} which is not associative and has priority 905 is represented by a clause in the \function{postOp} relation:
+\begin{alltt}
+postOp:[string,integer,integer]\{\}.
+\ldots
+postOp("!",904,905);
+\end{alltt}
+In this case, the first number is the priority of the expected term to the left of the \function{!} operator as a postfix operator, and the second number is the priority of the \function{!} expression itself.
+
+\subsection{Parsing analysis}
+It is most convenient to consider parsing analysis as generating \emph{parse trees} from streams of tokens.  A parse tree is a tree-like structure that reflects operators such as \function{+}; as well as syntactic constructions such as lists, tuples and applicative expressions.
+
+\paragraph{ Abstract syntax type definition}
+Parse trees are expressed in terms of an \emph{abstract syntax}. An abstract syntax is a notation which has operators for core elements -- such as characters, strings, symbols and numbers -- and a way of combining these into applicative forms -- such as lists, tuples and function application. The type definition of the \go\ abstract syntax is:
+\begin{alltt}
+absTree ::=
+    I(symbol)                       -- identifier
+  | INT(integer)                    -- integer literal
+  | FLT(float)                      -- floating point literal
+  | SYM(list[char])                 -- symbol
+  | CHR(char)                       -- character
+  | STR(list[char])                 -- string literal
+  | APPLY(absTree,list[absTree])    -- applicative
+  | BRACE(absTree,list[absTree])    -- braced expression
+  | SQUARE(absTree,list[absTree])   -- bracket expr.
+  .
+\end{alltt}
+where the \function{IDEN}, \function{SYM}, \function{CHR}, \function{NM} and \function{ST} forms correspond to identifiers, symbols, characters, numbers and literal strings respectively. Note that the type definition used here is simplified compared to that used in a compiler: a `real' version would include line number information that would help to identify the location of terms for reporting errors and for support for run-time debugging. We omit this for the sake of clarity.
+
+The \q{BRACE} form is used for syntactic forms such as:
+\begin{alltt}
+sync(L)\{ \emph{Action} \}
+\end{alltt}
+which is represented as:
+\begin{alltt}
+BRACE(APPLY(I('sync'),[\emph{L}]),[\emph{Action}])
+\end{alltt}
+and
+\begin{alltt}
+(integer,symbol)\{\}
+\end{alltt}
+which becomes:
+\begin{alltt}
+BRACE(APPLY(I(','),[I('integer'),I('symbol')]),[])
+\end{alltt}
+
+The \q{BRACE} constructor is declared with a list of argument sub-trees; however, the list will always either be empty or have exactly one element in it.
+
+The \q{SQUARE} form is used for polymorphic type forms such as:
+\begin{alltt}
+list[integer]
+\end{alltt}
+which is represented in the abstract syntax using
+\begin{alltt}
+SQUARE(I('list'),[I('integer')])
+\end{alltt}
+
+\paragraph{Parsing over streams of tokens}
+Note that the grammar rules for parsing \go\ are expressed in terms of streams of \function{tokType} expressions rather than streams of characters. This is not a problem for the grammar formalism itself as the grammar notation is inherently polymorphic. For example, the grammar rule for a number in the token stream is:
+\begin{alltt}
+term0:[absTree-]-->list[tokType].
+\ldots
+term0(INT(N)) --> [IN(N)].
+\end{alltt}
+The basic rules for parsing \go\ programs revolve around the notion of a {\em primitive} expression and an {\em operator} expression. These distinctions have nothing to do with the semantics of \go\ programs; they only relate to the syntactic relationships of elements of the language. In  Chapter~\ref{expressions} we provide an analysis of the elements of \go\ that more closely relates to the meaning of a program.
+     
+As with the standard rules for \go\ tokens, we give the rules for parsing sequences of tokens into parse trees as \go grammar rules. For readability, we  assume the input is parsed as a sequence of \q{tokType} entries (see section~\vref{token:toktype}), rather than the more realistic \q{tokenType} entries which carry line number information.
+
+\subsubsection{Primitive parse tree}
+\label{grammar:primitive}
+A primitive parse tree can be a literal (such as a number, symbol, character, string or regular identifier), an applicative expression (such as a function application, or a rule head) or a bracketted expression (such as a list, or parenthesised expression.
+
+\paragraph{Simple literals}
+The main grammar production that corresponds to the primitive expression is \function{term0}. The first few cases of this are straightforward, and correspond to occurrences of simple literal values in the token stream:
+
+\begin{alltt}
+term0:[absTree-]-->list[tokType].
+term0(CHR(c)) --> [CH(c)].       -- A character literal
+term0(STR(S)) --> [ST(s)],       -- A string literal
+    stringSeq(s,S).
+term0(INT(N)) --> [IN(N)].       -- An integer literal
+term0(FLT(N)) --> [FT(N)].       -- A floating point literal
+term0(SYM(S)) --> [SY(S)].       -- A symbolic literal
+\ldots
+stringSeq:[string+,string-]-->list[tokType];
+stringSeq(soFar,S) --> [ST(s)], stringSeq(soFar<>s,S).
+stringSeq(S,S) --> "".
+\end{alltt}
+The production for string literals is worth noting here: a single string may be constructed by a sequence of string literals -- they are all concatenated into a single string. This is the standard way that a \go program may include long string literals spanning many lines: each fragment is placed as a separate string literal on each line; the parser concatenates them all into a string string.
+     
+\paragraph{Identifiers and applicative expressions}
+An identifier may occur by itself, as in an occurrence of a variable, or it may signal an applicative expression, as in a function application. The various rules that capture these cases are amongst the most complicated in the entire \go grammar. In part, this is to allow the grammar to parse expressions such as:
+\begin{alltt}
+sync(X)\{
+  X.Ok() -> stdout.outLine("Ok")
+\}
+\end{alltt}
+
+The core grammar rule for applicative expressions uses \function{term00} to express the rules for the \emph{function} part of an applicative expression:
+\begin{alltt}
+term0(T) --> term00(L), termArgs(L,T).
+\end{alltt}
+and \function{termArgs} to capture the possible forms of arguments -- including none.
+
+There are two main rules for \function{term00} -- the identifier rule and the parenthesised expression rule. The first rule says that an identifier is a \function{term00} expression, provided that it is not also a standard operator. I.e., it isn't one of the symbols referred to in Table~\vref{grammar:operators}. 
+\begin{alltt}
+term00:[absTree-]-->list[tokType].
+term00(I(S)) --> [ID(S)],
+    \{\nasf{}isOperator(S)\}.
+term00(T) --> parenTerm(T).
+\end{alltt}
+
+The \function{termArgs} grammar production either encounters an opening parenthesis -- in which case the arguments of an applicative expression are parsed -- or not -- in which case the leading `function symbol' is interpreted as is.
+
+The rules for \q{termArgs} are:
+\begin{alltt}
+termArgs:[absTree+,absTree-]-->list[tokType].
+termArgs(Pref,Term) --> [LPAR,RPAR],
+    termArgs(APPLY(Pref,[]),Term).
+termArgs(Pref,Term) --> [LPAR],term(A1,999),
+    (COMMA,term(Ax,999))*Ax\uphat{}Args,[RPAR],
+    termArgs(APPLY(Pref,[A1,..Args]),Term).
+termArgs(Pref,Term) --> [LBRCE,RBRCE],
+    termArgs(BRACE(Pref,[]),Term).
+termArgs(Pref,Term) --> 
+    [LBRCE],term(Arg,2000),[RBRCE],
+    termArgs(BRACE(Pref,[Arg]),Term).
+termArgs(Pref,Term) --> [LBRA,RBRA],
+    termArgs(SQUARE(Pref,[]),Term).
+termArgs(Pref,Term) --> [LBRA],term(Arg,2000),
+    (COMMA,term(Ax,999))*Ax\uphat{}Args,[RBRA],
+    termArgs(SQUARE(Pref,[Arg,..Args]),Term).
+termArgs(Pref,Term) --> [ID('.'),ID(Fld)],
+    termArgs(APPLY(I('.'),[Pref,I(Fld)]),Term).
+termArgs(T,T)-->[].
+\end{alltt}
+In effect, an applicative term consists of a `function' applied to a sequence of expressions. This rule is iterative, allowing expressions of the form:
+\begin{alltt}
+f[A](B,C)
+\end{alltt}
+whose parse tree representation is:
+\begin{alltt}
+APPLY(SQUARE(I('f'),[I('A')]),[I('B'),I('C')])
+\end{alltt}
+There are other kinds of \q{APPLY} terms, arising from operator expressions, in addition to expressions using \function{termArgs} production. 
+
+Note that we have a special rule for dealing with the dot operator which enforces the requirement that the right hand side must be an identifier. This reflects the fact that method access in an object is always tightly bound: an expression such as
+\begin{alltt}
+O.f(A,B)
+\end{alltt}
+is parsed as though it were:
+\begin{alltt}
+(O.f)(A,B)
+\end{alltt}
+
+\paragraph{Parenthesised expressions}
+Parenthesised expressions are enclo\-sed by brack\-et characters. There are three such groups of characters -- parentheses \q{()} which indicate tuples as well as operator overriding, square brackets \q{[]} which indicate list expressions and braces \q{\{\}} which typically indicate program structure such as theta expressions and classes.
+
+\begin{alltt}
+parenTerm:[absTree-]-->list[tokType];
+parenTerm(I('()')) --> [LPAR,RPAR].
+parenTerm(T) --> [LPAR],term(T,2000),[RPAR].
+parenTerm(I('[]')) --> [LBRA,RBRA].
+parenTerm(APPLY(I(',..'),[L,R])) --> 
+    [LBRA],term(L,999), tList(R).
+parenTerm(I('\{\}')) --> [LBRCE,RBRCE].
+parenTerm(APPLY(I('\{\}'),[T])) -->
+    [LBRCE],term(T,2000),[RBRCE].
+\end{alltt}
+
+\paragraph{List expressions}
+\label{grammar:lists}    
+The rules for \function{tList} cover the list notation. A \go\ list expression is a sequence of terms separated by \constant{COMMA}s, and enclosed in square brackets. If the last element of a list expression is separated by a \constant{,..} (\constant{CONS}) token then it denotes the remainder of the list rather than the last element.
+     
+\begin{alltt}
+tList:[absTree-]-->list[tokType].
+tList(I('[]')) --> [RBRA].
+tList(T) --> [CONS], term(T,999), [RBRA].
+tList(APPLY(I(',..'),[L,R])) -->
+    [COMMA],term(L,999),tList(R).
+\end{alltt}
+     
+The abstract syntax of a list literal is based on the \function{,..} applicative expression. Thus the parse tree corresponding to the list literal \q{[A]} is:
+\begin{alltt}
+APPLY(I(',..'),[I('A'),I('[]')])
+\end{alltt}
+Note that this refers only to the abstract parse tree representation of list pairs; the run-time representation of a list such as this may be considerably more succinct.
+
+\subsubsection{Operator expression}
+\label{grammar:operator-expression}
+An operator expression can be an infix, prefix or a postfix operator expression. Most operators are infix; however it is possible for an operator to be simultaneously an infix and/or a prefix and/or a postfix operator. The grammar requires some disambiguation in the case that an operator is both infix and postfix.
+     
+Our productions for operator expressions are split into two fundamental cases: prefix expressions -- handled by the \function{termLeft} grammar rules -- and infix and postfix expressions -- handled by the \function{termRight} grammar rules.
+
+\paragraph{Prefix operator expressions}
+A prefix operator expression consists of a prefix operator, followed by a term. The priority of the prefix operator should not be greater than the `allowed' priority; and that the expected priority of the term that follows the prefix operator is based on the priority of the prefix operator itself.
+	
+The \function{termLeft} grammar does not report an error if it encounters an out-of-range prefix operator as the \function{termLeft} production may have been invoked recursively; and the prefix operator expression {\em may} have significance at an outer level. We rely on backtracking within the parser to resolve this particular conflict.
+
+\begin{alltt}
+termLeft:[absTree-,integer+,integer-]-->list[tokType].
+\ldots
+termLeft(APPLY(I(Op),[Right]),P,Oprior) -->
+    [I(Op)],
+    \{isPreOp(Op,Oprior,OrPrior), P>=Oprior\},
+    term(Right,OrPrior).
+\end{alltt}
+      
+The second rule for \function{termLeft} defaults to the primitive term expression in the case that the lead token is not a prefix operator:
+
+\begin{alltt}
+termLeft(Term,P,0) --> term0(Term).
+\end{alltt}
+
+\paragraph{Infix and postfix operator expressions}
+The \function{termRight} grammar production defines how infix and postfix operators are handled.
+
+The `input' to \function{termRight} includes the term encountered to the left of the infix or postfix operator. If the next token is an infix operator, then the right hand side term is parsed -- with appropriate expected priorities -- and we recursively look again for further infix and/or postfix operators:
+\begin{alltt}
+termRight:[absTree+,integer+,integer+,integer-,absTree-]-->
+    list[tokType].
+\ldots
+termRight(Left,prior,lprior,aprior,Term) -->
+    [I(Op)],
+    \{ isInfOp(Op,L,O,R),O=<prior,L>=lprior \},
+    term(Right,R),
+    termRight(APPLY(I(Op),[Left,Right]),
+	          prior,O,aprior,Term).
+\end{alltt}
+The input to the recursive call to \q{termRight} includes the infix term just discovered. 
+
+Postfix operators are treated in a similar way to infix expressions, except that postfix operators do not have a `right hand' expression:
+\begin{alltt}
+termRight(Left,prior,lprior,aprior,Term) -->
+    [I(Op)],
+    \{ isPstOp(Op,L,O),O=<prior,L>=lprior \},
+    termRight(APPLY(I(Op),[Left]),prior,O,aprior,Term).
+\end{alltt}
+Note that we make use of \go's backtracking to help disambiguate the case where an operator is simultaneously an infix and a postfix operator. There are several such operators, for example: \function{\dotspace}, \q{+} and \q{\uphat}. When encountering such dual-mode operators, the first interpretation as an infix operator is tried first; and if that fails then the postfix interpretation is used.
+
+\paragraph{Special infix operators}     
+The \q{\dotspace}(\q{TERM}) operator is a special operator in that it can serve both as punctuation and as an operator. As punctuation, it serves as an expression terminator and it serves as a separator operator when encountered in a class body or package.
+
+These punctuation symbols' roles as operators are captured via additional rules in the \function{termRight} grammar:
+\begin{alltt}
+termRight(Left,_,lprior,lprior,Left),[TERM] --> [TERM].
+termRight(Left,prior,lprior,aprior,Term,true) --> 
+    [TERM],
+    \{ 2000=<prior,1999>=lprior \},
+    term(Right,2000),
+    termRight(APPLY(I('. '),[Left,Right]),
+               prior,2000,aprior,Term).
+termRight(Left,prior,lprior,aprior,Term) -->
+    [TERM],
+    \{ 2000=<prior,2000>=lprior \},
+    termRight(APPLY(I('. '),[Left]),
+      prior,2000,aprior,Term).
+\end{alltt}
+We also need a special rule to deal with tupling operator \q{,} (\q{COMMA}):
+\begin{alltt}
+termRight(Left,prior,lprior,aprior,Term) -->
+    [COMMA],
+    \{ isInfOp(',',L,O,R),O=<prior,L>=lprior \},
+    term(Right,R),
+    termRight(APPLY(I(','),[Left,Right]), prior,O,aprior,Term).
+\end{alltt}
+The final rule for \function{termRight} simply returns the left-hand expression and does not consume further tokens:
+\begin{alltt}
+termRight(Left,_,prior,prior,Left) --> [].
+\end{alltt}
+
+\paragraph{Top-level term parse tree}       
+Our final production, for \function{term} itself, invokes the grammar for prefix/simple expressions and the grammar for infix and postfix expressions:
+\begin{alltt}
+term:[absTree-,integer+]-->list[tokType].
+term(T,prior) --> termLeft(Left,prior,Lprior),
+    termRight(Left,prior,Lprior,_,T).
+\end{alltt}
+
+
+\subsection{Example parse tree}
+The abstract parse trees of even simple expressions can be quite large. For example, the abstract tree corresponding to:
+
+\begin{alltt}
+app([E,..X],Y) => [E,..app(X,Y)]
+\end{alltt}
+is
+\begin{alltt}
+APPLY(I('=>'),
+      [APPLY(I('app'),
+             [APPLY(I(',..'),
+                    [I('E'),I('X')]),
+              I('Y')]),
+       APPLY(I(',..'),
+             [I('E'),
+              APPLY(I('app'),
+                    [I('X'),I('Y')])])])
+\end{alltt}
+Moreover, abstract parse trees only represent one intermediate kind of structure in a typical \go compiler. However, by the time that the above equation is compiled, it will have been reduced to just a few instructions.
+

@@ -1,0 +1,297 @@
+\chapter{Communicating processes}
+\label{message}
+
+\index{inter-thread communication}
+\index{message!based communication}
+\index{sending and receiving messages}
+
+The \q{sync}hronized action permits processes to share resources, but it is a poor tool for enabling inter-process coordination -- because \q{sync} does not offer a direct way of allowing one thread to communicate with other threads. In \go we use a \emph{message passing} paradigm to enable inter-process coordination. The two key actions involved in message communication are message send and message receive. The former involves a \emph{message dropbox} and the latter a \emph{message mailbox}.
+
+The facilities discussed in this are part of the \q{go.mbox} package, accessing them requires an \q{import} statement:
+\libsynopsis{go.mbox}
+
+
+\section{Mailboxes and dropboxes}
+\label{threads:mailbox}
+
+The \q{dropbox[T]}/\q{mailbox[T]} metaphor corresponds -- loosely -- to the public dropbox in which mail is dropped and the private mailbox from which messages are retrieved. The idea is that if two (or more) processes wish to communicate, they send messages by using \q{dropbox}es and read them from their \q{mailbox}es. 
+
+Mailboxes and dropboxes support a \emph{conversational} model of communication: each \q{mailbox}/\q{dropbox} pair denotes a conversation between processes. There is no particular implied mapping of mailboxes and dropboxes to particular \go threads; thus it supports inter-application cooperation as easily as intra-application cooperation between threads.
+
+The \q{mailbox} type is defined as:
+\begin{alltt}
+mailbox[T] \impl \{ next:[]=>T.
+    nextW:[number]=>T.
+    msg:[T]*.
+    msgW:[T,float]*.
+    pending:[]\{\}.
+    dropbox:[]=>dropbox[T] \}.
+\end{alltt}
+The \q{next} function is used to read the next message from the mailbox, the \q{nextW} function combines reading with a timeout; the \q{pending} predicate is true if there is at least one message in the \q{mailbox} and the \q{dropbox} function returns a \q{dropbox} object that can be used to deliver messages to this \q{mailbox}.
+
+The \q{dropbox} type is simpler:
+\begin{alltt}
+dropbox[T] \impl \{ post:[T]* \}.
+\end{alltt}
+The single method in the \q{dropbox} interface is the \q{post} action. \q{post} is used to deliver a message to the associated mailbox. 
+
+Note that \q{mailbox}es and \q{dropbox}es are \emph{polymorphic}. In fact, they are polymorphic in the type of the messages associated with the mailbox. In effect, mailboxes and dropboxes form a kind of \emph{typed channel} of communication. The most paradigmatic instantiation of a message type is a type defined using a type definition of enumerated symbols and constructor functions -- see Sections~\vref{type:user-symbol} and \vref{type:constructor}.
+
+\index{mailbox@\q{mailbox} type}
+Note that the \q{mailbox} and \q{dropbox} interfaces may be realized in multiple ways. The \q{go.mox} package permits threads to communicate with each within a single \go invocation, not between invocations. Note, furthermore, that a given \q{mailbox} may have a number of different \q{dropbox} implementations -- with differing communication capabilities -- all targeted at delivering messages to a given mailbox.
+
+
+\section{Using a dropbox}
+\label{message:dropbox}
+
+\subsection{Message send}
+\label{action:send}
+\index{message!sending}
+\index{action!message send}
+\synopsis{\emph{dropbox[T]}.post}{[T]*}
+
+\noindent
+The \q{post} method is used to deliver a message to the \q{mailbox} associated with the \q{dropbox}. In principle, a \q{mailbox} may have more than one way of delivering messages to it; with a different \q{dropbox} for each technique.
+
+Note that the sending process is given no immediate response to the message send. If required -- which is often -- the sender should wait for a response using a message receive action.
+
+\section{Using a mailbox}
+
+\subsection{Creating a local mailbox}
+\label{message:mailbox}
+\synopsis{mailbox}{[]\sconarrow{}mailbox[T]}
+
+The \q{mailbox} constructor is used to construct a \q{mailbox} entity that can be used to receive messages. 
+
+\begin{aside}
+Note that a \q{mailbox} should itself be used in a message: you should not send a mailbox in a message to another thread (say). Thus \q{mailbox}es are inherently owned by a single-thread. Of course, it is quite possible to send the \q{dropbox} associated with the \q{mailbox} in a message to another thread -- or to store it in a well known location.
+\end{aside}
+
+\subsection{\q{nullhandle} -- an empty dropbox}
+\label{mbox:nullhandle}
+\synopsis{nullhandle}{[]\conarrow{}mailbox[T]}
+The \q{nullhandle} constructor is an empty dropbox -- all messages posted to it will be discarded.
+
+\subsection{Retrieving the \q{next} message}
+\label{action:receive}
+
+\index{message!receiving}
+\index{action!message receive}
+\index{receiving messages}
+\index{thread message queue}
+\synopsis{\emph{mailbox[T]}.next}{[]\funarrow{}T}
+
+A message can be retrieved from a \q{mailbox} using a combination of the \q{next} function (or the \q{nextW} function) of the mailbox and the \q{case} action. Both functions get the first message and returns it; their behavior differs in the case that there is no first message: the \q{next} function suspends until there is a message, and the \q{nextW} suspends for a limited time -- its argument in seconds. If there is no message in that time then \q{nextW} raises a \q{timedout} exception.
+
+The raw \q{next} function returns a \emph{T} value that encapsulates the message. Note that there is no immediate way to confirm the sender of the message -- that information should be encoded in the message value itself if it is required.
+
+\subsection{Next matching message}
+\label{action:msg}
+
+\index{message!receiving}
+\index{action!message receive}
+\index{receiving messages}
+\index{thread message queue}
+\synopsis{\emph{mailbox[T]}.msg}{[T]*}
+
+The \q{msg} action can be executed to retrieve a \emph{matching} message. Invoking the \q{msg} action on a \q{mailbox} will cause its queue of messages to be searched looking for a message that matches the argument.
+
+If there is no message in the \q{mailbox}, then the \q{msg} action \emph{suspends} until a matching message is received in the \q{mailbox}.
+
+When a matching message is found, it is \emph{unified} with the argument of \q{msg}; thus \q{msg} also \emph{returns} the found message.
+
+The \q{msg} action deletes the message once one is found.
+
+As with the raw \q{next} function, there is no immediate way to confirm the sender of the message -- that information should be encoded in the message itself if it is required.
+
+\subsection{\q{nextW} -- a time limited message receive}
+\index{message!timeout}
+\index{Timing out a message receive}
+
+It is possible to `time out' a message receive -- by using the \q{nextW} function instead of the \q{next} function:
+
+\synopsis{\emph{mailbox[T]}.nextW}{[number]\funarrow{}T}
+
+This function returns the same value as the \q{next} function, but it differs in behavior should there be no message in the \q{mailbox}. 
+
+If there is no message in the \q{mailbox} for the given period of time, then \q{nextW} \q{raise}s a \q{timedout} exception. \q{timedout} is an error value defined within the \q{go.mbox} package to signal that a timeout has occurred.
+
+It is the responsibility of the receiver to ensure that the \q{timedout} exception is caught appropriately:
+\begin{alltt}
+\ldots;case Mbx.nextW(0.5) in (
+  \emph{Ptn\sub1} -> \emph{Act\sub1}
+| \ldots{}
+  \emph{Ptn\sub1} -> \emph{Act\sub1}
+) onerror (
+  timedout -> \emph{TimeoutAction}
+  );\ldots
+\end{alltt}
+This fragment looks for a message, and if there is none for 0.5 seconds after the start of the call to \q{Mbx.nextW(0.5)} then the \q{timedout} exception is raised and the \emph{TimeoutAction} is entered.
+
+The numeric argument of the \q{nextW} function refers to a number of seconds (it may be fractional) of real elapsed time; it does not refer to processor time.
+
+The start time of time-out is calculated from just before there is any attempt to read any messages; and the timeout is invoked only if there are no messages in the message queue.
+
+\begin{aside}[\dbend\dbend]
+\index{Why \q{timeout}s are bad for your program's health}
+Using timed \q{nextW} to access messages from the mailbox without care in the choice of timeout values is likely to result in programs that have bugs that are hard to detect -- since there is always some non-determinism in the order of execution in multi-threaded applications. Furthermore, especially for networked applications, computing the appropriate values to assign for timeouts is likely to be problematic given the enormous variation in network latency delays.
+\end{aside}
+
+\subsection{Wait for matching message}
+\label{action:msgw}
+
+\index{message!receiving}
+\index{action!message receive}
+\index{receiving messages}
+\index{thread message queue}
+\synopsis{\emph{mailbox[T]}.msgW}{[T,number]*}
+
+The \q{msgW} action is similar to the \q{msg} action except that a timeout is given. The \q{msgW} action will either find a matching message in the \q{mailbox} or will wait for the given timeout -- expressed as a number of seconds starting from the beginning of the \q{msgW} action.
+
+If no matching message is delivered to the \q{mailbox} within the \emph{timeout}, then a \q{timedout} exception is raised.
+
+If a matching message is found, it is \emph{unified} with the argument of \q{msg}; thus \q{msg} also \emph{returns} the found message.
+
+The \q{msgW} action deletes the message once one is found.
+
+
+\subsection{\q{pending} -- predicate to check for messages}
+\label{action:pending}
+
+\synopsis{\emph{mailbox[\_]}.pending}{[]\{\}}
+
+\noindent
+The \q{pending} predicate is satisfied if there are any messages currently in the \q{mailbox} queue. 
+
+\begin{aside}
+Note that in order for this predicate to have a well defined \firstterm{fluent}{A \emph{fluent} is a predicate with a particular extent in time: fluents have a starting time and an ending time (although it may not always be clear what those end points are in all situations.)} the call to \q{pending} -- together with any consequent actions -- should occur inside a \q{sync}hronized region. Otherwise messages may added or even removed -- if the mailbox is also shared across threads -- invalidating the truth value of the \q{pending} predicate.
+\end{aside}
+
+\subsection{\q{dropbox} -- return the dropbox associated with a mailbox}
+\label{mbox:dropbox}
+\synopsis{\emph{mailbox[T]}.dropbox}{[]\funarrow{}dropbox[T]}
+
+The \q{dropbox} function returns a \q{dropbox} for the associated \q{mailbox}. This dropbox can be used locally to send messages to the mailbox.
+
+%\subsubsection{Message delivery procedure}
+%\index{message!delivery procedure}
+%While the implementation of \q{mailbox}es and \q{dropbox}es is not determined, it may be illuminating to explore how the \q{go.mbox} package implements communication.
+
+%
+%\section{The simple communications system}
+%\label{SCS}
+
+%The simple communications system (SCS) uses the handle root to route messages between \go invocations. Within a \go invocation the communications library routes messages to the appropriate thread.
+
+%The SCS consists of a  communications server, or several federated communications  servers. These are  processes that execute independently of all the connected \go invocations. Typically, there will be a single SCS communications server on a local area network, or even on each computer. The SCS server manages the intra-application communications for all \go invocations connected to it. In the federated server situation the servers negotiate amongst themselves how and whether to forward messages.
+
+%A \go application wishing to use the SCS establishes a connection to the server -- using \go's built-in TCP/IP functions. Message forwarding is handled transparently to the individual thread by re-defining the meaning of the \q{>>} message send operator. This is provided by a high-level library call -- \q{scsConnect} -- which is in the \q{"scscomms.gof"} library.
+
+%For example, the program:
+%\begin{alltt}
+
+%directory\_server() -> server() .. \{
+%  pubs = \new{}hash[handle,(symbol,string)[]]().
+
+%  server() -> (
+%    register(Atts) << F -> pubs.put(F,Atts)
+%  | search(Key) << F -> 
+%      \{(Ats,Who) .. 
+%          (Who,(Ats::subset(Key,Ats))) in pubs.ext()\} >> F
+%  ); server().
+%\}
+%\end{alltt}
+%implements a simple directory server, allowing threads to register descriptions -- as lists of symbol/string pairs -- and also allowing them to search for matching descriptions.  
+
+%To create a version of this program that is accessable outside the \go invokation that created it, we wrap in a call to \q{scsConnect} (assuming that the above module is located in the file \q{directory.go})
+
+%\begin{alltt}
+%main .. \{
+%  include "directory.gof".
+%  include "sys:go/scscomms.gof".  -- access SCS library
+
+%  main() ->
+%    scsConnect(directory\_server).
+%\}
+%\end{alltt}
+
+%The \q{scsConnect} library procedure takes one argument -- a zero-argument procedure that represents the activity that will be participating in communications with other threads in other invocations. In this case this is the procedure exported by the included \q{listserver} module. 
+
+%An \q{scsConnect(P)} call tries to register the root component of the handle of the thread executing the \q{scsConnect} call.  If that registration succeeds,  its evaluation continues by executing \q{P()} in a modified mode that allows it to send and receive  messages from non-local threads.  If the root name  is in use, the call aborts. 
+
+%\q{scsConnect(P)} terminates when  \q{P()} terminates, at which point the connection to the SCS server will be closed and the registered root name deregisterd . Note that at that point any sub-threads \q{spawn}ed by the procedure  \q{P} will effectively become orphans -- unable to communicate externally.
+
+%Suppose that we now launch a \go client on the same host or on a host connected to the same SCS server.  It could have the structure:
+
+%\begin{alltt}
+%main .. \{
+%  include "sys:go/scscomms.gof".  -- access SCS library
+%  -- type defs
+
+%  main(T,R) ->
+%    scsConnect( (()->clientProc(hdl(X,Y))) ).
+
+%  clientProc(DS) ->
+%         ....
+%         register([...]) >> DS;
+%         .....
+%\}
+%\end{alltt}
+%The initially executed procedure of this program takes two arguments, the thread and root names for the list server initial thread.  The command line that starts the client will be of the form:
+
+%\begin{alltt}
+%go client.goc \emph{Th} \emph{Rt} 
+%\end{alltt}
+
+%where \emph{Rt} is the root name registered by the previously invoked list server and \emph{Th} is its initial thread name.  These command line arguments are passed into \q{main} and embedded in the closure:
+%\begin{alltt}
+%()->clientProc(X,Y)
+%\end{alltt}
+
+%that is the no-argument procedure passed to \q{scsConnect}. They allow \q{clientProc} to communicate with the list server using the SCS. But how can we know what the \emph{Th} and \emph{Rt} names for the server are?
+
+%One way is to have the launched list server write out its handle immediately it is started. To do this, we  change its \q{main} procedure to be:
+
+% \begin{alltt}
+%  main() ->
+%    outLine(stdout,self^0);
+%    scsConnect(directory\_server).
+%\end{alltt}
+
+%(having included the standard I/O library in the program). \q{self} is a reserved variable name in \go that always holds the handle of the thread that accesses its value.  The output will be something like:
+
+%\begin{alltt}
+% hdl('<main>','zeus#4518')
+%\end{alltt}
+
+%We can then launch the client with the command line:
+
+%\begin{alltt}
+%go client.goc '<main>' 'zeus#4518'  
+%\end{alltt}
+
+%As an alternative,  we can launch the server with an assigned root name and initial thread name.  We do this using the command line options. For example:
+
+%\begin{alltt}
+%go  -n initTh -N listServer SCSlistserver.goc
+%\end{alltt}
+
+%We can then immediately launch the client with the command line:
+
+%\begin{alltt}
+%go client.goc initTh DServer  
+%\end{alltt}
+
+%Note that it is not necessary to tell the server the handle of its client.  Since a client will always initiate the message interaction, the server will automatically get to know the handle of the client thread when it receives the client message. It will then use this to send a reply.
+
+%\subsection{Limitations of the SCS}
+
+%Although the SCS model is eminently simple, it does suffer some potentially serious limitations. The first is that the communicating entities are threads; which in turn implies that all parties to a communication must either be threads or easily modeled as such. Furthermore, all parties must be willing to expose this fact. However, this in turn can cause problems for fault-tolerant systems since if a system must be restarted there is no guarantee that the identities of the threads involved are the same in the restarted system -- in fact it is likely that they would \emph{not} be the same. This considerably complicates the recovery. Furthermore it \emph{requires} that the communicating parties use different threads to represent different conversations, which, in turn, exposes implementation details unnecessarily. This can prevent a change in implementation of a component even when the interface is the same.
+
+%A further limitation of the SCS is a difficulty of scaling. Within a given SCS server it is reasonable to provide straightforward access between all the connected invocations. However, when considering large scale systems -- with multiple SCS servers in multiple locations -- then federating servers becomes contentious. When routing a message between servers, for example, it may be difficult and/or arbitrary to decide which SCS servers to forward the message via. Such inter-server communication should often be governed by policy as well as technology.
+
+%Finally it should be noted that well-known handles have their own problems. The SCS depends on well-known or predefined handles as the core technique that clients have for accessing services. However, this makes it hard to dynamically configure systems, especially when there may be competing services and when those services are themselves not guaranteed to be available -- both considerations being paramount in inter-organizational settings.
+
+%In summary, the SCS is very light-weight -- making it suitable for intra-application communication -- but cannot meet the requirements of large scale `cross-border' applications. For that, a more elaborate (albeit heavier) communications infrastructure is required.
+
+%

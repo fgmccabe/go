@@ -1,0 +1,15 @@
+#!/bin/sh
+# Set up the paths so that April is made available to users
+
+tcshdir=/usr/share/init/tcsh
+
+if [ -f ${tcshdir}/login ]; then
+  if ! grep -q april ${tcshdir}/login ; then
+    cat << foobar >> ${tcshdir}/login
+# Automatically added by April installer
+# Added on `date`
+set path = ( \${path} /opt/april/bin )
+# Added on `date`
+foobar
+  fi
+fi

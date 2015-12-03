@@ -1,0 +1,524 @@
+% Automatically generated, do not edit 
+\setlongtables
+\begin{longtable}{|cll|}
+\caption{\go instruction set summary}\label{howitworks:table}\\ 
+\hline
+OpCode&Mnemonic&Summary\\
+\hline
+\endfirsthead
+\multicolumn{3}{c}{
+{Table \ref{howitworks:table} \go instruction set summary (cont.)}}\\
+\hline
+OpCode&Mnemonic&Summary\\
+\hline
+\endhead
+\hline\multicolumn{3}{r}{\small\emph{continued\ldots}}\
+\endfoot
+\hline
+\endlastfoot
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 00}\end{picture}
+&\tt halt &stop execution\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 01}\end{picture}
+&\tt die &stop current process\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 02}\end{picture}
+&\tt succ &Succeed a clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 03}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt kawl h,Lits[X]&call to program\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 04}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt lkawl h,Lits[X]&last call to program\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 05}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt dlkawl h,Lits[X]&deallocating last call\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 06}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt kawlO h,A[m]&call object method\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 07}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt lkawlO h,A[m]&last method call\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 08}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt dlkawlO h,A[m]&deallocating last variable call\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 0c}\end{picture}
+&\tt go\_to PC+long&jump\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 0d}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt escape h,X&service function\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 10}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt alloc h,X&allocate locals\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 11}\end{picture}
+&\tt dealloc &deallocate locals\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 12}\end{picture}
+&\tt tryme PC+long&try inline clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 13}\end{picture}
+&\tt retryme PC+long&retry inline clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 14}\end{picture}
+&\tt trustme &last inline clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 15}\end{picture}
+&\tt trycl PC+long&try clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 16}\end{picture}
+&\tt retry PC+long&retry clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 17}\end{picture}
+&\tt trust PC+long&last clause\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 18}\end{picture}
+&\tt fayl &fail current execution\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 19}\end{picture}
+&\tt cut &cut choice point\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1a}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt indexc A[h],X&character index jump\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1b}\put(5,5){\tt h}\end{picture}
+&\tt indexl A[h]&list index\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1c}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt indexs A[h],X&symbol index jump\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1d}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt indexn A[h],X&numerical index jump\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1e}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt indexx A[h],X&constructor index jump\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 1f}\end{picture}
+&\tt trpblk &start error block\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 20}\end{picture}
+&\tt trpend &end error block\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 21}\put(5,5){\tt h}\end{picture}
+&\tt except A[h]&raise run-time exception\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 22}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt gcmap h,X&Set active arguments & local depth\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 23}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt gc h,X&Invoke GC if not enough space\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 25}\put(60,5){\tt Xm}\put(60,5){\tt Xm}\end{picture}
+&\tt susp A[m],A[m]&suspend/execute call\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 26}\put(5,5){\tt h}\end{picture}
+&\tt resume h&continue from suspended call\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 27}\put(5,5){\tt h}\end{picture}
+&\tt trgr h&trigger suspended calls\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 2a}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt uAA A[h],A[m]&Unify argument registers\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 2b}\put(5,5){\tt h}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt uAY A[h],Y[X]&Unify\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 2d}\put(5,5){\tt h}\end{picture}
+&\tt uAS A[h],S++&Unify\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 2e}\put(5,5){\tt h}\end{picture}
+&\tt ucAS A[h],S++&Unify with occurs check\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 2f}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAlit A[h],Lits[X]&Unify with literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 32}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns A[h],Lits[X]&Unify with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 33}\put(5,5){\tt Yh}\put(60,5){\tt Ym}\end{picture}
+&\tt uYY Y[h],Y[m]&Unify Y[h],Y[m]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 34}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt uYS Y[X],S++&Unify\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 35}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt ucYS Y[X],S++&Unify with occurs check\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 36}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt uYnil Y[X]&Unify empty list\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 3c}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uSlit S++,Lits[X]&Unify literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 3f}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uScns S++,Lits[X]&Unify constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 37}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns0 Lits[X]&Unify A[0] with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 38}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns1 Lits[X]&Unify A[1] with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 39}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns2 Lits[X]&Unify A[2] with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 3a}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns3 Lits[X]&Unify A[3] with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 3b}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt uAcns4 Lits[X]&Unify A[4] with constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 46}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt mAA A[h],A[m]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 47}\put(5,5){\tt h}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt mAY A[h],Y[X]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 48}\put(5,5){\tt h}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt muAY A[h],Y[X]&Move unsafe\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 4a}\put(5,5){\tt h}\end{picture}
+&\tt mAS A[h],S++&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 4b}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt mAlit A[h],Lits[X]&Move literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 4c}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt mAcns A[h],Lits[X]&Build constructor \\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 4d}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\put(5,5){\tt h}\end{picture}
+&\tt mYA Y[X],A[h]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 4e}\put(5,5){\tt Yh}\put(60,5){\tt Ym}\end{picture}
+&\tt mYY Y[h],Y[m]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 50}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt mYS Y[X],S++&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 53}\put(5,5){\tt h}\end{picture}
+&\tt mSA S++,A[h]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 54}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt mSY S++,Y[X]&Move\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 55}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt mSlit S++,Lits[X]&Move literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 58}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt mScns S++,Lits[X]&Build constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 5a}\put(5,5){\tt h}\end{picture}
+&\tt oAU A[h]&Unbind A[h]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 5b}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt oYU Y[X]&Unbind local\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 5c}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\put(5,5){\tt h}\end{picture}
+&\tt oYA Y[X],A[h]&Overwrite local\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 5d}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt oYnil Y[X]&Overwrite with empty list\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 6e}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt cAA A[h],A[m]&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 6f}\put(5,5){\tt h}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt cAY A[h],Y[X]&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 70}\put(5,5){\tt h}\end{picture}
+&\tt cAS A[h],S++&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 71}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAlit A[h],Lits[X]&Match literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 74}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns A[h],Lits[X]&Match constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 75}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\put(5,5){\tt h}\end{picture}
+&\tt cYA Y[X],A[h]&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 76}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt cYS Y[X],S++&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 79}\put(60,5){\tt Xm}\end{picture}
+&\tt cSA S++,A[m]&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 7a}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt cSY S++,Y[X]&Match\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 7b}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cSlit S++,Lits[X]&Match literal\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 7e}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cScns S++,Lits[X]&Match constructor\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 80}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns0 Lits[X]&Match constructor in A[0]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 81}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns1 Lits[X]&Match constructor in A[1]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 82}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns2 Lits[X]&Match constructor in A[2]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 83}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns3 Lits[X]&Match constructor in A[3]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt 84}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt cAcns4 Lits[X]&Match constructor in A[4]\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a0}\put(5,5){\tt h}\put(60,5){\tt Xm}\end{picture}
+&\tt clAA A[h],A[m]&First/clear\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a1}\put(5,5){\tt h}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt clAY A[h],Y[X]&First/clear\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a3}\put(5,5){\tt h}\end{picture}
+&\tt clAS A[h],S++&First/clear\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a4}\put(60,5){\tt Xm}\end{picture}
+&\tt clSA S++,A[m]&First/clear\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a5}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt clSY S++,Y[X]&First/clear\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a6}\put(5,5){\tt h}\end{picture}
+&\tt vrA A[h]&Test for variable\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a7}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt vrY Y[X]&Test for variable\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a8}\put(5,5){\tt h}\end{picture}
+&\tt nvrA A[h]&Test for non-variable\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt a9}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt nvrY Y[X]&Test for non-variable\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b4}\put(5,5){\tt h}\end{picture}
+&\tt vdA A[h]&Void \q{A[h]}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b5}\put(5,5){\tt h}\put(55,5){\tt X\sub{hi}}\put(105,5){\tt X\sub{lo}}\end{picture}
+&\tt vdAA A[h],X&Void \q{A[h],Count}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b6}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt vdY Y[X]&Void \q{Y[X]}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b7}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\put(5,5){\tt h}\end{picture}
+&\tt vdYY Y[X],h&Void \q{Y[X],Count}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b8}\put(5,5){\tt h}\end{picture}
+&\tt clA A[h]&Clear \q{A[h]}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt b9}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\end{picture}
+&\tt clY Y[X]&Clear \q{Y[X]}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt bb}\end{picture}
+&\tt clS S++&Clear \q{S++}\\
+\setlength{\unitlength}{0.1mm}\begin{picture}(200,50)
+\put(0,0){\framebox(200,40){}}
+\multiput(50,0)(50,0){3}{\line(0,1){10}}
+\put(155,5){\tt bc}\put(55,5){\tt Y\sub{hi}}\put(105,5){\tt Y\sub{lo}}\put(5,5){\tt h}\end{picture}
+&\tt clYY Y[X],h&Clear \q{Y[X],Count}\\
+\end{longtable}

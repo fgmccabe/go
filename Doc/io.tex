@@ -1,0 +1,712 @@
+\chapter{I/O and the File System}
+\label{io}
+
+As with most modern languages I/O is not part of the language specification per se. The reason for this is that the different potential platforms for computation are so wildly different that a single model for I/O cannot fit all cases. However, \go does come with an I/O package based on an object-oriented model of files and I/O.
+
+In order to use the standard file system it is necessary to \q{import} the \q{go.io} package:
+\begin{alltt}
+\emph{Program}\{
+  import go.io.
+  \ldots
+\}
+\end{alltt}
+This gives the \q{import}ing package access to the types, standard functions and standard input/output/error file channels.
+
+\section{Files}
+\label{io:url}
+\index{File names}
+\index{URL}
+\go file names are based on the URI file naming convention. A URI encodes not only the file name but also the \firstterm{transport protocol}{A mechanism used to access a resource or to deliver messages between applications.} required to access the file. Common protocols include \q{file:} which refers to a file on the local file system, \q{http:} which is used to access files provided by a WWW server and \q{ftp:} which is used to access files using FTP service. Not all file transports support write access -- in particular \q{http:} does not support writing .
+
+The format of a URI as understood by \go is:
+\begin{alltt}
+\emph{proto}://\emph{host}/\emph{file}
+\end{alltt}
+where \emph{proto} is one of \q{file}, \q{sys}, \q{http} or \q{ftp}, \emph{host} is either a hostname expressed using standard DNS notation or an IP address expressed using `quads'.
+
+If the \emph{host} is empty then the current or \q{localhost} is assumed.
+
+\begin{description}
+\item[file]
+\index{file@\q{file:}}
+The \q{file} protocol is used when accessing the local file system. \go enforces its own access rights management; and it may be that a given process is not permitted to access a certain file even if the top-level \go application is permitted. In addition, \emph{relative} file names are interpreted relative to a \emph{current working directory}. A relative file name is one that does not start with a leading \q{'/'} character.
+
+For example, a \q{file} file identifier referring to a file \q{myFile} in the current working directory may be referred to using the file descriptor:
+\begin{alltt}
+file://myFile
+\end{alltt}
+
+If no protocol token is given, then it is assumed that \q{file://} is pre\-pended to the URI. Thus the \q{myFile} file may also be identified with:
+\begin{alltt}
+myFile
+\end{alltt}
+
+\item[http]
+\index{http@\q{http:}}
+The \q{http} protocol uses the standard HTTP 0.9 protocol to request a WWW server to access a file. Although normally a WWW server is used to `deliver' HTML files, other types of file may be handled by WWW servers.
+
+\item[ftp]
+\index{ftp@\q{ftp:}}
+The \q{ftp} protocol uses the FTP protocol to access a file.\footnote{Not currently implemented.} Unlike \q{http}, the \q{ftp} protocol may be used to write to files as well as read from files. However, the remote system may refuse a request to write a file.
+\end{description}
+
+In addition, a remote system may request a user identification and password. This is supported within the stream I/O system with an additional protocol although it is also possible to build the identification and password into the URL.
+
+\subsection{Character Encoding}
+\label{io:encoding}
+\go supports Unicode internally and in its access to the file system. Internally, the story for Unicode support is relatively simple: all characters are represented as 16 bit Unicode value. However, externally the Unicode story is somewhat more complex; as a \go program is typically required to be able to read a mix of ASCII data, raw byte data, 16 bit Unicode (UTF16) and 8 bit Unicode (UTF8).
+
+\index{Character encoding in files}
+\index{Files!Character encoding in}
+Each file channel is associated with an encoding type which indicates the mapping between the internal representations and the date represented in the file. The \q{ioEncoding} type is a standard built-in type and is defined:
+\begin{alltt}
+ioEncoding ::= rawEncoding | 
+   utf16Encoding | utf16SwapEncoding |
+   utf8Encoding |
+   unknownEncoding.
+\end{alltt}
+The meaning associated with these encoding types is:
+\begin{description}
+\item[\q{rawEncoding}]
+This form of encoding is one byte per character, regardless of the actual data. For an input channel, this is equivalent to `normal' reading for Unicode un-aware systems. If your data is pure binary or ASCII, for example, you should use \q{rawEncoding} for your encoding type.
+
+It is an error to write character data whose encoding is outside the range 0..255 to an output channel that is flagged as using \q{rawEncoding}.
+
+\item[\q{utf16Encoding}]
+This form of encoding corresponds to the standard UTF16 character encoding. Each character is represented as 16 bits, or two bytes with the most significant byte first.
+\item[\q{utf16SwapEncoding}]
+This form of encoding corresponds to swapped UTF16 character encoding: each character is represented as two bytes with the least significant byte first.
+\item[\q{utf8Encoding}]
+This form of encoding corresponds to standard UTF8 character encoding. UTF8 encodes ASCII characters (as well as certain others) in a single byte, others are encoding as multi-byte sequences.
+
+In many ways this encoding is the safest for reading and writing text files. However, because the number of bytes per character depends on the data being processed, it is not very suitable for random access to files. Nor is it suitable for processing binary data.
+\item[\q{unknownEncoding}]
+This encoding style is most useful for reading data. The Unicode standard encourages the use of sentinel character data at the beginning of a text file. If present, the sentinel information is used to automatically determine if the encoding is actually one of \q{utf16Encoding} or \q{utf16SwapEncoding}. If no sentinel is present, then the encoding defaults to \q{utf8Encoding}. For an output channel, this is equivalent to \q{rawEncoding}.
+\end{description}
+Normally the encoding is defined at the time a file channel is opened; however, it is possible to \emph{change} the file encoding for certain kinds of file objects. Such a change affects any remaining input/output operations on the file.
+
+\subsection{Standard file types}
+\label{io:file-type}
+The two types \q{inChannel} and \q{outChannel} define the operations over input file objects and output file objects respectively. There are specific functions for different kinds of I/O channels: files, sockets and so on.
+
+The \q{inChannel} type interface summarized in Table~\vref{infile:methods}.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+Method&Type&Description\\
+\hline
+\q{inCh}&\q{[]=>char}&Next character\\
+\q{inBytes}&\q{[integer]=>list[integer]}&Next N bytes\\
+\q{inB}&\q{[]=>integer}&Next byte\\
+\q{inLine}&\q{[string]=>string}&Read a line\\
+\q{inText}&\q{[string]=>string}&Read text block\\
+\q{pos}&\q{[]=>integer}&current file position\\
+\q{seek}&\q{[integer]*}&reset file position\\
+\q{eof}&\q{[]\{\}}&End of file test\\
+\q{close}&\q{[]*}&Close file channel\\
+\q{setEncoding}&\q{[ioEncoding]*}&Change encoding\\
+\hline
+\end{tabular}
+\end{center}
+\caption{The \q{inChannel} interface\label{infile:methods}}
+\end{table}
+
+The \q{outChannel} interface is summarized in Table~\vref{outfile:methods}.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+Method&Type&Description\\
+\hline
+\q{outCh}&\q{[char]*}&Write \q{char}acter to file\\
+\q{outB}&\q{[integer]*}&Write a byte to file\\
+\q{outBytes}&\q{[list[integer]]*}&Write list of bytes\\
+\q{outStr}&\q{[string]*}&Write a string to file\\
+\q{outLine}&\q{[string]*}&Write a line\\
+\q{close}&\q{[]*}&Close the file channel\\
+\q{setEncoding}&\q{[ioEncoding]*}&Change encoding\\
+\hline
+\end{tabular}
+\end{center}
+\caption{The \q{outChannel} interface\label{outfile:methods}}
+\end{table}
+
+\section{Accessing Files}
+\label{io:file-access}
+
+\subsection{\q{ffile} -- determine the existence of a file}
+\label{io:ffile}
+\index{ffile@\q{ffile} predicate}
+\index{file presence}
+\synopsis{ffile}{[string]\{\}}
+The \q{ffile} predicate is satisfied if the file exists in the file system.
+
+
+\subsection{\q{ftype} -- determine the type of a file}
+\label{io:ftype}
+\index{ftype@\q{ftype} function}
+\index{file type}
+\synopsis{ftype}{[string]\funarrow{}fileType}
+The \q{ftype} function determines what kind of file, if any, a file is. The \q{fileType} type is defined as an algebraic type:
+\begin{alltt}
+  fileType ::= fifoSpecial | directory | charSpecial | blockSpecial 
+  | plainFile | symlink | socket | unknownFileType.
+\end{alltt}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The argument should be a ground string.
+\item[\constant{'eNOFILE'}]
+A component of the file path does not exist.
+\item[\constant{'eNOTFND'}]
+The named file does not exist
+\item[\constant{'eNOPERM'}]
+Insufficient privileges to access file, typically a component of the file path.
+\item[\constant{'eINVAL'}]
+An error, possibly too many symbolic links, encountered in trying to access the file.
+\item[\constant{'eIOERROR'}]
+An I/O error encountered while trying to access the file.
+\end{description}
+
+
+\subsection{\q{fmodes} -- determine permissions of a file}
+\label{io:fmodes}
+\index{fmodees@\q{fmodes} function}
+\index{file permissions}
+\synopsis{fmodes}{[string]\funarrow{}list[filePerm]}
+Determine the permission modes associated with a file. The returned value is a list of \q{filePerm} symbols, where \q{filePerm} is given by the type definition:
+\begin{alltt}
+  filePerm ::= setUid | setGid | stIcky | rUsr | wUsr | xUsr |
+  rGrp | wGrp | xGrp | rOth | wOth | xOth.
+\end{alltt}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The argument should be a ground string.
+\item[\constant{'eNOFILE'}]
+A component of the file path does not exist.
+\item[\constant{'eNOTFND'}]
+The named file does not exist
+\item[\constant{'eNOPERM'}]
+Insufficient privileges to access file, typically a component of the file path.
+\item[\constant{'eINVAL'}]
+An error, possibly too many symbolic links, encountered in trying to access the file.
+\item[\constant{'eIOERROR'}]
+An I/O error encountered while trying to access the file.
+\end{description}
+
+\subsection{\q{fsize} -- determine size of a file}
+\label{io:fsize}
+\index{fsize@\q{fsize} function}
+\index{file size}
+\synopsis{fsize}{[string]\funarrow{}integer}
+Determine the size of a file. The returned integer is the number of bytes in the file.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The argument should be a ground string.
+\item[\constant{'eNOFILE'}]
+A component of the file path does not exist.
+\item[\constant{'eNOTFND'}]
+The named file does not exist
+\item[\constant{'eNOPERM'}]
+Insufficient privileges to access file, typically a component of the file path.
+\item[\constant{'eINVAL'}]
+An error, possibly too many symbolic links, encountered in trying to access the file.
+\item[\constant{'eIOERROR'}]
+An I/O error encountered while trying to access the file.
+\end{description}
+
+\subsection{\q{frm} -- remove a file}
+\label{io:frm}
+\index{frm@\q{frm} action procedure}
+\index{delete a file}
+\synopsis{frm}{[string]*}
+Delete the named file from the file system.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The argument should be a ground string.
+\item[\constant{'eNOFILE'}]
+A component of the file path does not exist.
+\item[\constant{'eNOTFND'}]
+The named file does not exist
+\item[\constant{'eNOPERM'}]
+Insufficient privileges to access file, typically a component of the file path.
+\item[\constant{'eINVAL'}]
+An error, possibly too many symbolic links, encountered in trying to access the file.
+\item[\constant{'eIOERROR'}]
+An I/O error encountered while trying to access the file.
+\end{description}
+
+\subsection{\q{fmv} -- rename a file}
+\label{io:fmv}
+\index{fmv@\q{fmv} action procedure}
+\index{rename a file}
+\synopsis{fmv}{[string,string]*}
+Rename a file from the first argument to the second argument.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The argument should be a ground string.
+\item[\constant{'eNOFILE'}]
+A component of the file path does not exist.
+\item[\constant{'eNOTFND'}]
+The named file does not exist
+\item[\constant{'eNOPERM'}]
+Insufficient privileges to access file, typically a component of the file path.
+\item[\constant{'eINVAL'}]
+An error, possibly too many symbolic links, encountered in trying to access the file.
+\item[\constant{'eIOERROR'}]
+An I/O error encountered while trying to access the file.
+\end{description}
+
+\subsection{\q{fcwd} -- return current working directory}
+\label{io:cwd}
+\synopsis{fcwd}{[]=>string}
+The \q{fcwd()} function returns the current working directory.
+
+\begin{aside}
+This function should be used with care -- especially if the \q{fcd} action is also being used. The reason is that different threads may have different views of the current working directory.
+\end{aside}
+
+\subsection{\q{fcd} -- set current working directory}
+\label{io:cd}
+\synopsis{fcd}{[string]*}
+The \q{fcd()} action procedure sets the current working directory.
+
+\subsection{\q{fls} -- list of file names}
+\label{io:ls}
+\synopsis{fls}{[string]\funarrow{}\q{list[string]}}
+The \q{fls} function returns a list of the names of the files -- based on the patterns of its argument. A function call of the form 
+\begin{alltt}
+fls(".")
+\end{alltt}
+will return a list of the files in the current working directory.
+
+           
+\subsection{Open a file for reading}
+\label{io:openInFile}
+
+\synopsis{openInFile}{[string,ioEncoding]=>inChannel}
+
+The \q{openInFile} function returns an \q{inChannel} object that represents an input channel to the file specified in the argument. Note that this name is a file name, not a URL.
+
+The encoding argument is used to determine how to interpret incoming data: as raw (or ASCII) data, as UTF. If you don't know the encoding, use \q{unknownEncoding} and \go will attempt to guess the encoding of the data based on a possible sentinel character.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{uri} argument should be a ground string.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the file system.
+\item[\constant{'eNOFILE'}]
+The requested file does not exist.
+\item[\constant{'eCFGERR'}]
+A problem arose when attempting to open the file in a mode required by \go.
+\end{description}
+
+\subsection{Access a URL for reading}
+\label{io:openURL}
+\synopsis{openURL}{[string,ioEncoding]=>inChannel}
+The \q{openURL} function opens a URI -- as opposed to a file -- and returns an \q{inChannel} object. \q{openURL} supports the \go file name convention, including the possibility of using Internet based access protocols such as \q{ftp:} and \q{http:}.\footnote{Currently, only \q{file:} and \q{http:} are supported.}
+
+The encoding argument is used to determine how to interpret incoming data: as raw (or ASCII) data, as UTF.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{uri} argument should be a ground string.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the file system.
+\item[\constant{'eNOFILE'}]
+The requested file does not exist.
+\item[\constant{'eCFGERR'}]
+A problem arose when attempting to open the file in a mode required by \go.
+\end{description}
+
+\subsection{Create a file}
+\label{io:openOutFile}
+\synopsis{openOutFile}{[string,ioEncoding]=>outChannel}
+The \q{openOutFile} function generates a file channel that can be used for write access -- in file `create' mode -- of a file. \q{openOutFile} supports the \go file name convention, including the possibility of using Internet based access protocols such as \q{ftp:} and \q{http:}.\footnote{Currently, only \q{file:} and \q{http:} are supported.}
+
+The encoding argument is used to determine how to write the outgoing data: as raw (or ASCII) data, as UTF. If you require compatiblity with non-Unicode aware systems use \q{rawEncoding}; otherwise for character data \q{utf8Encoding} or \q{utf16Encoding} are suitable choices.
+
+Note that it is an error to write data in \q{rawEncoding} when writing character data with a non-zero leading byte. The \go system will strip off such extra data -- discarding it.
+
+If you specify \q{utf16Encoding} the \go system automatically inserts a Unicode sentinel character (\q{\bsl+fffe}) at the beginning of the file. This permits other UTF16-aware systems to read the character data.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{uri} argument should be a ground string.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the file system.
+\item[\constant{'eNOFILE'}]
+The requested file does not exist; normally this means that some intermediate directory in the \param{uri} does not exist.
+\item[\constant{'eCFGERR'}]
+A problem arose when attempting to open the file in a mode required by \go.
+\end{description}
+
+\subsection{Open file in append mode}
+\label{io:openappend}
+\index{append mode file open}
+\index{file open!append mode}
+\synopsis{openAppendFile}{[string,ioEncoding]=>outChannel}
+The \q{openAppendFile} function generates a file channel that can be used for write access -- in file `append' mode -- of a file. I.e., once opened, new data is appended to the end of the file. \q{openAppendFile} only supports the \q{file:} file name convention.
+
+The encoding argument is used to determine how to read and write the data: as raw (or ASCII) data, as UTF. If you require compatiblity with non-Unicode aware systems use \q{rawEncoding}; otherwise for character data \q{utf8Encoding} or \q{utf16Encoding} are suitable choices.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{uri} argument should be a ground string.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the file system.
+\item[\constant{'eNOFILE'}]
+The requested file does not exist.
+\item[\constant{'eCFGERR'}]
+A problem arose when attempting to open the file in a mode required by \go.
+\end{description}
+
+\subsection{Connect to TCP host}
+\label{io:tcpConnect}
+
+\synopsis{tcpConnect}{[string,integer,inChannel-,outChannel-,ioEncoding]*}
+
+The \q{tcpConnect} action procedure connects to a TCP/IP server as identified by the first parameter -- which is the \param{host} \q{string} -- and the second parameter -- which is the \param{port}. If the attempt is successful then a pair of file channels are returned: the \q{inChannel} channel is used to read data coming from the remote connection and the \q{outChannel} channel is used to write data to the remote connection.
+
+The encoding argument is used to determine how to read and write data to the remote connection: as raw (or ASCII) data, as UTF. If you require compatiblity with non-Unicode aware systems use \q{rawEncoding}; otherwise for character data \q{utf8Encoding} or \q{utf16Encoding} are suitable choices.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{host} argument should be a ground string.
+\item[\constant{'eINTNEEDD'}]
+The \param{port} argument should be a ground integer value.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the remote system.
+\item[\constant{'eINVAL'}]
+The \param{host} is not a legal host names or \param{port} is not a legal port identifier.
+\item[\constant{'eIOERROR'}]
+Unable to establish a connection to the remote host.
+\end{description}
+
+\subsection{Spawn a new process and connect to it}
+\label{io:pipeConnect}
+
+\synopsis{pipeConnect}{[string,list[string],list[(symbol,string)],\\
+outChannel-,inChannel-,inChannel-,ioEncoding]*}
+
+The \q{pipeConnect} action procedure spawns a separate process -- at the operating system level. An action such as
+\begin{alltt}
+pipeConnect(\emph{Cmd},\emph{Args},\emph{Env},\emph{sIn},\emph{sOut},\emph{sErr},\emph{encoding})
+\end{alltt}
+results in executing the command:
+\begin{alltt}
+\emph{Cmd Args}
+\end{alltt}
+with environment variables set from \param{Env}. The command argument \param{Cmd} should be a fully qualified program name -- it may be a script file -- giving the absolute path of the program to execute.
+
+Each element of the environment is a pair: a \q{symbol} denoting the environment variable to set and a \q{string} giving its value. This form of environment is consistent with \q{getenv} (see Section~\vref{misc:getenv}) and \q{envir} (see Section~\vref{misc:envir}).
+
+If the attempt to spawn the new command is successful then three file channels are returned: \param{sIn} is the new process's `input' channel -- i.e., data written to \param{sIn} will be read as input by the child process -- output generated by the child process will be available from the \param{sOut} file channel object and any error output of the child process (i.e., its \q{stderr}) will be available via the \param{sErr} channel.
+
+The \q{ioEncoding} argument is used to specify the encoding of the various channels to and from the sub-process.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+The \param{Cmd} argument should be a ground string.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access the remote system.
+\item[\constant{'eINVAL'}]
+The environment was not set up correctly, or one of the string arguments was not properly formed.
+\item[\constant{'eIOERROR'}]
+Unable to establish a connection to the spawned process.
+\end{description}
+
+\section{Reading from files}
+\label{io:reading}
+
+All of the following functions and actions reference an \q{inFile} object value as returned by a file opening operation.
+
+\subsection{\q{inCh} -- read a character}
+\label{io:inCh}
+
+\synopsis{\emph{inChannel}.inCh}{[]=>char}
+
+The \q{inCh} method of the \q{inChannel} class returns the next character from the input channel. If the channel is already at end of file, then an exception will be raised.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eEOF'}]
+Attempted to read past end of file.
+\item[\constant{'eIOERROR'}]
+I/O error arose when reading from the channel
+\end{description}
+
+\subsection{\q{inLine} -- read a line}
+\label{io:inLine}
+
+\synopsis{\emph{inChannel}.inLine}{[string]=>string}
+
+The \q{inLine} function returns the next line of text -- as a string -- from the \q{inFile} channel. A line of text is defined as the sequence of characters up to either end-of-file or until a terminating string is found -- the terminating string is the \q{string} argument passed in to \q{inLine}.
+
+To read a line that is terminated by the new-line character, use:
+\begin{alltt}
+\emph{inChannel}.inLine("\bsl{}n")
+\end{alltt}
+
+Hint:
+\begin{quote}
+Setting the \param{term} to \q{"\bsl{}r\bsl{}n"} will read a line in the `cr-lf' form; which is useful for certain Internet protocols.
+\end{quote}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eEOF'}]
+Attempted to read past end of file.
+\item[\constant{'eINSUFARG'}]
+The \param{term} string should be a ground string.
+\item[\constant{'eSTRNEEDD'}]
+The \param{term} string should be a ground string.
+\item[\constant{'eIOERROR'}]
+I/O error arose when reading from the channel
+\end{description}
+
+\subsection{\q{inB} -- read a byte}
+\label{io:inByte}
+
+\synopsis{\emph{inChannel}.inB}{[]=>integer}
+
+The \q{inB} method returns the next byte from the input channel -- \emph{as an \q{integer} value}.
+
+\begin{aside}
+The actual amount of data read by this function will depend on the encoding set for the file. If the file channel is set to read UTF8 or UTF16 encoded characters, then this will return the next unicode character -- a 16 bit value. Otherwise, \q{\emph{inChannel}.inB} will return a value corresponding to a single byte.
+\end{aside}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eEOF'}]
+Attempted to read past end of file.
+\item[\constant{'eIOERROR'}]
+I/O error arose when reading from the channel
+\end{description}
+
+\subsection{\q{inBytes} -- read a sequence of bytes}
+\label{io:inBytes}
+
+\synopsis{\emph{inChannel}.inBytes}{[integer]=>list[integer]}
+
+The \q{inBytes} method returns the next N characters from the input channel -- \emph{as a list of \q{integer} byte values}.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eEOF'}]
+Attempted to read past end of file.
+\item[\constant{'eIOERROR'}]
+I/O error arose when reading from the channel
+\end{description}
+
+
+\subsection{\q{inText} -- read a segment of text}
+\label{io:inText}
+
+\synopsis{\emph{inChannel}.inText}{[string]=>string}
+
+The \q{inText} function returns the next block of text -- as a string -- from the opened input channel. The block of text is defined as the sequence of characters up to one of the characters in the argument string. 
+
+To read a line that is terminated by the new-line character, use:
+\begin{alltt}
+\emph{file}.inText("\bsl{}n")
+\end{alltt}
+
+Hint:
+\begin{quote}
+Where the \param{term} string consists of just a single character, the \q{inText} function will have the same effect as \q{inLine}. 
+Setting the \param{term} string to the empty string will have the effect of reading the entire contents of the file in a single string.
+\end{quote}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eEOF'}]
+Attempted to read past end of file.
+\item[\constant{'eINSUFARG'}]
+The \param{term} string should be a ground string.
+\item[\constant{'eSTRNEEDD'}]
+The \param{term} string should be a ground string.
+\item[\constant{'eIOERROR'}]
+I/O error arose when reading from the channel
+\end{description}
+
+
+\subsection{\q{eof} -- test for end of file}
+\label{io:eof}
+
+\synopsis{\emph{inChannel}.eof}{[]\{\}}
+
+The \q{eof} predicate is true if the input channel is at the end of file. Attempting to read past the end of file -- i.e., when \q{\emph{inChannel}.eof()} is true -- will result in an \q{error} exception.
+
+\subsection{\q{close} -- close input channel}
+\label{io:inclose}
+
+\synopsis{\emph{inChannel}.close}{[]*}
+
+The \q{close} action closes the connection to the input channel.  Subsequent attempts to read from this channel will result in a \q{'noPERM'} error.
+
+
+\section{Writing to files}
+\label{io:writing}
+
+\subsection{\q{outCh} -- write a character}
+\label{io:outCh}
+
+\synopsis{\emph{outChannel}.outCh}{[char]*}
+
+The \q{outCh} action writes a character to the output channel.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this channel.
+\item[\constant{'ECHRNEEDD'}]
+The \param{C} argument should be a character.
+\item[\constant{'eIOERROR'}]
+I/O error arose when writing to the channel
+\end{description}
+
+\subsection{\q{outStr} -- write a string}
+\label{io:outStr}
+
+\synopsis{\emph{outChannel}.outStr}{[string]*}
+
+The \q{outStr} action writes a string to the output channel.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this channel.
+\item[\constant{'ECHRNEEDD'}]
+The \param{C} argument should be a character.
+\item[\constant{'eIOERROR'}]
+I/O error arose when writing to the channel
+\end{description}
+
+\subsection{\q{outLine} -- write a line}
+\label{io:outLine}
+
+\synopsis{\emph{outChannel}.outLine}{[string]*}
+
+The \q{outLine} action writes a string to the output channel, and follows it with a new-line character.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this channel.
+\item[\constant{'ECHRNEEDD'}]
+The \param{C} argument should be a character.
+\item[\constant{'eIOERROR'}]
+I/O error arose when writing to the channel
+\end{description}
+
+\subsection{\q{outB} -- write a byte}
+\label{io:outB}
+
+\synopsis{\emph{outChannel}.outB}{[integer]*}
+
+The \q{outB} action writes a single byte to the output channel. The argument to \q{outB} should be in the range 0..255.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+The client is not permitted to access this input channel.
+\item[\constant{'eINVAL}]
+A non-valid byte value was given.
+\item[\constant{'eIOERROR'}]
+I/O error arose when writing to the channel
+\end{description}
+
+\subsection{\q{close} -- close output channel}
+\label{io:outclose}
+
+\synopsis{\emph{outChannel}.close}{[]*}
+
+The \q{close} action closes the connection to the output channel. Any subsequent attempt to write to this channel will result in a \q{'noPERM'} error.
+
+\section{Standard I/O channels}
+\label{io:standard}
+The standard version of the I/O package includes three already opened files: \q{stdout} and \q{stderr} which are output files and \q{stdin} which is an input file. 
+
+\subsection{\q{stdin} -- standard input}
+\label{io:stdin}
+\synopsis{stdin}{inChannel}
+
+The \q{stdin} value is an \q{inChannel} object that represents the standard input to the \go application. Reading from \q{stdin} has the same effect as reading from the standard input.
+
+\subsection{\q{stdout} -- standard output}
+\label{io:stdout}
+\synopsis{stdout}{outChannel}
+
+The \q{stdout} value is an \q{outChannel} object that represents the standard output from the \go application. Writing to \q{stdout} has the effect of writing to the system's standard output.
+
+\subsection{\q{stderr} -- standard error output}
+\label{io:stderr}
+\synopsis{stderr}{outChannel}
+
+The \q{stderr} value is an \q{outChannel} object that represents the standard error output channel from the \go application. 
+
+\section{Establishing a TCP server}
+\label{io:tcp}
+\index{TCP server}
+\go has a simple, yet powerful, primitive that allows an application to easily establish a TCP \emph{server} on a particular port.
+
+\subsection{tcpServer}
+\label{io:tcp-server}
+\synopsis{tcpServer}{[integer,serverProc,ioEncoding]*}
+This action establishes a new TCP server that is listening on a specified port:
+\begin{alltt}
+tcpServer(9999,SrP,utf8Encoding)
+\end{alltt}
+The \q{tcpServer} action waits -- i.e., blocks the \go thread that is executing this action. When a remote client establishes a connection with a \go server then a subsiduary \go thread is \q{spawn}ed off to handle the new connection; the \q{spawn}ed thread executes the action
+\begin{alltt}
+SrP.exec(\emph{Host},\emph{hostIP},\emph{port},\emph{inP},\emph{outP})
+\end{alltt}
+where \emph{host} is the hostname of the computer making the connection, \emph{hostIP} is its IP address (both of which are \q{string}s), the local \emph{port} assigned to this connection, and the input channel (where the handler thread reads data from the connection) object \q{inP} and the output channel object -- where the handler writes to the connection.
+
+The IP address is a string in so-called quad form. Note that the host name is not necessarily reliable: it is possible to spoof hostnames; therefore you should only use this field for informational purposes. 
+
+The object \q{SrP} passed in to the \q{tcpServer} action should be of type \q{serverProc}:
+\begin{alltt}
+serverProc \impl \{ exec:[string,string,integer,inChannel,outChannel]* \}.
+\end{alltt}
+When the \q{SrP.exec()} action procedure terminates the connection to the remote client will be closed -- unless it already been closed through an error in the I/O handling. 
+
+The \q{ioEncoding} argument is used to control the encoding of character data passing between the server and the remote connections. 
+
+The \q{tcpServer} action itself does not normally terminate -- unless it was not possible to establish the TCP listening port or unless a permission predicate raises an exception during a test of an incoming connection. If it is desired, it is possible to spawn a separate thread whose purpose is to establish and execute the \q{tcpServer}, while other threads continue with application activities.
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINTNEEDD'}]
+The \param{port} argument should be an integer value.
+\item[\constant{'eNOPERM'}]
+The client is not permitted to establish a TCP listener.
+\item[\constant{'eCFGERR'}]
+A problem arose when attempting to establish the listener.
+\end{description}

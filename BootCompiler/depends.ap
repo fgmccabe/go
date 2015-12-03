@@ -1,0 +1,359 @@
+/*
+ * Dependency analysis/theta reformatting
+ * Based on the dependency analysis program in the April compiler.
+ * Computes a topological sort....
+*/
+#include "go.ah";
+
+module
+  import{
+    interface "errors.af" and
+    interface "abstract.af" and
+    interface "misc.af" and
+    interface <stdio.af>
+} in
+{
+  thetaDepend(Th,Env,Opts) => valof{
+    (Imports,Types,Inits,Defs) = thDepend(Th,Opts);
+
+    valis [Imports]<>analyseGroup(Types,Env,Opts)<>analyseGroup(Defs,Env,Opts)<>[Inits];
+  };
+
+  minPoint(X,Y) => {
+    if X<=Y || Y==0 then
+      X
+    else
+      Y
+  };
+  
+  sameName(IDEN(Lc,N1),T2) => case T2 in {
+    IDEN(_,N2) => N1==N2
+  | APPLY(_,IDEN(_,":"),[A,_]) => sameName(IDEN(Lc,N1),A)
+  | _ => false
+  };
+
+  analyseGroup(Defs,Env,Opts) => let {
+    stack:[];
+    defs:[];
+    groups:[];
+
+    analyseDefs(eX,Dfs) => valof{
+      groups := [];
+
+      defs := Dfs;
+          
+      if dbgDeps in Opts then{
+        "Analysing definitions\n">>stdout;
+
+        for (NN,Md,BB) in Dfs do
+          (if Md==private then "private " else "")++
+        display(NN)++":"++display(BB)++"\n">>stdout;
+        "-----\n">>stdout;
+      };
+
+      while [(Nm,Mode,El),..Df].=defs do{
+        if dbgDeps in Opts then
+          "Analyse definition: "<>display(El)<>"\n">>stdout;
+
+        _ = analyseDef(Nm,eX);
+      };
+
+      if dbgDeps in Opts then{
+        "Groups are\n">>stdout;
+
+        for gp in rev(groups) do{
+          "-----\n">>stdout;
+          showGroup("",gp);
+        };
+
+        "+++++\n">>stdout;
+      };
+      
+      valis rev(groups);
+    };
+
+    analyseDef(N,eX) => valof{
+      low = listlen(stack)+1;
+      point : low;
+
+      thisDef : [];
+      defs := collect{
+        for (E2,M2,B2) in defs do{
+          if sameName(N,E2) then{
+            stack := [(N,M2,low,B2),..stack];
+            thisDef := [B2,..thisDef]
+          }
+          else
+            elemis (E2,M2,B2)
+        }
+      };
+
+      if dbgDeps in Opts then{
+        "Analysing def "++display(N)++"\n">>stdout;
+        "Stack before analysis of def is\n">>stdout;
+        for (NN,Md,LL,BB) in stack do
+          display(NN)++"/"++display(BB)++":"++LL^0++"\n">>stdout;
+        "-----\n">>stdout;
+      };
+
+      for d in thisDef do
+        point := minPoint(point,analyse(d,low,eX)); -- analyse the elements
+
+      if dbgDeps in Opts then{
+        "Stack after analysis of def "++display(N)++" is\n">>stdout;
+        "low="++low^0++", point = "++point^0++"\n">>stdout;
+        for (NN,Md,LL,BB) in stack do
+          display(NN)++":"++LL^0++"\n">>stdout;
+        "-----\n">>stdout;
+      };
+
+      if low==point then {
+        gp : [];
+        while [(NN,Md,Mk,BB),..S] .= stack && Mk>=point do{
+          gp := [(NN,Md,BB),..gp];
+          stack := S;
+        };
+
+        if gp!=[] then{
+          
+          if dbgDeps in Opts then
+            showGroup("New group",gp);
+          groups := [gp,..groups];
+        }
+      };
+
+      if dbgDeps in Opts then
+        "Stack depth after analysing "++display(N)++" is "++listlen(stack)^0++"\n">>stdout;
+      valis point;
+    };
+
+    analyse(El,low,eX) => case El in {
+      IDEN(_,Nm) => valof {
+        if !(Nm in eX) then {
+          if (E2::sameName(El,E2),_,L,_) in stack then
+            valis L
+          else if (E2::sameName(El,E2),_,B) in defs then {
+            valis analyseDef(E2,[])
+          }
+          else
+            valis low;
+        }
+        else
+          valis low
+      }
+    | INT(_,_)=>low
+    | FLT(_,_)=>low
+    | ST(_,_)=>low
+    | SYM(_,_)=>low
+    | CHR(_,_)=>low
+    | VOID=>low
+    | TPL(_,L) => valof{
+        Low : low;
+        for El in L do
+          Low := minPoint(analyse(El,low,eX),Low);
+        valis Low
+      }
+    | APPLY(_,IDEN(_,".."),[Bnd,APPLY(_,IDEN(Lc,"{}"),[TPL(LcT,Th)])]) => valof{
+        eXX = extendExcl(Th,eX);
+        valis minPoint(analyse(Bnd,low,eXX),analyse(TPL(LcT,Th),low,eXX))
+      }
+    | APPLY(_,IDEN(_,"=>"),[P,APPLY(_,IDEN(_,":-"),[R,B])]) => 
+        minPoint(analyse(P,low,eX),minPoint(analyse(R,low,eX),analyse(B,low,eX)))
+    | APPLY(_,IDEN(_,":-"),[H,B]) => minPoint(analyse(H,low,eX),analyse(B,low,eX))
+    | APPLY(_,IDEN(_,"<~"),[H,B]) => minPoint(analyse(H,low,eX),analyse(B,low,eX))
+    | APPLY(_,IDEN(_,"=>"),[P,R]) => minPoint(analyse(P,low,eX),analyse(R,low,eX))
+    | APPLY(_,IDEN(_,"->"),[P,R]) => minPoint(analyse(P,low,eX),analyse(R,low,eX))
+    | APPLY(_,IDEN(_,"-->"),[APPLY(_,IDEN(_,"~"),[P,R]),B]) => 
+        minPoint(analyse(P,low,eX),minPoint(analyse(R,low,eX),analyse(B,low,eX)))
+    | APPLY(_,IDEN(_,"-->"),[P,R]) => minPoint(analyse(P,low,eX),analyse(R,low,eX))
+    | APPLY(_,IDEN(_,"."),[R,E]) => minPoint(analyse(R,low,eX),analyse(E,low,eX))
+    | APPLY(_,IDEN(_,":"),[P,R]) => minPoint(analyse(P,low,eX),analyse(R,low,eX))
+    | APPLY(_,L,R) => minPoint(analyse(TPL(noLoc,R),low,eX),analyse(L,low,eX))
+    | BRACE(_,L,R) => minPoint(analyse(TPL(noLoc,R),low,eX),analyse(L,low,eX))
+    | SQUARE(_,L,R) => minPoint(analyse(TPL(noLoc,R),low,eX),analyse(L,low,eX))
+    | _ => exception error("problem in analyse",'fail)
+    };
+
+    extendExcl(Th,eX) => valof{
+      eXX : [];
+      for El in Th do{
+        case El in{
+          APPLY(_,IDEN(_,":"),[IDEN(_,Nm),R]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,"=>"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,":-"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,":--"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,"->"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,"-->"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,"<$"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,"="),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | APPLY(_,IDEN(_,":="),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+
+        | APPLY(_,IDEN(_,"<~"),[IDEN(_,Nm),_]) -> {
+            if !Nm in eXX then
+              eXX := [Nm,..eXX]
+          }
+        | X -> {}
+        }
+      };
+      
+      valis eXX<>eX
+    };
+
+  } in analyseDefs([],Defs);
+
+  flattenTpl(X) => { if TPL(_,L).=X then L else [X] };
+    
+  showGroup(Title,g){
+    Title++":"++(g//+((.(N,M,X).)=>(if M==private then "private " else "")<>display(N)<>"="<>display(X)++"\n"))++"\n">>stdout;
+  };
+  
+  showGroups(Title,groups){
+    Title++"\n">>stdout;
+    for g in groups do
+      showGroup("",g)
+  };
+
+  checkName(IDEN(Lc,Nm),Defs){
+    if (IDEN(Lc0,!Nm),_,_) in Defs then
+      reportError("Multiple definitions of "++Nm++" not permitted, also at "++
+                  showLocation(Lc0),Lc)
+  };
+    
+  thDepend(Th,Opts) => valof{
+    Defs : [];                                    -- program definitions
+    Types : [];                                   -- type assignments
+    Inits : [];                                   -- initializers
+    Imports : [];
+    
+    for El in Th do{
+      if dbgDeps in Opts then
+        "Checking dependencies for "<>display(El)<>"\n">>stdout;
+
+      case El in{
+        APPLY(Lc0,IDEN(_,"<~"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Types);
+          Types := [(Id,private,APPLY(Lc0,IDEN(Lc,"<~"),[Id,R])),..Types]
+        }
+      | APPLY(_,IDEN(_,"<~"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Types);
+          Types := [(Id,public,El),..Types]
+        }
+      | APPLY(Lc0,IDEN(_,":"),[Id::IDEN(Lc,Nm).=Id,
+			       APPLY(_,IDEN(_,"private"),[R])]) -> {
+          Types := [(Id,private,APPLY(Lc0,IDEN(Lc,":"),[Id,R])),..Types]
+        }
+      | APPLY(_,IDEN(_,":"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          Types := [(Id,public,El),..Types]
+        }
+      | APPLY(Lc0,IDEN(_,"="),[Id::IDEN(Lc,Nm).=Id,
+			       APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc,"="),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,"="),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(_,":="),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc,":="),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,":="),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(_,"=>"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc,"=>"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,"=>"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(Lc1,":-"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc1,":-"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,":-"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(Lc1,":--"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc1,":--"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,":--"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(Lc1,"-->"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc1,"-->"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,"-->"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(Lc1,"->"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc1,"->"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,"->"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(Lc0,IDEN(Lc1,"<$"),[Id::IDEN(Lc,Nm).=Id,APPLY(_,IDEN(_,"private"),[R])]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,private,APPLY(Lc0,IDEN(Lc1,"<$"),[Id,R])),..Defs]
+        }
+      | APPLY(_,IDEN(_,"<$"),[Id::IDEN(Lc,Nm).=Id,R]) -> {
+          checkName(Id,Defs);
+          Defs := [(Id,public,El),..Defs]
+        }
+      | APPLY(_,IDEN(Lc,"import"),[I]) ->{
+          Id = IDEN(Lc,makePkgName(I));
+          checkName(Id,Defs);                     -- should not import same package twice
+          Imports := [(Id,private,El),..Imports];             -- imports must be done first
+        }
+      | APPLY(Lc0,IDEN(Lc,"$"),[I]) ->
+          Inits := [(IDEN(Lc,"$"),private,APPLY(Lc0,IDEN(Lc,"$"),[I])),..Inits]
+      | X ->
+          reportError("Invalid definition element `"++display(X)++"'",Context(X))
+      }
+    };
+    valis (Imports,Types,Inits,Defs)
+  };
+
+  makePkgName(Mod) => case Mod in {
+    IDEN(Lc,Nm) => Nm
+  | APPLY(_,IDEN(_,"."),[L,R]) => makePkgName(L)<>"."<>makePkgName(R)
+  };
+
+} export (thetaDepend,showGroup,showGroups);

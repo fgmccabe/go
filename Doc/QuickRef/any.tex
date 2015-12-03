@@ -1,0 +1,58 @@
+\subsection{Any expressions}
+\label{expression:any}
+\index{any expression}
+\index{??@\q{??} expression}
+\index{operaot!\q{??}}
+
+The \q{??} constructor is used to encapsulate heterogeneous values in a type-safe way. For example, using the \q{??} constructor we can have a list of the form:
+\begin{alltt}
+[??('foo'), ??(23), ??(((X)=>X*X))]
+\end{alltt}
+which mixes a list of symbols, numbers and even functions. This is permissable because the type of a \q{??} expression is \q{any}.
+
+Type inference of an \q{??} constructor function uses the inference rule:
+\begin{equation*}
+\forall t.\left\{\frac{\typeprd{E}{\q{A}}{t}}{\typeprd{E}{\q{??(A)}}{\q{any}}}\right\}
+\end{equation*}
+this is equivalent to the inference rule:
+\begin{prooftree}
+\AxiomC{$\exists t.\typeprd{E}{\q{A}}{t}$}
+\UnaryInfC{\typeprd{E}{\q{??(A)}}{\q{any}}}
+\end{prooftree}
+This transformation is legal because the quantified variable does not appear in the result type of the function type.
+
+In effect, \q{t} is an existentially quantified type variable in the definition for \q{??}.
+
+Even more important than the ability to package values of different types is the ability to `unwrap' such values in a type-safe way. Consider the equation:
+\begin{alltt}
+square(??(X)) => X*2
+\end{alltt}
+This function is of type:
+\begin{alltt}
+any=>number
+\end{alltt}
+however, it is not defined over all \q{any} values: it is only defined for numeric \q{any} values -- where the argument of the \q{??} constructor is a \q{number}. \go is required to verify this, potentially by ensuring at run-time that the constructor argument of \q{??} is a \q{number}.
+
+In order to achieve this, the \go compiler has to augment the run-time representation of the \q{??} constructor with a type description. The \go reference implementation does exactly this; however, a more detailed analysis of the program might determine that many uses of the \q{??} constructor are in fact of type \q{number}, in which case the program may be transformed into an equivalent one which does not require the run-time augmentation of \q{??}.
+
+\go imposes a restriction on existentially quantified type variables: that the type of value that is `packaged up' with the constructor itself be \emph{ground}. I.e., a function definition of the form:
+\begin{alltt}
+unwrap(??(X))=>X
+\end{alltt}
+is \emph{not} legal, as it is not possible to determine the correct type of \q{unwrap}; indeed, the type of \q{f} would be:
+\begin{alltt}
+[t]-((any)=>t)
+\end{alltt}
+I.e., this function could return any kind of desired type, and the type system would therefore sanction its use in any context. Clearly, this is not always safe. Hence, the \go system will ensure that the hidden type associated with an existentially quantified expression is ground. In this case, we might annotate \q{X} with a type expression:
+\begin{alltt}
+f2(??(X:number))=>X
+\end{alltt}
+The type of \q{f2} is more straightforward:
+\begin{alltt}
+(any)=>number
+\end{alltt}
+and the run-time system will ensure that the included argument within the \q{??} term is indeed a \q{number} -- otherwise an error exception will be raised.
+
+Existential types are convenient for `tunneling' disparate values via non-typed `channels'. The most important of such channels is message communication between processes -- the \q{any} type permits type-safe communication between \go processes even across the global Internet.
+
+ 

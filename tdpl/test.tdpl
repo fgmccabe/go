@@ -1,0 +1,17 @@
+-- A test grammar
+
+exp -> additive.
+
+additive -> L=mult Op=add_op R=additive { apply(Op,L,R).
+additive -> mult { $1 }.
+
+add_op -> "+" / "-".
+
+mult -> L=prim O=mult_op R=mult { apply(O,L,R) }.
+mult -> prim.
+
+mult_op -> "*"/"/".
+
+prim -> number / identifier / "(" exp ")".
+
+number -> "-"?[0-9]+.

@@ -1,0 +1,65 @@
+/* automatically generated -- do not edit */
+/* Module interface file for canonmap.aam */
+({
+    (mapSpec)=>char[]
+   }?mungePrefix,{
+    (mapSpec,char[])=>nameClass
+   }?lookupDefnType,{
+    (mapSpec,char[])=>char[]
+   }?mungeName,{
+    (mapSpec,char[])=>char[]
+   }?mungeLocalName,{
+    (mapSpec)=>canonTerm
+   }?thVar,{
+    (mapSpec)=>canonTerm
+   }?clVar,(mapSpec, char[], canonCode){}?defineProg,{
+    (mapSpec)=>(char[],canonCode)[]
+   }?defined,{
+    (mapSpec)=>canonCall[]
+   }?labelAccess,{
+    (mapSpec)=>canonTerm[]
+   }?labelArgs,{
+    (mapSpec)=>canonTerm[]
+   }?labelVars,{
+    (mapSpec)=>canonTerm[]
+   }?extraVars,{
+    (mapSpec,symbol)=>canonTerm
+   }?getProperty,(mapSpec, symbol, canonTerm){}?setProperty,(mapSpec, symbol){}?delProperty,{
+    (mapSpec,symbol)=>logical
+   }?isProperty,{
+    (mapSpec)=>canonTerm
+   }?mapLabel,{
+    (mapSpec,char[])=>nameClass
+   }?lookupNameDef,{
+    (nameClass)=>char[]
+   }?unpackName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupFunName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupRelName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupGrmName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupPrcName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupClassName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupTypeName,{
+    (mapSpec,char[])=>nameClass
+   }?lookupVarName,{
+    (mapSpec,char[],char[])=>nameClass
+   }?lookupPackageRef, %a-( %b-{
+    (char[],(char[][],(char[],typeBinding,type_tree)[], %a)[],att_tree(attTree)[], %b)=>mapSpec
+   })?setupModuleMap,{
+    (mapSpec,att_tree(attTree))=>mapSpec
+   }?setupClassMap,{
+    (mapSpec,att_tree(attTree))=>mapSpec
+   }?setupAnonClassMap,{
+    (mapSpec,char[],canonTerm,canonTerm[])=>mapSpec
+   }?setupSpawnMap,{
+    (mapSpec)=>mapSpec
+   }?setupRuleMap,{
+    (mapSpec)=>char[]
+   }?showMap,{
+    (mapSpec)=>mapSpec
+   }?cloneMap) from "canonmap.aam";

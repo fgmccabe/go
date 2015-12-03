@@ -1,0 +1,2351 @@
+/*
+ * Module to implement a sub-type relationship
+ */
+
+#include "go.ah";
+#include "go_tok.ah";
+
+module
+ import {
+  interface "ops.af" and
+  interface "errors.af" and
+  interface "misc.af" and
+  interface "types.af" and
+  interface <stdio.af>
+}
+in {
+
+  -- throws an error if X not a sub-type of Y. That way we can get a reason message
+  -- variables are represented as Lx < x < Ux, or Ly < y < Uy
+
+  returncode ::= yes | no | unknown;
+
+  subType(X,Y,Env){
+    R = currReset();
+
+    try{
+      sbType(deRef(X),deRef(Y),Env)
+    }
+    onerror{
+      E -> {
+        doReset(R);
+        exception E
+      }
+    }
+  };
+
+  sbType(XX,YY,Env){
+    X = deRef(XX); Y = deRef(YY);
+    case X in {
+      bound(L) -> {
+        if bound(L).=Y then {
+        }
+        else if (L,tvarBind,tL) in Env then
+          sbType(tL,Y,Env)
+        else
+          exception error(showType(X)<>" not defined",'fail)
+      }
+    | varType(Lx,_,_,_,Ux,SetUx,_,Kx) -> {         -- X is a type variable
+        case Y in {
+          bound(R) -> {
+            if (R,tvarBind,tR) in Env then{
+              sbType(X,tR,Env);
+            }
+            else
+              exception error(showType(Y)<>" not defined",'fail)
+          }
+        | varType(_,_,_,_,_,_,_,!Kx) -> {}              -- same variable
+        | varType(Ly,SetLy,_,_,Uy,_,_,Ky) ->           -- variable-variable binding
+            smType(X,Y,Env)
+        | allType(rV,rG,rT) -> 
+            sbType(X,rT,[(rV,tvarBind,rG),..Env])
+        | topType -> {}
+        | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+        | _ -> {
+            nUx = typeGlb(Ux(),Y,Env);
+
+            try{
+              sbType(Lx(),nUx,Env);
+              SetUx(nUx)
+            }
+            onerror{
+              error(Bec,'fail) -> 
+                exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                                "\nbecause "<>Bec,'fail)
+            }
+          }
+        }
+      }
+    | voidType -> {}                              -- bottom of the hierarchy
+
+    | typeType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | allType(rV,rG,rT) -> 
+          sbType(X,rT,[(rV,tvarBind,rG),..Env])
+      | topType -> {}
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | topType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | topType -> {}
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | tplType(L) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | tplType(R) -> {                           -- two tuple types
+          if listlen(L)==listlen(R) then{
+            lL : L; lR : R;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              sbType(lE,rE,Env);
+              lL := llL; lR := llR;
+            }
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | enuType(lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | enuType(rX) -> sbType(lX,rX,Env)	  -- and for the result type
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | conType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | conType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            lL : lA; lR : rA;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              sbType(rE,lE,Env);
+              lL := llL; lR := llR;
+            };
+            sbType(lX,rX,Env);                    -- and for the result type
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | sconType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | sconType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            sbArgs(lA,rA,Env);		     -- check for argument compatibility
+            sbType(lX,rX,Env);                    -- and for the result type
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+	}
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | funType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | funType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            sbArgs(lA,rA,Env);                    -- check for argument compatibility
+            sbType(lX,rX,Env);                    -- and for the result type
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | predType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | predType(rA) -> {
+          if listlen(lA)==listlen(rA) then
+            sbArgs(lA,rA,Env)
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | topType -> {}
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | actType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | actType(rA) -> {
+          if listlen(lA)==listlen(rA) then{
+            sbArgs(lA,rA,Env);                    -- check the arguments are Ok
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | grType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | grType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            sbArgs(lA,rA,Env);
+            sbType(rX,lX,Env);
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | faceType(lM) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) -> 
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | faceType(rM) -> {
+          for (Fld,Mode,rE) in rM do{            -- everything in Y must be in X
+            if (Fld,Mode,lE) in lM then{
+              sbType(lE,rE,Env)                   -- but still a subtype
+            }
+            else
+              exception error(showType(Y)<>" does not implement method: "<>Fld,'fail)
+          }
+        }
+      | uType(_,_,_) -> {
+          exception error(showType(X)<>" not a subtype of any user type, e.g.: "<>
+                          showType(Y),'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | uType(lPk,lNm,lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            sbType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,_) -> {
+          nG = typeLub(X,Ly(),Env);               -- x <~ Y, Ly <~ Y, Y <~ Uy
+
+          try{
+            sbType(nG,Uy(),Env);
+            SetLy(nG)                              -- we have a new lower bound
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | uType(!lPk,!lNm,rA) -> {
+          lL : lA; lR : rA;
+          while [lE,..llL].=lL && [rE,..llR].=lR do{
+            sbType(lE,rE,Env);
+            lL := llL; lR := llR;
+          }
+        }
+      | uType(rPk,rNm,rA) -> {
+          if (!lNm,typeBind,lDf) in Env then{
+            if (_,typeDef(lP,lSuper)).=freshen(lDf) then{
+              smType(lP,X,Env);			  -- bind the freshened variables
+
+              if uType(rPk,rNm,rP) in lSuper then
+                sbType(uType(rPk,rNm,rP),Y,Env)
+              else
+                exception error(showType(X)<>" not sub-type of "<>showType(Y),'fail)
+            }
+            else
+              exception error(showType(X)<>" has bad definition",'fail)
+          }
+          else
+            exception error(showType(X)<>" has no definition",'fail)
+        }
+      | topType -> {}
+      | voidType -> exception error(showType(X)<>" not consistent with void",'fail)
+      | faceType(rM) -> {			 -- X can be either face or stat
+          lM=fieldsOf(typeInterface(X,Env));     -- find the type's interface
+            
+          for (Fld,Mode,rE) in rM do{            -- everything in Y must be in X
+            if (Fld,Mode,lE) in lM then{
+              sbType(lE,rE,Env)                   -- but still a subtype
+            }
+            else
+              exception error(showType(X)<>" does not implement method: "<>Fld,'fail)
+          }
+        }
+
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | allType(lV,lG,lT) ->               -- universal on the left requires right
+        sbType(lT,Y,[(lV,tvarBind,voidType),..Env])
+    }
+  };
+
+  sbArgs(lA,rA,Env){
+    lL : lA; lR : rA;
+    while [(lE,lMd),..llL].=lL && [(rE,rMd),..llR].=lR do{
+      case rMd in {
+        inpMode -> {
+          case lMd in {
+            inpMode -> sbType(rE,lE,Env)  -- note contra-variance
+          | superMode -> sbType(rE,lE,Env)  -- super mode is like input mode
+          | biMode -> sbType(lE,rE,Env)
+          | outMode ->
+              exception error("output mode element: "<>showType(lE)<>
+			      " not consistent with input mode: "<>showType(rE),
+                              'fail)
+          }
+        }
+      | superMode -> {
+          case lMd in {
+            inpMode -> sbType(rE,lE,Env)  -- note contra-variance
+          | superMode -> sbType(rE,lE,Env)  -- super mode is like input mode
+          | biMode -> sbType(lE,rE,Env)
+          | outMode ->
+              exception error("output mode element: "<>showType(lE)<>
+			      " not consistent with input mode: "<>showType(rE),
+                              'fail)
+          }
+        }
+      | outMode -> {
+          case lMd in {
+            outMode -> sbType(lE,rE,Env)  -- note pro-variance
+          | biMode -> sbType(lE,rE,Env)
+          | inpMode ->
+              exception error("output mode element: "<>showType(rE)<>
+			      " not consistent with input mode: "<>showType(lE),'fail)
+          | superMode ->
+              exception error("output mode element: "<>showType(rE)<>
+			      " not consistent with super mode: "<>showType(lE),
+                              'fail)
+          }
+        }
+      | biMode -> {
+          case lMd in {
+	    inpMode -> sbType(rE,lE,Env)
+	  | superMode -> sbType(rE,lE,Env)
+	  | biMode -> smType(lE,rE,Env)
+	  | outMode -> sbType(lE,rE,Env)
+          }
+        }
+      };
+      lL := llL; lR := llR;
+    }
+  };
+
+  below(XX,YY,Keys,Env) => valof{
+    X = deRef(XX); Y = deRef(YY);
+
+    case X in {
+      bound(L) -> {
+        if bound(L).=Y then 
+          valis yes
+        else if (L,tvarBind,tL) in Env then
+          valis below(tL,Y,Keys,Env)
+        else
+          valis no
+      }
+    | varType(Lx,_,_,_,Ux,SetUx,_,Kx) -> {         -- X is a type variable
+        case Y in {
+          bound(R) -> {
+            if (R,tvarBind,tR) in Env then{
+              valis below(X,tR,Keys,Env);
+            }
+            else
+              valis no
+          }
+        | varType(_,_,_,_,_,_,_,!Kx) -> valis yes       -- same variable
+        | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {          -- variable-variable binding
+            if inUpper(X,Ky) then                 -- is Y already above X?
+              valis yes
+            else if inUpper(Y,Kx) then{           -- Y is less than X ...
+              valis no
+            }
+            else
+              valis unknown
+          }
+        | allType(rV,rG,rT) -> 
+            valis below(X,rT,Keys,[(rV,tvarBind,rG),..Env])
+        | topType -> valis yes
+        | voidType -> valis no
+        | _ -> {
+            if below(Ux(),Y,Keys,Env)==yes then
+              valis yes
+            else if !Kx in Keys && below(Y,Lx(),[Kx,..Keys],Env)==yes then
+              valis no
+            else
+              valis unknown
+          }
+        }
+      }
+    | voidType -> valis yes                       -- bottom of the hierarchy
+
+    | typeType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | allType(rV,rG,rT) -> 
+          valis no
+      | topType -> valis yes
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | _ ->
+          valis no
+      }
+
+    | topType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | voidType -> valis no
+      | topType -> valis yes
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if !Ky in Keys && below(X,Ly(),[Ky,..Keys],Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | _ ->
+          valis no
+      }
+    | tplType(L) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | tplType(R) -> {                           -- two tuple types
+          if listlen(L)==listlen(R) then{
+            lL : L; lR : R;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              ret = below(lE,rE,Keys,Env);
+              if ret!=yes then
+                valis ret;
+              lL := llL; lR := llR;
+            };
+            valis yes
+          }
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ ->
+          valis no
+      }
+    | enuType(lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | enuType(rX) -> 
+            valis below(lX,rX,Keys,Env)
+      | topType -> valis yes
+      | _ -> valis no
+      }
+
+    | conType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | conType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            lL : lA; lR : rA;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              ret = below(rE,lE,Keys,Env);
+              if ret!=yes then
+                valis ret;
+              lL := llL; lR := llR;
+            };
+            valis below(lX,rX,Keys,Env)
+          }
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+
+    | sconType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | sconType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            ret = blArgs(lA,rA,Keys,Env);
+
+            if ret!=yes then
+              valis ret
+            else
+              valis below(lX,rX,Keys,Env);
+          }
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+
+    | funType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | funType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            ret = blArgs(lA,rA,Keys,Env);
+
+            if ret!=yes then
+              valis ret
+            else
+              valis below(lX,rX,Keys,Env);
+          }
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+    | predType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | predType(rA) -> {
+          if listlen(lA)==listlen(rA) then
+            valis blArgs(lA,rA,Keys,Env)
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+    | actType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | actType(rA) -> {
+          if listlen(lA)==listlen(rA) then
+            valis blArgs(lA,rA,Keys,Env)
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+    | grType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | grType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            ret = blArgs(lA,rA,Keys,Env);
+            if ret!=yes then
+              valis ret
+            else
+              valis below(rX,lX,Keys,Env);
+          }
+          else
+            valis no
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+    | faceType(lM) -> case Y in {		  -- left is stateful
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | faceType(rM) -> {
+          for (Fld,Mode,lE) in rM do{            -- everything in Y must be in X
+            if (Fld,Mode,rE) in lM then{
+              ret = below(lE,rE,Keys,Env);        -- but still a subtype
+              if ret!=yes then
+                valis ret;
+            }
+            else
+              valis no
+          };
+          valis yes
+        }
+      | topType -> valis yes
+      | _ -> valis no
+      }
+    | uType(lPk,lNm,lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            valis below(X,tR,Keys,Env);
+          }
+          else
+            valis unknown
+        }
+      | varType(Ly,SetLy,_,_,Uy,_,_,Ky) -> {
+          if below(X,Ly(),Keys,Env)==yes then
+            valis yes
+          else if !Ky in Keys && below(Uy(),X,[Ky,..Keys],Env)==yes then
+            valis no
+          else
+            valis unknown
+        }
+      | uType(!lPk,!lNm,rA) -> {
+          lL : lA; lR : rA;
+          while [lE,..llL].=lL && [rE,..llR].=lR do{
+            ret = below(lE,rE,Keys,Env);
+            if ret!=yes then
+              valis ret;
+            lL := llL; lR := llR;
+          };
+          valis yes
+        }
+      | uType(rPk,rNm,rA) -> {
+          if (!lNm,typeBind,lDf) in Env then{
+            if (_,typeDef(lP,lSuper)).=freshen(lDf) then{
+              smType(lP,X,Env);			  -- bind the freshened variables
+
+              if uType(rPk,rNm,rP) in lSuper then
+                valis below(uType(rPk,rNm,rP),Y,Keys,Env)
+              else
+                valis no
+            }
+            else
+              valis unknown
+          }
+          else
+            valis unknown
+        }
+      | topType -> valis yes
+      | faceType(rM) -> {
+          lM=fieldsOf(typeInterface(X,Env));     -- find the type's interface
+            
+          for (Fld,Mode,lE) in rM do{            -- everything in Y must be in X
+            if (Fld,Mode,rE) in lM then{
+              ret = below(lE,rE,Keys,Env);        -- but still a subtype
+              if ret!=yes then
+                valis ret
+            }
+            else
+              valis no
+          };
+          valis yes
+        }
+      | _ -> valis no
+      }
+    | allType(lV,lG,lT) ->               -- universal on the left requires right
+        valis below(lT,Y,Keys,[(lV,tvarBind,voidType),..Env])
+    }
+  };
+
+  blArgs(lA,rA,Keys,Env) => valof{
+    lL : lA; lR : rA;
+    while [(lE,lMd),..llL].=lL && [(rE,rMd),..llR].=lR do{
+      ret = {
+        case rMd in {
+          inpMode => {
+            case lMd in {
+              inpMode => below(rE,lE,Keys,Env)  -- note contra-variance
+            | superMode => below(rE,lE,Keys,Env)  -- super mode is like input mode
+            | biMode => below(lE,rE,Keys,Env)
+            | outMode => no
+            }
+          }
+        | superMode => {
+            case lMd in {
+              inpMode => below(rE,lE,Keys,Env)  -- note contra-variance
+            | superMode => below(rE,lE,Keys,Env)  -- super mode is like input mode
+            | biMode => below(lE,rE,Keys,Env)
+            | outMode => no
+            }
+          }
+        | outMode => {
+            case lMd in {
+              outMode => below(lE,rE,Keys,Env)  -- note pro-variance
+            | biMode => below(lE,rE,Keys,Env)
+            | inpMode => no
+	    | superMode => no
+            }
+          }
+        | biMode => {
+            case lMd in {
+              inpMode => below(rE,lE,Keys,Env)
+            | superMode => below(rE,lE,Keys,Env)
+            | biMode => below(lE,rE,Keys,Env)
+            | outMode => below(lE,rE,Keys,Env)
+            }
+          }
+        }
+      };
+      
+      if ret!=yes then
+        valis ret;
+      lL := llL; lR := llR;
+    };
+    valis yes;
+  };
+
+
+  -- compute least upper bound of two types.
+  -- the smallest type larger than both
+
+  typeLub(XX,YY,Env) => valof{
+    X = deRef(XX); Y = deRef(YY);
+
+    if varType(Lx,_,_,_,Ux,_,_,Kx).=X then{
+      if varType(Ly,_,_,_,Uy,_,_,Ky).=Y then {
+        try{
+          subType(Ux(),Ly(),Env);
+          valis Y
+        }
+        onerror{
+          _ -> {
+            try{
+              subType(Uy(),Lx(),Env);
+              valis X
+            }
+            onerror{
+              _ -> {
+                try{
+                  subType(Ux(),Uy(),Env);
+                  valis Y
+                }
+                onerror{
+                  _ -> {
+                    sameType(X,Y,Env);
+                    valis X
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      else{                                       -- Y is not a type var
+        try{
+          subType(Ux(),Y,Env);
+          valis Y
+        }
+        onerror{
+          _ -> {
+            sameType(X,Y,Env);
+            valis X
+          }
+        }
+      }
+    }
+    else if varType(Ly,_,_,_,Uy,_,_,_).=Y then{       -- X is not a variable
+      try{
+        subType(Uy(),X,Env);
+        valis X
+      }
+      onerror{
+        _ -> {
+            sameType(X,Y,Env);
+          valis X
+        }
+      }
+    }
+    else {                                         -- neither are variable
+      case X in {
+        bound(Nm) -> if (Nm,tvarBind,tL) in Env then
+          valis typeLub(tL,Y,Env)
+        else
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      | voidType -> valis Y
+      | topType -> valis topType
+      | typeType -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | typeType -> valis typeType
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | tplType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            valis topType
+        | voidType -> valis X
+        | topType -> valis topType
+        | tplType(rA) -> valis tplType(collect{
+                                         rrA : rA; llA : lA;
+                                         while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+                                           elemis typeLub(lE,rE,Env);
+                                           llA := lxA; rrA := rxA;
+                                         }
+                                       })
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | enuType(lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | enuType(rR) -> 
+              valis enuType(typeLub(lR,rR,Env))
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | conType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | conType(rA,rR) -> {
+            if listlen(lA)==listlen(rA) then
+              valis conType(collect{
+                              rrA : rA; llA : lA;
+                              while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+                                elemis typeGlb(lE,rE,Env);
+                                llA := lxA; rrA := rxA;
+                              }
+                            },typeLub(lR,rR,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | sconType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | sconType(rA,rR) -> {
+            if listlen(lA)==listlen(rA) then
+              valis sconType(lubArgs(lA,rA,Env),typeLub(lR,rR,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | funType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | funType(rA,rR) -> {
+            if listlen(lA)==listlen(rA) then
+              valis funType(lubArgs(lA,rA,Env),typeLub(lR,rR,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | predType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | predType(rA) -> {
+            if listlen(lA)==listlen(rA) then
+              valis predType(lubArgs(lA,rA,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | actType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | actType(rA) -> {
+            if listlen(lA)==listlen(rA) then
+              valis actType(lubArgs(lA,rA,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | grType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+
+        | voidType -> valis X
+        | topType -> valis topType
+        | grType(rA,rR) -> {
+            if listlen(lA)==listlen(rA) then
+              valis grType(lubArgs(lA,rA,Env),typeGlb(lR,rR,Env))
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | faceType(lM) -> case Y in {		  -- state free interface
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | faceType(rM) -> valis faceType(collect{
+                                           for (Fld,Mode,lT) in lM do{
+                                             if (Fld,Mode,rT) in rM then
+                                               elemis (Fld,Mode,typeLub(lT,rT,Env))
+                                           }
+                                         })
+        | uType(Pk,Nm,A) -> {
+            rM=fieldsOf(typeInterface(Y,Env));     -- find the type's interface
+            
+            for (Fld,Mode,lE) in lM do{            -- everything in Y must be in X
+              if (Fld,Mode,rE) in rM then{
+                sbType(rE,lE,Env)                  -- but still a subtype
+              }
+              else
+                exception error(showType(X)<>" does not implement method: "<>Fld,'fail);
+              valis X;                        -- faces are bigger than defined types
+            }
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | uType(lPk,lNm,lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeLub(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis X
+        | topType -> valis topType
+        | uType(!lPk,!lNm,rA) -> valis uType(lPk,lNm,collect{
+					       rrA : rA; llA : lA;
+					       while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+						 elemis typeLub(lE,rE,Env);
+						 llA := lxA; rrA := rxA;
+					       }
+					     })
+        | uType(rPk,rNm,rA) -> {
+            if below(X,Y,[],Env)==yes then
+              valis Y
+            else if below(Y,X,[],Env)==yes then
+              valis X
+            else
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        | faceType(rM) -> {			  -- consistent only if the
+	    try{				  -- the user type is a
+	      lM=fieldsOf(typeInterface(X,Env));  -- stateless interface
+            
+	      for (Fld,Mode,rE) in rM do{            -- everything in Y must be in X
+		if (Fld,Mode,lE) in lM then{
+		  if below(lE,rE,[],Env)!=yes then  -- but still a subtype
+		    valis topType
+		}
+		else
+		  exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+	      }
+	    } onerror {
+	      _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+	    };
+            valis Y;                      -- faces are bigger than defined types
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | allType(A,G,lT) -> {
+          case Y in {
+            bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+              valis typeLub(X,tR,Env)
+            else
+              valis topType
+          | voidType -> valis X
+          | topType -> valis topType
+          | allType(B,bG,rT) ->
+              valis typeLub(lT,rT,[(B,tvarBind,bG),(A,tvarBind,G),..Env])
+          | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+          }
+        }
+      }
+    }
+  };
+
+  lubArgs(lA,rA,Env) => collect{
+    rrA : rA; llA : lA;
+    while [(lE,lM),..lxA].=llA && [(rE,rM),..rxA].=rrA do{
+      case lM in {
+        inpMode -> {
+          case rM in {
+            inpMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | superMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | biMode ->  elemis (typeGlb(lE,rE,Env),lM)
+          | outMode -> exception error(showType(lE)<>"+ not consistent with "<>
+                                       showType(rE)<>"-",'fail)
+          }
+        }
+      | superMode -> {
+          case rM in {
+            inpMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | superMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | biMode ->  elemis (typeGlb(lE,rE,Env),lM)
+          | outMode -> exception error(showType(lE)<>"++ not consistent with "<>
+                                       showType(rE)<>"-",'fail)
+          }
+        }
+      | outMode -> {
+          case rM in {
+            outMode -> elemis (typeLub(lE,rE,Env),lM)
+          | biMode -> elemis (typeLub(lE,rE,Env),lM)
+          | inpMode -> exception error(showType(lE)<>"- not consistent with "<>
+                                       showType(rE)<>"+",'fail)
+          | superMode -> exception error(showType(lE)<>"- not consistent with "<>
+					 showType(rE)<>"++",'fail)
+          }
+        }
+      | biMode -> {
+          case rM in {
+            inpMode -> elemis (typeGlb(lE,rE,Env),rM)
+          | superMode -> elemis (typeGlb(lE,rE,Env),rM)
+          | outMode -> elemis (typeLub(lE,rE,Env),rM)
+          | biMode -> elemis (typeLub(lE,rE,Env),rM)
+          }
+        }
+      };
+      llA := lxA; rrA := rxA;
+    }
+  };
+
+
+  -- compute greatest lower bound of two types.
+  -- the largest type smaller than both
+  typeGlb(XX,YY,Env) => valof{
+    X = deRef(XX); Y = deRef(YY);
+
+    if varType(Lx,_,_,_,Ux,_,_,Kx).=X then{
+      if varType(Ly,_,_,_,Uy,_,_,Ky).=Y then {
+        try{
+          subType(Ux(),Ly(),Env);
+          valis X
+        }
+        onerror{
+          _ -> {
+            try{
+              subType(Uy(),Lx(),Env);
+              valis Y
+            }
+            onerror{
+              _ -> {
+                try{
+                  subType(Ux(),Uy(),Env);
+                  valis X
+                }
+                onerror{
+                  _ -> {
+                    sameType(X,Y,Env);
+                    valis Y
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      else{                                       -- Y is not a type var
+
+        try{
+          subType(Ux(),Y,Env);
+          valis X
+        }
+        onerror{
+          _ -> {
+            sameType(X,Y,Env);
+            valis X
+          }
+        }
+      }
+    }
+    else if varType(Ly,_,_,_,Uy,_,_,_).=Y then{       -- X is not a variable
+      try{
+        subType(Uy(),X,Env);
+        valis Y
+      }
+      onerror{
+        _ -> {
+          sameType(X,Y,Env);
+          valis X
+        }
+      }
+    }
+    else{                                         -- neither are variable
+      case X in {
+        bound(Nm) -> if (Nm,tvarBind,tL) in Env then
+          valis typeGlb(tL,Y,Env)
+        else
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      | voidType -> valis voidType
+      | topType -> valis Y
+      | typeType -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | typeType -> valis typeType
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | tplType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            valis voidType
+        | voidType -> valis voidType
+        | topType -> valis X
+        | tplType(rA) -> valis tplType(collect{
+                                         rrA : rA; llA : lA;
+                                         while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+                                           elemis typeGlb(lE,rE,Env);
+                                           llA := lxA; rrA := rxA;
+                                         }
+                                       })
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | enuType(lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | enuType(rR) -> 
+            valis enuType(typeGlb(lR,rR,Env))
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | conType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | conType(rA,rR) -> if listlen(lA)==listlen(rA) then
+            valis conType(collect{
+                            rrA : rA; llA : lA;
+                            while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+                              elemis typeLub(lE,rE,Env);
+                              llA := lxA; rrA := rxA;
+                            }
+                          },typeGlb(lR,rR,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | sconType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | sconType(rA,rR) -> if listlen(lA)==listlen(rA) then
+            valis sconType(glbArgs(lA,rA,Env),typeGlb(lR,rR,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | funType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | funType(rA,rR) -> if listlen(lA)==listlen(rA) then
+            valis funType(glbArgs(lA,rA,Env),typeGlb(lR,rR,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | predType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | predType(rA) -> if listlen(lA)==listlen(rA) then
+            valis predType(glbArgs(lA,rA,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | actType(lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | actType(rA) -> if listlen(lA)==listlen(rA) then
+            valis actType(glbArgs(lA,rA,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | grType(lA,lR) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | grType(rA,rR) -> if listlen(lA)==listlen(rA) then
+            valis grType(glbArgs(lA,rA,Env),typeLub(lR,rR,Env))
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | faceType(lM) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | faceType(rM) -> valis faceType(collect{
+                                           for (Fld,Mode,lT) in lM do{
+                                             if (Fld,Mode,rT) in rM then
+                                               elemis (Fld,Mode,typeGlb(lT,rT,Env))
+                                             else
+                                               elemis (Fld,Mode,lT)
+                                           };
+                                           for (Fld,Mode,rT) in rM do{
+                                             if !(Fld,_,_) in lM then
+                                               elemis (Fld,Mode,rT)
+                                           }
+                                         })
+        | uType(_,_,_) -> {
+	    try{				  -- only consistent for
+	      rM=fieldsOf(typeInterface(Y,Env));  -- find the type's interface
+            
+	      for (Fld,Mode,lE) in lM do{	 -- everything in Y must be in X
+		if (Fld,Mode,rE) in rM then{
+		  if below(rE,lE,[],Env)!=yes then     -- but still a subtype
+		    exception error(showType(X)<>" not consistent with "<>
+				    showType(Y),'fail)
+		}
+		else
+		  exception error(showType(X)<>" does not implement method: "<>
+				  Fld,'fail);
+	      };
+              valis Y;			  -- faces are bigger than defined types
+            } onerror {
+	      _ -> exception error(showType(X)<>" not consistent with "<>
+				   showType(Y),'fail)
+	    }
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | uType(lPk,lNm,lA) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | uType(!lPk,!lNm,rA) -> 
+	    valis uType(lPk,lNm,collect{
+			  rrA : rA; llA : lA;
+			  while [lE,..lxA].=llA && [rE,..rxA].=rrA do{
+			    elemis typeGlb(lE,rE,Env);
+			    llA := lxA; rrA := rxA;
+			  }
+			})
+        | uType(rPk,rNm,rA) -> {
+            try{
+              subType(X,Y,Env);
+              valis X
+            }
+            onerror{
+              _ -> {
+                try{
+                  subType(Y,X,Env);
+                  valis Y
+                }
+                onerror{
+                  error(Bec,'fail) ->
+                    exception error(showType(X)<>" not consistent with "<>
+                                    showType(Y)<>"\nbecause "<>Bec,'fail)
+                }
+              }
+            }
+          }
+        | faceType(rM) -> {
+	    try{
+	      faceType(lM).=typeInterface(X,Env); -- find the type's interface
+            
+	      for (Fld,Mode,rE) in rM do{	 -- everything in Y must be in X
+		if (Fld,Mode,lE) in lM then{
+		  try{
+		    subType(lE,rE,Env);
+		  }
+		  onerror{
+		    _ -> 
+		      valis voidType
+		  }
+		}
+		else
+		  exception error(showType(X)<>" does not implement method: "<>Fld,'fail);
+	      };
+	      valis X;			  -- faces are bigger than defined types
+	    } onerror {
+	      _ -> exception error(showType(X)<>" not consistent with "<>
+				   showType(Y),'fail)
+	    }
+          }
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      | allType(A,G,lT) -> case Y in {
+          bound(Nm) -> if (Nm,tvarBind,tR) in Env then
+            valis typeGlb(X,tR,Env)
+          else
+            exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        | voidType -> valis voidType
+        | topType -> valis X
+        | allType(B,bG,rT) -> 
+            valis typeGlb(lT,rT,[(B,tvarBind,bG),(A,tvarBind,G),..Env])
+        | _ -> exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+        }
+      }
+    }
+  };
+
+  glbArgs(lA,rA,Env) => collect{
+    rrA : rA; llA : lA;
+    while [(lE,lM),..lxA].=llA && [(rE,rM),..rxA].=rrA do{
+      case lM in {
+        inpMode -> {
+          case rM in {
+            inpMode -> elemis (typeLub(lE,rE,Env),lM)
+          | superMode -> elemis (typeLub(lE,rE,Env),lM)
+          | biMode ->  elemis (typeLub(lE,rE,Env),lM)
+          | outMode -> exception error(showType(lE)<>"+ not consistent with "<>
+                                       showType(rE)<>"-",'fail)
+          }
+        }
+      | superMode -> {
+          case rM in {
+            inpMode -> elemis (typeLub(lE,rE,Env),lM)
+          | superMode -> elemis (typeLub(lE,rE,Env),lM)
+          | biMode ->  elemis (typeLub(lE,rE,Env),lM)
+          | outMode -> exception error(showType(lE)<>"++ not consistent with "<>
+                                       showType(rE)<>"-",'fail)
+          }
+        }
+      | outMode -> {
+          case rM in {
+            outMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | biMode -> elemis (typeGlb(lE,rE,Env),lM)
+          | inpMode -> exception error(showType(lE)<>"- not consistent with "<>
+                                       showType(rE)<>"+",'fail)
+          | superMode -> exception error(showType(lE)<>"- not consistent with "<>
+                                       showType(rE)<>"++",'fail)
+          }
+        }
+      | biMode -> {
+          case rM in {
+            inpMode -> elemis (typeLub(lE,rE,Env),rM)
+          | superMode -> elemis (typeLub(lE,rE,Env),rM)
+          | outMode -> elemis (typeGlb(lE,rE,Env),rM)
+          | biMode -> elemis (typeGlb(lE,rE,Env),rM)
+          }
+        }
+      };
+      llA := lxA; rrA := rxA;
+    }
+  };
+
+  sameType(X,Y,Env){
+    R = currReset();
+
+    try{
+      smType(X,Y,Env)
+    }
+    onerror{
+      E -> {
+        doReset(R);
+        exception E
+      }
+    }
+  };
+
+  smType(XX,YY,Env){
+    X = deRef(XX); Y = deRef(YY);
+
+    case X in {
+      bound(L) -> {
+        if ! bound(!L).=Y then {
+          if (L,tvarBind,tL) in Env then{
+            smType(tL,Y,Env);
+          }
+          else
+            exception error(showType(X)<>" not defined",'fail)
+        }
+      }
+    | varType(Lx,SetLx,Ex,SetEx,Ux,SetUx,_,Kx) -> {         -- A variable
+        case Y in {
+          bound(R) -> {
+            if (R,tvarBind,tR) in Env then{
+              smType(X,tR,Env);
+            }
+            else
+              exception error(showType(Y)<>" not defined",'fail)
+          }
+        | varType(_,_,_,_,_,_,_,!Kx) -> {}             -- nothing to do
+        | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,Ky) -> { -- variable-variable binding
+            nLx = typeLub(Lx(),Ly(),Env);
+            nUx = typeGlb(Ux(),Uy(),Env);
+
+            if below(nLx,nUx,[],Env)==no then -- Lx<~Ux == Ly<~Uy|-lub(Lx,Ly)<~glb(Ux,Uy)
+              exception error(showType(X)<>" not consistent with "<>showType(Y),'fail);
+
+	    if isReadOnly(X) then{
+	      if isReadOnly(Y) then
+		exception error("not permitted to bind two quantifiers: "<>showType(X)<>
+				" and "<>showType(Y),'fail)
+	      else
+		SetEy(X)
+	    }
+	    else if isReadOnly(Y) then
+	      SetEx(Y)
+	    else if Ky<Kx then{
+              SetEy(X);
+	      SetUx(nUx);
+	      SetLx(nLx);
+	    }
+            else{
+              SetEx(Y);
+	      SetUy(nUx);
+	      SetLy(nLx);
+	    }
+          }
+        | _ -> {
+            try{
+              SetEx(Y);				  -- bind X to Y
+              sbType(Lx(),Y,Env);
+              sbType(Y,Ux(),Env);
+            }
+            onerror{
+              error(Bec,'fail) ->
+                exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                                "\nbecause "<>Bec,'fail)
+            }
+          }
+        }
+      }
+    | voidType -> case Y in {                 -- bottom of the hierarchy
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | voidType -> {}
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | typeType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | typeType -> {}
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | topType -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | topType -> {}
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | tplType(L) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | tplType(R) -> {                           -- two tuple types
+          if listlen(L)==listlen(R) then{
+            lL : L; lR : R;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              smType(lE,rE,Env);
+              lL := llL; lR := llR;
+            }
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | enuType(lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | enuType(rX) ->
+            smType(lX,rX,Env)
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | conType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | conType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            lL : lA; lR : rA;
+            while [lE,..llL].=lL && [rE,..llR].=lR do{
+              smType(lE,rE,Env);
+              lL := llL; lR := llR;
+            };
+            smType(lX,rX,Env);
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | sconType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | sconType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            smArgs(lA,rA,Env);
+            smType(lX,rX,Env);
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+
+    | funType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | funType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            smArgs(lA,rA,Env);
+            smType(lX,rX,Env);
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | predType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | predType(rA) -> {
+          if listlen(lA)==listlen(rA) then{
+            smArgs(lA,rA,Env)
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | actType(lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);				  -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | actType(rA) -> {
+          if listlen(lA)==listlen(rA) then{
+            smArgs(lA,rA,Env)
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | grType(lA,lX) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{ 
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | grType(rA,rX) -> {
+          if listlen(lA)==listlen(rA) then{
+            smArgs(lA,rA,Env);
+            smType(rX,lX,Env);                     -- here too.
+          }
+          else
+            exception error("arity of "<>showType(X)<>" not consistent with "<>
+                            showType(Y),'fail)
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | faceType(lM) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | faceType(rM) -> {
+          for (Fld,Mode,lE) in rM do{            -- everything in Y must be in X
+            if (Fld,Mode,rE) in lM then{
+              smType(lE,rE,Env)                  -- but still a subtype
+            }
+            else
+              exception error(showType(X)<>" does not implement method: "<>Fld,'fail)
+          };
+          for (Fld,Mode,lE) in lM do{            -- everything in Y must be in X
+            if !(Fld,_,_) in rM then
+              exception error(showType(Y)<>" does not implement method: "<>
+			      Fld,'fail)
+	  }
+        }
+      | _ -> 
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | uType(lPk,lNm,lA) -> case Y in {
+        bound(R) -> {
+          if (R,tvarBind,tR) in Env then{
+            smType(X,tR,Env);
+          }
+          else
+            exception error(showType(Y)<>" not defined",'fail)
+        }
+      | varType(Ly,SetLy,Ey,SetEy,Uy,SetUy,_,_) -> {
+          try{
+            SetEy(X);                             -- bind Y to X
+            sbType(Ly(),X,Env);
+            sbType(X,Uy(),Env);
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error(showType(X)<>" not consistent with "<>showType(Y)<>
+                              "\nbecause "<>Bec,'fail)
+          }
+        }
+      | uType(!lPk,!lNm,rA) -> {
+          lL : lA; lR : rA;
+          while [lE,..llL].=lL && [rE,..llR].=lR do{
+            smType(lE,rE,Env);
+            lL := llL; lR := llR;
+          }
+        }
+      | uType(rPk,rNm,rA) -> 
+          exception error(showType(X)<>" not equal to "<>showType(Y),'fail)
+
+      | _ ->
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    | allType(lV,_,lT) -> {             -- universal on the left requires right also
+        if allType(rV,_,rT).=Y then
+          smType(lT,rT,[(lV,tvarBind,bound(rV)),(rV,tvarBind,bound(lV)),..Env])
+        else
+          exception error(showType(X)<>" not consistent with "<>showType(Y),'fail)
+      }
+    }
+  };
+
+  smArgs(lA,rA,Env){
+    lL : lA; lR : rA;
+    while [(lE,lMd),..llL].=lL && [(rE,rMd),..llR].=lR do{
+      case rMd in {
+        inpMode -> {
+          case lMd in {
+            inpMode -> smType(rE,lE,Env)
+          | superMode -> smType(rE,lE,Env)
+          | biMode -> sbType(lE,rE,Env) 
+          | outMode ->
+              exception error("output mode element: "<>showType(lE)<>
+			      " not consistent with input mode: "<>showType(rE),
+                              'fail)
+          }
+        }
+      | superMode -> {
+          case lMd in {
+            inpMode -> smType(rE,lE,Env)
+          | superMode -> smType(rE,lE,Env)
+          | biMode -> sbType(lE,rE,Env) 
+          | outMode ->
+              exception error("output mode element: "<>showType(lE)<>
+			      " not consistent with input mode: "<>showType(rE),
+                              'fail)
+          }
+        }
+      | outMode -> {
+          case lMd in {
+            outMode -> smType(rE,lE,Env)
+          | biMode -> sbType(rE,lE,Env)
+          | inpMode ->
+              exception error("output mode element: "<>showType(rE)<>
+			      " not consistent with input mode: "<>showType(lE),
+                              'fail)
+          | superMode ->
+              exception error("output mode element: "<>showType(rE)<>
+			      " not consistent with super mode: "<>showType(lE),
+                              'fail)
+          }
+        }
+      | biMode -> {
+          case lMd in {
+            outMode -> sbType(rE,lE,Env)
+          | biMode -> smType(lE,rE,Env)
+          | inpMode -> sbType(lE,rE,Env)
+          | superMode -> sbType(lE,rE,Env)
+          }
+        }
+      };
+      lL := llL; lR := llR;
+    }
+  };
+
+  mkEnv = {
+    ([],[],Tail) => Tail
+  | ([bound(V),..B],[T,..A],Tail) => [(V,tvarBind,T),..mkEnv(B,A,Tail)]
+  };
+
+  typeInterface(Tp,Env) => valof{
+    case deRef(Tp) in {
+      uType(Pk,Nm,A) -> {
+        if (!Nm,typeBind,T::typeDef(uType(Pk,_,_),_).=stripForAlls(T)) in Env then{
+          try{
+            typeDef(uType(_,_,fA),I) .= stripForAlls(T);
+	    
+            if faceType(M) in I then
+              valis substituteType(faceType(M),mkEnv(fA,A,[]),[])
+            else
+              exception error("no definition known for type "<>showType(Tp),'fail)
+          }
+          onerror{
+            error(Bec,'fail) ->
+              exception error("cannot form interface of type expression: "<>
+                              showType(Tp)<>"\nbecause "<>Bec,'fail)
+          }
+        }
+	else if (!Nm,tvarBind,_) in Env then
+          exception error("temp definition",'notdef)
+        else
+          exception error("no definition given for type "<>showType(Tp),'fail)
+      }
+    | faceType(M) -> valis Tp
+    | allType(_,_,_) -> {
+	(_,fTp) = freshen(Tp);
+        valis typeInterface(fTp,Env)
+      }
+    | varType(Lx,_,_,_,Ux,_,_,_) ->
+        valis typeInterface(Ux(),Env)
+    | conType(_,_) ->
+	exception error("type "<>showType(Tp)<>" is a constructor type, not a named type (perhaps some missing arguments)",'fail)
+
+    | sconType(_,_) ->
+	exception error("type "<>showType(Tp)<>" is a constructor type, not a named type (perhaps some missing arguments)",'fail)
+
+    | _ ->
+        exception error("type "<>showType(Tp)<>" is not a named type",'fail)
+    }
+  };
+
+  typeSupers(Tp,Env) => valof{
+    case deRef(Tp) in {
+      uType(Pk,Nm,A) -> {
+        if (!Nm,typeBind,lDf::typeDef(uType(Pk,Nm,_),_).=stripForAlls(lDf)) in Env then{
+          if (_,typeDef(lP,lSuper)).=freshen(lDf) then{
+            smType(lP,Tp,Env);			  -- bind the freshened variables
+
+            valis collect{
+              for (T::uType(_,_,_).=T) in lSuper do
+                elemis T
+            }
+          }
+          else
+            valis []
+        }
+	else if (!Nm,tvarBind,_) in Env then
+          exception error("temp definition",'notdef)
+        else
+          exception error(showType(Tp)<>" has no definition",'fail)
+      }
+    | allType(_,_,_) ->{
+	(_,fTp).=freshen(Tp);
+        valis typeSupers(fTp,Env)
+      }
+    | varType(Lx,_,_,_,Ux,_,_,_) ->
+        valis typeSupers(Ux(),Env)
+    | _ ->
+        exception error("cannot determine super types of "<>showType(Tp),
+                        'internal)
+    }
+  };
+
+  __debug_display__(X) =>  { try { case X in {
+        any(T) => showType(T)
+      | any(LT) => showType(tplType(LT))
+      | any(E) => showEnvD(E,30)
+      | any(Z) => Z^0
+      }
+    }
+    onerror{
+      error(_,_) => X^0
+    }
+  };
+
+} export (subType,sameType,typeLub,typeGlb,mkEnv,typeInterface,typeSupers)

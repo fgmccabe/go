@@ -1,0 +1,20 @@
+
+#include "go_tok.ah";
+#include "terms.ah";
+#include "canon.ah";
+#include "comp.ah";
+
+compOpt ::= noCodeGen | wffOnly | typeCheckOnly | noMeta | genGOF
+          | sysGOF(string) | decOpt
+          | classPath(string[]) | noStdLib | version(string)
+          | bootOpt | showCanon | dbgComp | dbgType | dbgCanon
+          | dbgToken | dbgParse | dbgDeps
+          | dbgOpt  | noGenFail | genProfile | codeFile(string)
+          | bkPt(string) | noDbg(string) | dbg(string)  | dbgVar(string[])
+          | frameVars(canonTerm,canonTerm[])
+          | noAssert(string)
+          | inPkg(string) | inProg(string) ;
+
+#op('//+,infix,840);                              -- Map a list to a string
+
+

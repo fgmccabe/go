@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dl::ontology dl::name="surgery">
+  <dl::individual dl::name="Dr.Clearskin">
+    <dl::class dl::name="Doctor"/>
+    <dl::fills dl::property="specialty">
+      <dl::individual dl::name="dermatology"/>
+    </dl::fills>
+    <dl::fills dl::property="country">
+      <dl::individual dl::name="america"/>
+    </dl::fills>
+  </dl::individual>
+</dl::ontology>

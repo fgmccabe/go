@@ -1,0 +1,450 @@
+Conflict in state 19 between rule 16 and token PLUS resolved as reduce.
+Conflict in state 19 between rule 16 and token MINUS resolved as reduce.
+Conflict in state 19 between rule 16 and token STAR resolved as reduce.
+Conflict in state 19 between rule 16 and token SLASH resolved as reduce.
+Conflict in state 27 between rule 12 and token PLUS resolved as reduce.
+Conflict in state 27 between rule 12 and token MINUS resolved as reduce.
+Conflict in state 27 between rule 12 and token STAR resolved as shift.
+Conflict in state 27 between rule 12 and token SLASH resolved as shift.
+Conflict in state 28 between rule 13 and token PLUS resolved as reduce.
+Conflict in state 28 between rule 13 and token MINUS resolved as reduce.
+Conflict in state 28 between rule 13 and token STAR resolved as shift.
+Conflict in state 28 between rule 13 and token SLASH resolved as shift.
+Conflict in state 29 between rule 14 and token PLUS resolved as reduce.
+Conflict in state 29 between rule 14 and token MINUS resolved as reduce.
+Conflict in state 29 between rule 14 and token STAR resolved as reduce.
+Conflict in state 29 between rule 14 and token SLASH resolved as reduce.
+Conflict in state 30 between rule 15 and token PLUS resolved as reduce.
+Conflict in state 30 between rule 15 and token MINUS resolved as reduce.
+Conflict in state 30 between rule 15 and token STAR resolved as reduce.
+Conflict in state 30 between rule 15 and token SLASH resolved as reduce.
+
+Grammar
+rule 1    program -> statements
+rule 2    statements -> statements statement
+rule 3    statements -> statement
+rule 4    statement -> assignment
+rule 5    statement -> print
+rule 6    statement -> halt
+rule 7    assignment -> ID EQUAL exp SEMI
+rule 8    print -> PRINT exp SEMI
+rule 9    halt -> HALT SEMI
+rule 10   exp -> ID
+rule 11   exp -> INT
+rule 12   exp -> exp PLUS exp
+rule 13   exp -> exp MINUS exp
+rule 14   exp -> exp STAR exp
+rule 15   exp -> exp SLASH exp
+rule 16   exp -> MINUS exp
+rule 17   exp -> LPAR exp RPAR
+
+Terminals, with rules where they appear
+
+$ (-1)
+error (256)
+ID (257) 7 10
+INT (258) 11
+SEMI (259) 7 8 9
+EQUAL (260) 7
+PRINT (261) 8
+HALT (262) 9
+LPAR (263) 17
+RPAR (264) 17
+PLUS (265) 12
+MINUS (266) 13 16
+STAR (267) 14
+SLASH (268) 15
+UMINUS (269)
+
+Nonterminals, with rules where they appear
+
+program (16)
+    on left: 1
+statements (17)
+    on left: 2 3, on right: 1 2
+statement (18)
+    on left: 4 5 6, on right: 2 3
+assignment (19)
+    on left: 7, on right: 4
+print (20)
+    on left: 8, on right: 5
+halt (21)
+    on left: 9, on right: 6
+exp (22)
+    on left: 10 11 12 13 14 15 16 17, on right: 7 8 12 13 14 15 16
+    17
+
+
+state 0
+
+    ID  	shift, and go to state 1
+    PRINT	shift, and go to state 2
+    HALT	shift, and go to state 3
+
+    program	go to state 31
+    statements	go to state 4
+    statement	go to state 5
+    assignment	go to state 6
+    print	go to state 7
+    halt	go to state 8
+
+
+
+state 1
+
+    assignment  ->  ID . EQUAL exp SEMI   (rule 7)
+
+    EQUAL	shift, and go to state 9
+
+
+
+state 2
+
+    print  ->  PRINT . exp SEMI   (rule 8)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 14
+
+
+
+state 3
+
+    halt  ->  HALT . SEMI   (rule 9)
+
+    SEMI	shift, and go to state 15
+
+
+
+state 4
+
+    program  ->  statements .   (rule 1)
+    statements  ->  statements . statement   (rule 2)
+
+    ID  	shift, and go to state 1
+    PRINT	shift, and go to state 2
+    HALT	shift, and go to state 3
+
+    $default	reduce using rule 1 (program)
+
+    statement	go to state 16
+    assignment	go to state 6
+    print	go to state 7
+    halt	go to state 8
+
+
+
+state 5
+
+    statements  ->  statement .   (rule 3)
+
+    $default	reduce using rule 3 (statements)
+
+
+
+state 6
+
+    statement  ->  assignment .   (rule 4)
+
+    $default	reduce using rule 4 (statement)
+
+
+
+state 7
+
+    statement  ->  print .   (rule 5)
+
+    $default	reduce using rule 5 (statement)
+
+
+
+state 8
+
+    statement  ->  halt .   (rule 6)
+
+    $default	reduce using rule 6 (statement)
+
+
+
+state 9
+
+    assignment  ->  ID EQUAL . exp SEMI   (rule 7)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 17
+
+
+
+state 10
+
+    exp  ->  ID .   (rule 10)
+
+    $default	reduce using rule 10 (exp)
+
+
+
+state 11
+
+    exp  ->  INT .   (rule 11)
+
+    $default	reduce using rule 11 (exp)
+
+
+
+state 12
+
+    exp  ->  LPAR . exp RPAR   (rule 17)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 18
+
+
+
+state 13
+
+    exp  ->  MINUS . exp   (rule 16)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 19
+
+
+
+state 14
+
+    print  ->  PRINT exp . SEMI   (rule 8)
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+
+    SEMI	shift, and go to state 20
+    PLUS	shift, and go to state 21
+    MINUS	shift, and go to state 22
+    STAR	shift, and go to state 23
+    SLASH	shift, and go to state 24
+
+
+
+state 15
+
+    halt  ->  HALT SEMI .   (rule 9)
+
+    $default	reduce using rule 9 (halt)
+
+
+
+state 16
+
+    statements  ->  statements statement .   (rule 2)
+
+    $default	reduce using rule 2 (statements)
+
+
+
+state 17
+
+    assignment  ->  ID EQUAL exp . SEMI   (rule 7)
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+
+    SEMI	shift, and go to state 25
+    PLUS	shift, and go to state 21
+    MINUS	shift, and go to state 22
+    STAR	shift, and go to state 23
+    SLASH	shift, and go to state 24
+
+
+
+state 18
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+    exp  ->  LPAR exp . RPAR   (rule 17)
+
+    RPAR	shift, and go to state 26
+    PLUS	shift, and go to state 21
+    MINUS	shift, and go to state 22
+    STAR	shift, and go to state 23
+    SLASH	shift, and go to state 24
+
+
+
+state 19
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+    exp  ->  MINUS exp .   (rule 16)
+
+
+    $default	reduce using rule 16 (exp)
+
+
+
+state 20
+
+    print  ->  PRINT exp SEMI .   (rule 8)
+
+    $default	reduce using rule 8 (print)
+
+
+
+state 21
+
+    exp  ->  exp PLUS . exp   (rule 12)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 27
+
+
+
+state 22
+
+    exp  ->  exp MINUS . exp   (rule 13)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 28
+
+
+
+state 23
+
+    exp  ->  exp STAR . exp   (rule 14)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 29
+
+
+
+state 24
+
+    exp  ->  exp SLASH . exp   (rule 15)
+
+    ID  	shift, and go to state 10
+    INT 	shift, and go to state 11
+    LPAR	shift, and go to state 12
+    MINUS	shift, and go to state 13
+
+    exp 	go to state 30
+
+
+
+state 25
+
+    assignment  ->  ID EQUAL exp SEMI .   (rule 7)
+
+    $default	reduce using rule 7 (assignment)
+
+
+
+state 26
+
+    exp  ->  LPAR exp RPAR .   (rule 17)
+
+    $default	reduce using rule 17 (exp)
+
+
+
+state 27
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp PLUS exp .   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+
+    STAR	shift, and go to state 23
+    SLASH	shift, and go to state 24
+
+    $default	reduce using rule 12 (exp)
+
+
+
+state 28
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp MINUS exp .   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+
+    STAR	shift, and go to state 23
+    SLASH	shift, and go to state 24
+
+    $default	reduce using rule 13 (exp)
+
+
+
+state 29
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp STAR exp .   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+
+
+    $default	reduce using rule 14 (exp)
+
+
+
+state 30
+
+    exp  ->  exp . PLUS exp   (rule 12)
+    exp  ->  exp . MINUS exp   (rule 13)
+    exp  ->  exp . STAR exp   (rule 14)
+    exp  ->  exp . SLASH exp   (rule 15)
+    exp  ->  exp SLASH exp .   (rule 15)
+
+
+    $default	reduce using rule 15 (exp)
+
+
+
+state 31
+
+    $   	go to state 32
+
+
+
+state 32
+
+    $   	go to state 33
+
+
+
+state 33
+
+    $default	accept

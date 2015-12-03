@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Execute the gpg parser generator
+
+export PATH=/opt/go/bin:${PATH}
+export GO_DIR=/opt/go/:/opt/go/go/gpg/
+
+exec go gpg $*

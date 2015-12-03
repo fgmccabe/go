@@ -1,0 +1,152 @@
+\chapter{Grammar rules}
+\label{grammars}
+
+\index{logic grammars}
+\index{grammar rule}
+A \go grammar consists of grammar rules of the form:
+\begin{alltt}
+N,T\sub1,\ldots,T\subn --> R\sub1,\ldots,R\sub{k}
+\end{alltt}
+where \qe{N} is a non-terminal, \qe{T\subi} are all terminals and \qe{R\sub{j}} are either terminals or non-terminals.
+
+The stream of data that is processed by a grammar rule is typically a \q{string}. However, in general, the stream may be represented by any kind of list.
+
+\section{Grammar conditions}
+\index{logic grammars!basic conditions}
+
+\subsection{Terminal grammar condition}
+\label{grammar:terminal}
+
+\index{logic grammars!terminal}
+An expression enclosed in a list represents a \emph{terminal grammar condition}:
+\begin{alltt}
+[\emph{Exp}]
+\end{alltt}
+For grammar rules over strings, a \q{string} literal may act as a terminal grammar condition. The special case of the empty list, or empty string, is often used to denote an empty grammar condition.
+
+\subsection{Non-terminal grammar call}
+\label{grammar:nonterminal}
+
+\index{logic grammars!non terminal}
+A \emph{non-terminal grammar call} is of the form:
+\begin{alltt}
+\emph{nt(Args)}
+\end{alltt}
+this denotes a `call' to another grammar program.
+
+The default mode for passing arguments to a grammar non-terminal is \emph{bidirectional} -- arguments are unified rather than matched.
+
+\subsection{Class relative grammar call}
+\label{grammar:dot}
+\index{logic grammars!class relative non terminal}
+The class relative variant of the non-terminal invokes a grammar defined within a class:
+\begin{alltt}
+\emph{O}.Nt(A\sub1,\ldots,A\subn)
+\end{alltt}
+
+\subsection{Equality condition}
+\label{grammar:equality}
+
+\index{grammar!equality condition}
+\index{type inference!equality definition}
+An equality definition grammar condition:
+\begin{alltt}
+\emph{Ex\sub1} = \emph{Ex\sub2}
+\end{alltt}
+has no effect other than to ensure that two terms are equal.
+
+\subsection{Inequality condition}
+\label{grammar:notequality}
+
+\index{inequality}
+\index{grammar!inequality}
+The \q{!=} grammar condition is written:
+\begin{alltt}
+\emph{T\sub1} != \emph{T\sub2}
+\end{alltt}
+this is satisfied if the two expressions are \emph{not} unifiable.
+
+\subsection{Query condition}
+\label{grammar:goal}
+
+\index{logic grammars!goal condition}
+A \emph{query condition} is written:
+\begin{alltt}
+\{ \emph{Goal} \}
+\end{alltt}
+a query condition represents a predicate to be verified as part of the parsing process. Grammar query conditions do not `consume' any of the input.
+
+\subsection{Disjunction grammar condition}
+\label{grammar:disjunction}
+
+A grammar \emph{disjunction} is written:
+\begin{alltt}
+( \emph{G\sub1} | \emph{G\sub2} )
+\end{alltt}
+A grammar disjunction succeeds if either arm of the disjunction is able to parse the input stream.
+
+\subsection{Conditional grammar condition}
+\label{grammar:conditional}
+
+\index{logic grammars!conditional}
+A \emph{conditional} grammar condition is written:
+\begin{alltt}
+(\emph{T}?\emph{G\sub1}|\emph{G\sub2})
+\end{alltt}
+If the grammar condition qe{T} succeeds, then the grammar \emph{G\sub1} is used to parse the input, otherwise \emph{G\sub2} is used. Note that \qe{G\sub1} sees the input after \qe{T}; however, the \qe{G\sub2} branch must parse the entire input.
+
+\subsection{Negated grammar condition}
+\label{grammar:negation}
+
+\index{logic grammars!negated condition}
+A \emph{negated} grammar condition is written:
+\begin{alltt}
+\nasf{} \emph{G}
+\end{alltt}
+where \qe{G} is a grammar condition. A negated grammar condition succeeds if \qe{G} is not able to parse the input.
+
+\subsection{Iterated grammar}
+\label{grammar:iterator}
+\index{Iterated grammar condition}
+\index{logic grammar!iteration}
+
+The iterator grammar condition is written:
+\begin{alltt}
+\emph{G} * \emph{E} \uphat \emph{L}
+\end{alltt}
+This grammar succeeds if the grammar \emph{G} successfully parses any number of times. The result is returned in \emph{L} -- which consists of a list constructed from \emph{E}.
+
+\subsection{Error handler}
+\label{grammar:errorhandler}
+
+\index{error handling!in logic grammars}
+\index{logic grammars!error handling}
+An \q{onerror} grammar condition takes the form:
+\begin{alltt}
+\emph{G} onerror (\emph{P\sub1} --> \emph{G\sub1} | \ldots{} | \emph{P\subn} --> \emph{G\subn})
+\end{alltt}
+An \q{onerror} grammar condition has the same meaning as the condition \emph{G}; unless a run-time problem arises. In this case, the first clause in the handler that matches with the raised error is the one that is entered. 
+
+\subsection{Raise exception}
+\label{grammar:raise}
+
+\index{logic grammars!raise exception}
+\index{error handling!exceptions in logic grammars}
+The \q{raise} exception grammar condition is written:
+\begin{alltt}
+raise \emph{Ex}
+\end{alltt}
+This does not parse any input; it terminates processing of the input and raises the exception \qe{Ex}. 
+\begin{aside}
+By explicitly raising and handling exceptions in grammar rules we can add error handling and recovery to a grammar.
+\end{aside}
+
+\subsection{End of file}
+\label{grammar:eof}
+
+\index{logic grammars!end of file condition}
+The \q{eof} grammar condition:
+\begin{alltt}
+eof
+\end{alltt}
+is satisfied only at the end of the input.

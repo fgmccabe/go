@@ -1,0 +1,123 @@
+#include "go_tok.ah";
+#include "go.ah";
+
+module
+{
+
+  L //+ F => valof{
+    O : "";
+    for X in L do
+      O := O++F(X);
+    valis O
+  };
+
+  sequence(L,I,S,F,D) => valof{
+    out : I;
+    sep : [];
+    for E in L do{
+      out := out<>sep<>D(E);
+      sep := S;
+    };
+    valis out<>F
+  };
+
+  rev(X) => valof{
+    R : [];
+    for E in X do
+      R := [E,..R];
+    valis R;
+  };
+
+
+  sort(L,F) => case L in {
+    [] => []
+  | [X] => L
+  | [X,..R] => valof {
+      (A,B) = split(X,R,F);
+      valis sort(A,F)<>[X,..sort(B,F)]
+    }
+  };
+
+  split(X,L,F) => valof{
+    A : [];
+    B : [];
+    for E in L do{
+      if F(X,E) then
+        B:=[E,..B]
+      else
+        A:=[E,..A]
+    };
+    valis (A,B)
+  };
+
+  max = {
+    (A,B)::A>B => A
+  | (_,B) => B
+  };
+  
+  listmax(L) => valof{
+    max : 0;
+    for I in L do{
+      if I>max then
+        max := I
+    };
+    valis max;
+  };
+
+  vNo : 0;
+  genNew(prefix) => valof{
+    vNo := vNo+1;
+    valis prefix<>(char[]%%vNo)
+  };
+
+  listIfy(E,Key) => case E in {
+    APPLY(_,IDEN(_,!Key),[L,R]) => listIfy(L,Key)<>listIfy(R,Key)
+  | APPLY(_,IDEN(_,!Key),[L]) => listIfy(L,Key)
+  | _ => [E]
+  };
+  
+  flattenTpl(El) => { case El in {
+      TPL(_,L) => L
+    | _ => [El]
+    }
+  };
+
+  last([X,..L]) => valof{
+    LL : X;
+    for U in L do
+      LL := U;
+    valis LL;
+  };
+
+  fileRoot(f) => {
+    if _++"/"++T.=f then
+      fileRoot(T)
+    else if T++"."++_.=f then
+      fileRoot(T)
+    else
+      f
+  };
+
+  pairs = {
+    ([],[]) => []
+  | ([D,..L],[E,..R]) => [(D,E),..pairs(L,R)]
+  | (_,_) => exception error("nonmatching lists",'fail)
+  };
+
+  showLocation(Loc) => case Loc in {
+    noLoc => "unknown location"
+  | loc(fl,ln,pi,po) => "File "++fl++" at line "++ln^0
+  };
+
+  id(X)=>X;
+
+  chopTail(N) => chopLast(N,''/,[]);
+
+  chopLast = {
+    ([],_,A) => A
+  | ([C,..S],!C,A) => chopLast(S,C,[])
+  | ([X,..S],C,A) => chopLast(S,C,A<>[X])
+  };
+
+} export ((//+),pairs,rev,sort,max,listmax,genNew,listIfy,flattenTpl,last,fileRoot,
+          showLocation,id,sequence)

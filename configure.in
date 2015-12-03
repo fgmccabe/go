@@ -1,0 +1,443 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT
+AC_CONFIG_SRCDIR([Headers/signature.h])
+AM_INIT_AUTOMAKE(go,1.1f)
+
+dnl Add macros to aclocal include list
+ACLOCAL="aclocal -I macros"
+
+dnl We prefer to install in /opt
+AC_PREFIX_DEFAULT(/opt/go)
+
+dnl We want a configuration header file
+AC_CONFIG_HEADERS([config.h])
+
+dnl Check for system type
+AC_CANONICAL_HOST
+
+dlibext=.so
+
+case "$host_os" in
+    solaris* )
+    echo Set up for System V 
+    AC_DEFINE(SYSV,,[Check if we have a system 5 set up or not])
+    ;;
+  linux*)
+    go_LDFLAGS=-rdynamic
+    ;;
+  darwin* | rhapsody*)
+    dlibext=
+    ;;
+esac
+AC_SUBST(dlibext)
+
+AC_SUBST(go_LDFLAGS)
+
+dnl Checks for programs.
+AC_ISC_POSIX
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_INSTALL
+AM_PATH_LISPDIR
+AM_PROG_LIBTOOL
+
+dnl Check for X windows
+AC_PATH_XTRA
+if test "x$have_x" == xyes; then
+  XDIR=goXlib
+  GRAPHDIR=graph
+  GOXLIB="\${top_builddir}/goXlib/libxgo.la -lX11"
+  XGOMAKE=goXlib/Makefile
+  AC_DEFINE(GOXLIB,,[We have X windows])
+  AC_DEFINE(GRAPHDIR,,[We have X windows])
+fi
+AC_SUBST(XDIR)
+AC_SUBST(GRAPHDIR)
+AC_SUBST(GOXLIB)
+
+NA_DETECT_APRILDEP
+dnl NA_GO_EXT(required)
+dnl NA_DETECT_GO(required)
+
+dnl NA_DETECT_OPENSSL(optional)
+dnl if test $na_openssl != "not found"; then
+dnl   GOPENSSL=goSSL
+dnl  GOSSLIB="\${top_builddir}/goSSL/libgossl.la"
+dnl  SSLIB="-lssl"
+dnl  GOSSLMAKE=goSSL/Makefile
+dnl  AC_DEFINE(GOSSLIB,,[We have OpenSSL])
+dnl fi
+dnl AC_SUBST(GOPENSSL)
+dnl AC_SUBST(GOSSLIB)
+dnl AC_SUBST(SSLIB)
+
+NA_WITH_HTMLDIR
+NA_ENABLE_BUILDDOC
+
+dnl enable/disable ANSI colours in output
+AC_ARG_ENABLE(colours,
+[  --enable-colours        Turn on ANSI colours in output [default=yes]],
+[case "${enableval}" in
+   no)
+	AC_DEFINE(NOCOLOURS,,[Define NOCOLOURS to prevent ANSI output])
+	;;
+ esac],
+dnl colours enabled by default.
+[])
+
+dnl Set up debugging flag
+AC_ARG_ENABLE(debug,
+[  --enable-debug          Turn on debugging code],
+[case "${enableval}" in
+  yes)
+	CFLAGS='-g -Wall'
+	AC_DEFINE(ALLTRACE,,[Enable tracing debugging code to be compiled])
+	;;
+  hi)
+	CFLAGS='-g -Wall -O3'
+	AC_DEFINE(ALLTRACE,,[Enable tracing debugging code to be compiled])
+	;;
+  lo)
+	CFLAGS='-g -Wall'
+dnl    	AC_DEFINE(NDEBUG,,[Turn off assertion testing when enabled])
+dnl	AC_DEFINE(ALLTRACE,,[Enable tracing debugging code to be compiled])
+	;;
+  semi)
+        CFLAGS='-g -Wall -O3'
+       	AC_DEFINE(NDEBUG,,[Turn off assertion testing when enabled])
+        ;;
+  profile)
+	CFLAGS='-g -pg -Wall'
+	AC_DEFINE(ALLTRACE)
+	;;
+
+  no)  	CFLAGS='-O3 -Wall -DNDEBUG'
+       	AC_DEFINE(NDEBUG)
+       	AC_DEFINE(NOCOLOURS)
+      	;;
+  *)    CFLAGS='${enableval}'
+        AC_DEFINE(ALLTRACE)
+	;;
+esac],[CFLAGS='-O3 -Wall'
+AC_DEFINE(NDEBUG)
+AC_DEFINE(NOCOLOURS)])
+
+dnl Set up occurs check flag
+AC_ARG_ENABLE(occurs,
+[  --enable-occurs          Turn on occurs check],
+[case "${enableval}" in
+  yes)
+	AC_DEFINE(DO_OCCURS_CHECK,,[Define if we want to do occurs check])
+	;;
+
+  no)  	AC_DEFINE(NO_OCCURS_CHECK,,[Define if we want to do occurs check])
+      	;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-occurs) ;;
+esac],[AC_DEFINE(NO_OCCURS_CHECK,,[Define if we want to do occurs check])])
+
+
+dnl Pick up where an existing go system is, in order to allow cross compilation
+AC_ARG_WITH(go,
+[  --with-go[=dir]        Indicate location of an existing go installation],
+[godir=${withval}
+ goexec=${withval}/bin/go
+ gocomp=${withval}/bin/goc],
+[godir=\${top_builddir}
+  goexec=\${top_builddir}/Engine/go
+  gocomp=\${top_builddir}/BootCompiler/goc
+])
+
+AC_SUBST(gocomp)
+AC_SUBST(goexec)
+AC_SUBST(godir)
+
+dnl Figure out where to put the html stuff
+AC_ARG_WITH(htmldir,
+[  --with-html[=PREFIX/html]       Indicate location of the html dir],
+[htmldir=${withval}],
+[htmldir='${prefix}/html'])
+
+AC_SUBST(htmldir)
+
+dnl Pick up where ooio library
+
+
+AC_MSG_CHECKING([Looking for the the ooio library])
+AC_ARG_WITH(ooio,
+[  --with-ooio[=dir]        Indicate location of the ooio library],
+[ooiodir=${withval}],
+[ooiodir='/opt/nar/ooio']
+)
+
+AC_SUBST(ooiodir)
+AC_MSG_RESULT(${ooiodir})
+
+AC_MSG_CHECKING([if compiler allows zero array size])
+save_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
+struct {
+  int one;
+  char somemore[];
+} foo;
+
+foo.one = 1;
+]])],[AC_DEFINE(ZEROARRAYSIZE,, How to specify a zero array size)
+AC_MSG_RESULT(no)],[AC_DEFINE(ZEROARRAYSIZE, 0, How to specify a zero array size)
+AC_MSG_RESULT(yes)])
+CFLAGS="$save_cflags"
+
+dnl Pick up where April is
+AC_ARG_WITH(april,
+[  --with-april[=dir]        Indicate location of the april installation],
+[april=${withval}],
+[AC_PATH_PROG(april,april,/opt/april/bin/april,$PATH)
+])
+
+aprildir=`echo $april | sed -e s%/bin/april$%%`
+echo aprildir computed as $aprildir
+
+AC_SUBST(aprildir)
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(fcntl.h limits.h sys/time.h syslog.h unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+
+if test "x$prefix" != xNONE; then
+  GODIR=${prefix}
+else
+  GODIR=${ac_default_prefix}
+fi
+AC_SUBST(GODIR)
+
+AC_MSG_CHECKING([for alignment of long long])
+AC_CACHE_VAL(llong_alignment,
+[AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(){
+  long v1;
+  long long v2;
+  struct {
+    long v1;
+    long long v2;
+  } v3;
+
+  if(sizeof(v3)==sizeof(v1)+sizeof(v2))
+    exit(0);
+  else
+    exit(1);
+}]])],[llong_alignment=align32],[llong_alignment=align64],[llong_alignment=align64])])
+
+if test $llong_alignment = align64; then
+  AC_DEFINE(LLONG_ALIGNMENT,1,[Define with 1 if long long alignment is necessary])
+else
+  AC_DEFINE(LLONG_ALIGNMENT,0,[Define with 1 if long long alignment is necessary])
+fi
+AC_MSG_RESULT($llong_alignment)
+ 
+AC_MSG_CHECKING([for alignment of double])
+AC_CACHE_VAL(double_alignment,
+[AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(){
+  long v1;
+  double v2;
+  struct {
+    long v1;
+    double v2;
+  } v3;
+
+  if(sizeof(v3)==sizeof(v1)+sizeof(v2))
+    exit(0);
+  else
+    exit(1);
+}]])],[double_alignment=align32],[double_alignment=align64],[double_alignment=align64])])
+
+if test $double_alignment = align64; then
+  AC_DEFINE(DOUBLE_ALIGNMENT,1,[Define with 1 if double alignment is necessary])
+else
+  AC_DEFINE(DOUBLE_ALIGNMENT,0,[Define with 1 if double alignment is necessary])
+fi
+AC_MSG_RESULT($double_alignment)
+
+AC_CACHE_VAL(word16,
+[
+AC_CHECK_SIZEOF(long,4)
+AC_CHECK_SIZEOF(int,4)
+AC_CHECK_SIZEOF(short int,2)
+
+if test $ac_cv_sizeof_int = 2; then
+  word16="int"
+elif test $ac_cv_sizeof_short_int = 2; then
+  word16="short int"
+elif test $ac_cv_sizeof_long = 2; then
+  word16="long"
+else
+  AC_MSG_ERROR([cant determine a 16 bit int type])
+fi
+])
+AC_DEFINE_UNQUOTED(WORD16,$word16,[Define with a type that is 16 bits long])
+
+AC_CACHE_VAL(word32,
+[
+AC_CHECK_SIZEOF(long,4)
+AC_CHECK_SIZEOF(int,4)
+AC_CHECK_SIZEOF(short int,2)
+
+if test $ac_cv_sizeof_int = 4; then
+  word32="int"
+elif test $ac_cv_sizeof_short_int = 4; then
+  word32="short int"
+elif test $ac_cv_sizeof_long = 4; then
+  word32="long"
+else
+  AC_MSG_ERROR([cant determine a 32 bit int type])
+fi
+])
+AC_DEFINE_UNQUOTED(WORD32,$word32,[Define with a type that is 32 bits long])
+
+AC_MSG_CHECKING([32 bit int type])
+AC_MSG_RESULT($word32)
+ 
+AC_CACHE_VAL(word64,
+[
+AC_CHECK_SIZEOF(long long,8)
+AC_CHECK_SIZEOF(long,4)
+
+if test $ac_cv_sizeof_long_long = 8; then
+  word64="long long"
+elif test $ac_cv_sizeof_long = 8; then
+  word64="long"
+else
+  AC_MSG_ERROR([cant determine a 64 bit int type])
+fi
+])
+AC_DEFINE_UNQUOTED(WORD64,$word64,[Define with a type that is 64 bits long])
+
+
+AC_MSG_CHECKING([64 bit int type])
+AC_MSG_RESULT($word64)
+ 
+AC_CACHE_VAL(ptrint,
+[
+AC_CHECK_SIZEOF(void *,4)
+AC_CHECK_SIZEOF(unsigned long,4)
+AC_CHECK_SIZEOF(unsigned int,4)
+AC_CHECK_SIZEOF(unsigned short int,2)
+
+if test $ac_cv_sizeof_unsigned_long = $ac_cv_sizeof_void_p; then
+  ptrint="unsigned long"
+elif test $ac_cv_sizeof_unsigned_int = $ac_cv_sizeof_void_p; then
+  ptrint="unsigned int"
+elif test $ac_cv_sizeof_unsigned_short_int = $ac_cv_sizeof_void_p; then
+  ptrint="unsigned_short int"
+else
+  AC_MSG_ERROR([cant determine a size of a pointer])
+fi
+])
+AC_DEFINE_UNQUOTED(PTRINT,$ptrint,[Define a integer type that is the size of a pointer])
+AC_MSG_CHECKING([size of a pointer])
+AC_MSG_RESULT($ptrint)
+ 
+AC_MSG_CHECKING([getopt accepts '+' prefix])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <unistd.h>
+extern int optind;
+int main(int a, char *v[])
+{
+	int argc = 3;
+	char *argv[4] = { "self", "arg", "-h", NULL };
+
+	/* Returns success (zero) if -h option is detected (ie. getopt permutes) */
+
+	if (getopt(argc, argv, "+h") == -1) {
+		optind = 0; 
+		if (getopt(argc, argv, "h") == 'h')
+			return 0;
+	}
+
+	return 1;
+}
+]])],[AC_DEFINE(GNU_GETOPT_NOPERMUTE, "+",Define "+" prefix to make getopt posixly compliant (non-permuting),
+   "" if getopt does not support + prefix, or is non-permuting by default)
+AC_MSG_RESULT("yes")],[AC_DEFINE(GNU_GETOPT_NOPERMUTE, "",Define "+" prefix to make getopt posixly compliant (non-permuting),
+   "" if getopt does not support + prefix, or is non-permuting by default)
+AC_MSG_RESULT("no")],[AC_DEFINE(GNU_GETOPT_NOPERMUTE, "",Define "+" prefix to make getopt posixly compliant (non-permuting),
+   "" if getopt does not support + prefix, or is non-permuting by default)
+AC_MSG_RESULT("no")
+])
+
+dnl enable/disable dynamically loaded extensions to Go
+AC_ARG_ENABLE(dynext,
+[  --enable-dynext         Enable dynamically loaded extensions to Go! [default=yes]],
+[case "${enableval}" in
+   yes)
+	AC_DEFINE(DYNAMICEXT, 1, [Enable dynamically loaded extensions in Go!])
+        AC_CHECK_LIB(dl,dlopen)
+	;;
+   no)
+        ;;
+ esac],
+dnl extensions enabled by default
+[
+        AC_CHECK_LIB(dl,dlopen)
+])
+
+dnl Checks for library functions.
+AC_PROG_GCC_TRADITIONAL
+AC_TYPE_SIGNAL
+AC_FUNC_STRFTIME
+AC_CHECK_FUNCS(gethostname gettimeofday select socket strerror getdtablesize getrlimit timegm)
+AC_CHECK_FUNCS(localeconv)
+AC_CHECK_LIB(m,log10)
+AC_CHECK_LIB(socket,accept)
+AC_CHECK_LIB(nsl,inet_ntoa)
+
+dnl AM_GNU_GETTEXT
+dnl ALL_LINGUAS="en en_GB en_US"
+dnl Figure out where to put the locale stuff
+dnl AC_ARG_WITH(localedir,
+dnl [  --with-locale[=PREFIX/locale]       Indicate location of the localization dir],
+dnl [localedir=${withval}],
+dnl [localedir=${prefix}/locale])
+
+dnl AC_SUBST(localedir)
+dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$localedir")
+
+AC_CONFIG_FILES([Makefile
+        Headers/Makefile
+	mysql/Makefile
+	Engine/Headers/Makefile 
+	Engine/Makefile
+	Doc/Makefile
+	Doc/QuickRef/Makefile
+        Doc/version.tex
+	BootCompiler/april.Make
+	BootCompiler/go.Make
+	BootCompiler/Makefile
+        BootCompiler/goc
+	GoCompiler/Makefile
+	Tests/Makefile
+	go/Makefile
+	golex/Makefile
+	golex/golex
+	gpg/Makefile
+	gpg/gpg
+	rdf/Makefile
+	dl/Makefile
+	tdpl/Makefile
+        go.Make
+	go.spec
+        macros/Makefile
+        macros/bin/Makefile
+        ])
+AC_OUTPUT

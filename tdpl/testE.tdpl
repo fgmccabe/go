@@ -1,0 +1,7 @@
+-- Test E-elimination
+
+S -> L "a" M.
+L -> L M.
+L -> ().
+M -> M M.
+M -> ().

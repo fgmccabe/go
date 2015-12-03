@@ -1,0 +1,22 @@
+\chapter{Description Logic Library}
+\label{dl}
+Ontologies are becoming more and more important in recent times. Of course, the most famous ontology language is W3C's OWL. However, that language is quite complex and may have features that are not needed for most applications.
+
+The \q{dl} package is a highly simplified Description Logic system that allows you to represent simple ontologies and perform simple reasoning over them. You can access the \q{dl} package by using the:
+\libsynopsis{go.dl}
+import statement.
+The \q{dl} package allows you to construct an ontology knowledge base, to add concepts and individuals to it (either directly or by loading an ontology from an external XML file), test two concepts for subsumption, find the concepts associated with an individual and find individuals that satisfy a given concept.
+
+\section{XML Ontology files}
+\label{dl:xml}
+
+Perhaps the most convenient way of loading an ontology into an application is to use the \q{loadOntology} function. This parses an ontology file and returns a knowledge base containing that ontology.
+
+The format of a \q{dl} ontology XML file is simple and straightforward: each ontology file is has, as its root, a \q{dl::ontology} element:
+\begin{alltt}
+<?xml version="1.0" encoding="utf-8"?>
+<dl::ontology dl::name="\emph{OntologyName}">
+  \ldots
+</dl::ontology>
+\end{alltt}
+

@@ -1,0 +1,535 @@
+\chapter{Procedures and Actions}
+\label{actions}
+
+\index{action}
+Actions are central to any significant computer application; and \go supports this reality. The behavioral component of a \go program should be written using \go's action rule notation.
+
+Actions may only be invoked in a limited set of circumstances and action rules look different to clauses. In addition, action rules may have access to system resources -- such as the file and communications systems -- which are not immediately available to predicate programs or function programs.
+
+\index{program!procedure definition}
+\index{procedure definition}
+\index{action!action rule}
+\index{rule!action rule}
+\go's action rules represent the primary tool for constructing behaviors. \index{procedure}
+An \firstterm{action procedure}{A set of rules that defines a behavior in a program. Contrast, for example, with a \emph{predicate} program which defines a relation.}  consists of one of more action rules occurring contiguously in a class body or package separated \dotspace operator:
+\begin{alltt}
+\emph{name}(\emph{Ptn\sub1\sub1},\ldots,\emph{Ptn\sub1\subn}) :: \emph{G\sub1}-> \emph{Action\sub1}.
+\ldots
+\emph{name}(\emph{Ptn\sub{k}\sub1},\ldots,\emph{Ptn\sub{k}\subn}) :: \emph{G\sub{k}} -> \emph{Action\sub{k}}.
+\end{alltt}
+where \emph{Ptn\sub{i}} are pattern terms, \emph{G\subi} are guards (goal query conditions)  and \emph{Action\subi} are legal actions.
+
+In a similar fashion to equations, action rules are applied in turn -- from first to last in the action program. The first action rule that matches -- both the argument and the guard -- is used to reduce the call. No further action rule will be considered once a rule has successfully matched the call.
+
+By default, the mode of use of an argument for an action rule in \emph{input}. This means that the corresponding pattern is matched rather than being unified. However, by setting the mode of an action procedure's type to bidirectional or output, then the action rule can be used to return a result.
+
+\index{type inference!actions}
+The type inference rules associated with actions are mostly about the \safeact{E}{A} predicate: an action A, in a context E, is type safe if \safeact{E}{A}.
+
+\index{type inference!action rule}
+The key type inference rule for action rules is:
+\begin{equation}
+\insertBetweenHyps{\hskip-0.5pt}
+\AxiomC{\typeprd{\emph{E}}{\q{P}}{\q{[T\sub1,\ldots,T\subn]*}}}
+\AxiomC{\typeprd{\emph{E}}{\q{(\emph{A\sub1},\ldots,\emph{A\subn})}}{(\emph{T\sub1},\ldots,\emph{T\subn})}}
+\AxiomC{\safegoal{E}{G}}
+\noLine
+\TrinaryInfC{\safeact{E}{A}}
+\UnaryInfC{\typesafe{\emph{E}}{\q{P(\emph{A\sub1},\ldots,\emph{A\subn}) :: \emph{G} -> A}}}
+\DisplayProof
+\end{equation}
+which simply declares that if a procedure type is known, and the types of the arguments are consistent with that type, any guard present is type safe and the actions in the body are type safe then the rule is type consistent.
+
+\section{Basic actions}
+\label{action:basic}
+\index{action!basic}
+\index{basic actions}
+
+\index{action rule!non failure}
+\index{error exception!in action rule}
+\index{eFAIL@\q{eFAIL} exception}
+Note that actions are not permitted to fail. If an action does cause a failure -- for example by some internal goal query failing -- then an unexpected failure -- \q{'eFAIL'} -- \q{error} exception will be \q{raise}d.
+ 
+Apart from in action rules' bodies, actions can also be found in other kinds of rules -- for example, actions can be embedded in the bodies of \q{valof} and \q{spawn} expressions.
+
+\subsection{Empty action}
+\label{action:empty}
+
+\index{empty action}
+\index{action!empty}
+The empty action is written simply as an empty pair of braces: \q{\{\}}; and has no effect.
+
+\begin{equation}
+\AxiomC{}
+\UnaryInfC{\safeact{E}{\q{\{\}}}}
+\DisplayProof
+\end{equation}
+Empty actions are required for the base cases of recursive action procedures and for conditional actions where one or more of the arms of the conditional is empty.
+
+\subsection{Equality}
+\label{action:equality}
+
+\index{action!equality definition}
+\index{type inference!equality definition}
+An equality \emph{action} has no effect other than to ensure that two terms are equal. Typically, this is done to establish the value of an intermediate variable:
+\index{\q{=} operator}
+\index{operator!\q{=}}
+\begin{alltt}
+\emph{Ex\sub1} = \emph{Ex\sub2}
+\end{alltt}
+As with equality goals, an equality action is type safe if the types of the two expressions are the same:
+\begin{equation}
+\AxiomC{\typeprd{Env}{Ex\sub1}{T\sub{E}}}
+\AxiomC{\typeprd{Env}{Ex\sub2}{T\sub{E}}}
+\BinaryInfC{\safeact{\emph{E}}{\q{\emph{Ex\sub1} = \emph{Ex\sub2}}}}
+\DisplayProof
+\end{equation}
+Note, however, that unlike equality conditions, an equality action should not fail. A failed equality action will result in an \q{eFAIL} exception being raised.
+
+\subsection{Variable assignment}
+\label{action:assignment}
+
+\index{action!assignment}
+\index{:=@\q{:=} operator}
+\index{operator!\q{:=}}
+A variable assignment action assigns a new value to a re-assignable variable. It takes the form:
+\begin{alltt}
+\emph{V} := \emph{Ex}
+\end{alltt}
+Note that \emph{V} must be declared as a re-assignable variable in a package or class body; and that the assignment action must be \emph{inside} the scope of the variable.
+
+\index{\q{eINSUFARG} exception}
+In addition to the scope restriction, the new value of the variable -- \emph{Ex} -- must be \emph{ground}. Any attempt to assign a variable to a non-ground value will cause an \q{'eINSUFARG'} error to be raised.
+
+The type of an expression assigned to a variable must be a sub-type of the variable's type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{V}{T\sub{V}}}
+\AxiomC{\typeprd{Env}{Ex}{T\sub{E}}}
+\AxiomC{\subtype{T\sub{E}}{T\sub{V}}}
+\TrinaryInfC{\safeact{\emph{E}}{\q{\emph{V} := \emph{Ex}}}}
+\DisplayProof
+\end{equation}
+
+Note that although the re-assignable variable's value is always ground, the standard packages \q{dynamic} (see Section~\vref{dynamic:knowledge}) and \q{cell} (see Section~\vref{dynamic:cell}) do permit non-ground values to be stored.
+
+
+\subsection{Invoke procedure}
+\label{action:invoke}
+
+\index{action!invoke procedure}
+\index{procedure invocation}
+The procedure invoke action acts as a call to an action procedure -- which itself should be defined by action rules. 
+
+\index{type!safety of procedure call}
+The rules for type checking the argument of an action procedure call depend on the modes of the arguments -- as defined in the type of the procedure itself. Assuming that the type of a called procedure is known:
+\begin{equation}
+\typeprd{Env}{P}{\q{[\emph{t\sub1}\emph{mode\sub1},\ldots,\emph{t\subn}\emph{mode\subn}]*}}
+\end{equation}
+then the rules for type checking an argument \q{\emph{Ex\subi}} depends on the \emph{mode\subi} associated with argument \emph{i}:
+\begin{description}
+\item[input] This is the default mode for an action procedure. An input argument is correctly typed if its type is a subtype of (or same as) the required type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{Ex\subi}{T\sub{i}}}
+\AxiomC{\subtype{T\sub{i}}{t\sub{i}}}
+\BinaryInfC{\typesafe{\emph{E}}{\q{\emph{Ex\subi}}}}
+\DisplayProof
+\end{equation}
+\q{input} arguments are matched against: passing a variable into an action procedure in an input argument position will never cause that variable to become further instantiated.
+
+In fact, attempting to match a non-variable pattern against a variable input will cause the match to \emph{fail}.
+
+\item[super input] As with \q{input} moded arguments, the input argument is correctly typed if its types is a subtype of the required type:
+\begin{equation}
+\AxiomC{\typeprd{Env}{Ex\subi}{T\sub{i}}}
+\AxiomC{\subtype{T\sub{i}}{t\sub{i}}}
+\BinaryInfC{\typesafe{\emph{E}}{\q{\emph{Ex\subi}}}}
+\DisplayProof
+\end{equation}
+\q{super input} arguments are also matched against. However, the additional run-time aspect of \q{++} moded arguments is that the action procedure will \emph{suspend} if the actual argument is a variable.
+
+\item[output or bidirectional] arguments must have the \emph{same} type as denoted in \q{\emph{t\subi}}:
+\begin{equation}
+\AxiomC{\typeprd{Env}{Ex\subi}{t\sub{i}}}
+\AxiomC{\subtype{T\sub{i}}{t\sub{i}}}
+\BinaryInfC{\typesafe{\emph{E}}{\q{\emph{Ex\subi}}}}
+\DisplayProof
+\end{equation}
+\q{bidirectional} arguments are unified against. This means that the incoming argument may be side-effected as a result -- if the rule pattern is more specific than the actual argument.
+
+\q{output} arguments must be variable at the point of the call. The intention being that the called action procedure is responsible for determining its value. It is not guaranteed that the action procedure will instantiate the variable, only that it may. 
+
+Passing a non-variable to an output argument is considered an error, and the action procedure will fail to apply -- resulting in an error exception being raised.
+\end{description}
+
+\subsection{Class relative invocation}
+\label{action:dot}
+\index{action!class relative action}
+A variation on the regular invoke action is the 'dot'-invocation -- or class relative action. An action of the form:
+\begin{alltt}
+\emph{O}.P(A\sub1,\ldots,A\subn)
+\end{alltt}
+denotes that the action:
+\begin{alltt}
+P(A\sub1,\ldots,A\subn)\end{alltt}
+is to be executed relative to the class program identified by the term \q{\emph{O}}.
+
+\begin{aside}
+The type inference process is not always able to infer the type of an object in a class relative action call. 
+\end{aside}
+
+Other than the source of the type information for the called action procedure, the type inference rules for a dot-invocation are the same as for the unadorned procedure invocation (see Section~\vref{action:invoke}).
+
+\section{Combination actions}
+\label{action:combine}
+\index{action!combined}
+Combination actions are, as the name suggests, actions composed of other actions. \go has a similar range of action combiners to other languages; although the forms may be a little different -- particularly for iteration.
+
+\subsection{Action sequence}
+\label{action:sequence}
+
+\index{action!sequence}
+\index{sequence of actions}
+\index{\q{;} operator}
+\index{operator!\q{;}}
+A sequence of actions is written as a sequence of actions separated by semi-colons:
+\begin{alltt}
+\emph{A\sub1};\emph{A\sub2};\ldots;\emph{A\subn}
+\end{alltt}
+The actions in a sequence are executed in order.
+
+\index{type inference!action sequence}
+A sequence is type safe if all the actions are also type safe:
+\begin{equation}
+\insertBetweenHyps{\quad\ldots\quad}
+\AxiomC{\safeact{E}{A\sub1}}
+\AxiomC{\safeact{E}{A\subn}}
+\BinaryInfC{\safeact{E}{\emph{A\sub1};\ldots;\emph{A\subn}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Goal action}
+\label{action:goal}
+
+\index{action!goal action}
+\index{goal action}
+\index{\pling\xspace{}operator}
+\index{operator!\pling}
+The goal action allows a goal to take the role of an action. It is written as the goal surrounded by braces:
+\begin{alltt}
+\{ \emph{G} \}
+\end{alltt}
+\index{type inference!goal action}
+A goal is a type safe action if it is a type safe goal:
+\begin{equation}
+\insertBetweenHyps{\quad\ldots\quad}
+\AxiomC{\safegoal{E}{G}}
+\UnaryInfC{\safeact{E}{\q{\{$G$\}}}}
+\DisplayProof
+\end{equation}
+
+\index{\q{eFAIL} exception}
+The \emph{G} is expected to \emph{succeed}; if it does not then an \q{'eFAIL'} error exception will be raised. In keeping with this, only the first solution to the \emph{G} will be considered -- i.e., it is as though the \emph{G} were a `one-of' \emph{G}.
+
+\subsection{Conditional action}
+\label{action:conditional}
+\index{action!conditional action}
+\index{conditional action}
+The conditional action allows a programmer to specify one of two (or more) actions to take depending on whether a particular condition holds. 
+
+\index{test goal!in conditional action}
+A \firstterm{conditional}{A form of condition that applies a test to select one of two branches to apply. There are conditional forms of expression, action, predicate and grammar condition.} is a test goal; depending on whether it succeeds either the `then' action branch or the `else' action branch is taken.  Conditionals are written:
+\begin{alltt}
+\ldots{};(\emph{T}?\emph{A\sub1}|\emph{A\sub2});\ldots{}   -- \rm Note the parentheses
+\end{alltt}
+This can be read as:
+\begin{quote}
+if \emph{T} succeeds, then execute \emph{A\sub1}, otherwise execute \emph{A\sub2}.
+\end{quote}
+Only one solution of \emph{T} is attempted; i.e., it is as though \emph{T} were implicitly a one-of goal.
+
+Note that the precedences of operators is such that conditional actions must be surrounded by parentheses:
+\begin{alltt}
+action(A,B) ->
+    ( A > B ?
+      stdout.outLine("A is bigger")
+    | stdout.outLine("B is bigger or equal")
+    ).
+\end{alltt}    
+
+\index{type inference!conditional action}
+The type inference rule for conditional actions is:
+\begin{equation}
+\AxiomC{\safegoal{Env}{\q{T}}}
+\AxiomC{\safeact{Env}{\q{A\sub1}}}
+\AxiomC{\safeact{Env}{\q{A\sub2}}}
+\TrinaryInfC{\safeact{Env}{\q{T?A\sub1|A\sub2}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Forall action}
+\label{action:forall}
+\index{action!forall action}
+\index{forall action}
+\index{\q{*>} operator}
+\index{operator!\q{*>}}
+The forall action is an iteration action that repeats an action for each solution to a predicate condition.
+
+The form of the forall action is:
+\begin{alltt}
+\emph{T}*>\emph{A}
+\end{alltt}
+This can be read as:
+\begin{quote}
+For each answer that satisfies \emph{T} execute \emph{A}.
+\end{quote}
+
+\index{type inference!forall action}
+The type inference rule for forall actions is:
+\begin{equation}
+\AxiomC{\safegoal{Env}{\q{T}}}
+\AxiomC{\safeact{Env}{\q{A}}}
+\BinaryInfC{\safeact{Env}{\q{T *> A}}}
+\DisplayProof
+\end{equation}
+
+\subsection{Case analysis action}
+\label{action:case}
+\index{action!\q{case} action}
+\index{case@\q{case} action}
+\index{operator!case@\q{case}}
+
+The \q{case} action is a generalization of the conditional action supporting a range of possibilities. The form of the \q{case} action is:
+\begin{alltt}
+\ldots;case \emph{Exp} in (\emph{Ptn\sub1} -> \emph{Act\sub1} | \ldots| \emph{Ptn\subn} -> \emph{Act\subn});\ldots
+\end{alltt}
+The \q{case} action works by first of all evaluating the \emph{Exp}ression, then then \emph{matching} the value against the patterns \emph{Ptn\subi} in turn until one of them matches.
+
+In fact, \q{case} can be given a semantics in terms of an auxiliary procedure. If \emph{V\sub1},\ldots,\emph{V\sub{k}} are the free variables in \emph{Ptn\subi}, \emph{Act\sub{j}}, then a \q{case} action as above is equivalent to:
+\begin{alltt}
+\ldots;ActProc123(Exp,\emph{V\sub1},\ldots,\emph{V\sub{k}});\ldots
+
+ActProc123(Ptn\sub1,\emph{V\sub1},\ldots,\emph{V\sub{k}}) -> \emph{Act\sub1}.
+\ldots
+ActProc123(Ptn\subn,\emph{V\sub1},\ldots,\emph{V\sub{k}}) -> \emph{Act\subn}.
+\end{alltt}
+where \q{ActProc123} is a new identifier not occurring elsewhere in the program.
+
+A \q{case} action is type safe if the individual arms of the case match the governing expression; specifically if the pattern of case arms is the same as the governing expression's type and the case actions are also type safe:
+
+\begin{equation}
+\AxiomC{\typeprd{\emph{E}}{\q{P\subi}}{\q{T\sub{Ex}}}}
+\AxiomC{\safegoal{E}{G\subi}}
+\AxiomC{\safeact{E}{A\subi}}
+\TrinaryInfC{\safeact{\emph{E}}{\q{case Ex in (\ldots{}P\subi::\emph{G\subi} -> A\subi}\ldots)}}
+\DisplayProof
+\end{equation}
+where
+\begin{equation}
+\typeprd{\emph{E}}{\q{Ex}}{\q{T\sub{Ex}}}
+\end{equation}
+is the type assignment for the governing expression.
+
+\subsection{\q{valis} Action}
+\label{action:valis}
+
+\index{action!\q{valis} action}
+\index{\q{valis} action}
+\index{\q{valof} expression!returning a value}
+The \q{valis} action is used to `export' a value from an action sequence. The argument of a \q{valis} action is an expression; and the type of the expression becomes the type of the \q{valof} expression that the \q{valis} is embedded in:
+\begin{equation}
+\AxiomC{\typeprd{E}{X}{T\sub{X}}}
+\AxiomC{\safeact{E}{A\sub1}\quad\ldots\quad\safeact{E}{A\subn}}
+\BinaryInfC{\typeprd{E}{\q{valof\{A\sub1;\ldots;A\subi;valis X;A\sub{i+1};\ldots;A\subn\}}}{T\sub{X}}}
+\DisplayProof
+\end{equation}
+
+The \q{valis} action is legal within an \q{action} goal or \q{valof} expression's action sequence; it has no valid semantics outside that context. There may be any number of \q{valis} statements in such a statement sequence; if there are none, or if no \q{valis} action is executed, then the value of the corresponding \q{valof} is an unbound variable.
+
+Executing a \q{valis} action \emph{does not} terminate the action body, furthermore, if more than one \q{valis} is executed then they must all agree (unify) on their reported value. If different \q{valis} actions do not agree on their values then an \q{eFAIL} exception will be raised.
+
+The type of expression evaluate by the \q{valis} action should reflect its context: if the context is a \q{valof} expression, then the type of the \q{valof} expression is the same as the type of \q{valis} expression. If the context is an \q{action} goal, then the type associated with the \q{valis} should be \q{logical}; i.e., either \q{true} or \q{false}.
+
+\subsection{error handler}
+\label{action:errorhandler}
+
+\index{action!error handling}
+\index{error handling!in actions}
+\index{\q{onerror} action}
+\index{operator!\q{onerror}}
+An action may be protected by an error handler in a similar way to expressions and goals. An \q{onerror} action takes the form:
+
+\begin{alltt}
+\emph{Action} onerror (\emph{P\sub1} -> \emph{A\sub1} | \ldots{} | \emph{P\subn} -> \emph{A\subn})
+\end{alltt}
+In such an expression, \emph{Action}, \emph{A\subi} are all actions, and the types of \emph{P\subi} is of the standard error type \q{exception}:
+\index{type inference!\q{onerror} action}
+\begin{equation}
+\AxiomC{\safeact{E}{Action}}
+\AxiomC{\safeact{E}{A\subi}}
+\AxiomC{\typeprd{\emph{E}}{\q{P\subi}}{\q{exception}}}
+\TrinaryInfC{\safeact{\emph{E}}{Action~\q{onerror (\emph{P\sub1} \q{->} \emph{A\sub1}\q{|}\ldots\q{|}\emph{P\subn} \q{->} \emph{A\subn})}}}
+\DisplayProof
+\end{equation}
+Semantically, an \q{onerror} action has the same meaning as \emph{Action}; unless a run-time problem arises in the execution of the action. In this case, an error exception would be raised (of type \q{exception}); and the execution of \emph{Action} is terminated and one of the error handling clauses is used instead. The first clause in the handler that unifies with the raised exception is the one that is used.
+
+Note that it is quite possible for an exception to have been raised within the evaluation of \emph{Action}.
+
+\subsection{\q{raise} action}
+\label{action:raise}
+
+\index{raise exception action}
+\index{action!raise@\q{raise} an exception}
+\index{operator!\q{raise}}
+The \q{raise} action raises an exception which should be `caught' by an enclosing \q{onerror} form. The enclosing \q{onerror} form need not be an action: it may be within an \q{onerror} expression or goal. 
+
+The argument of a \q{raise} action is a \q{exception} expression:
+\begin{equation}
+\AxiomC{\typeprd{\emph{E}}{\emph{Er}}{\q{exception}}}
+\UnaryInfC{\safeact{E}{\q{raise}~\emph{Er}}}
+\DisplayProof
+\end{equation}
+
+
+\section{Threads}
+\label{action:threads}
+
+\go is a multi-threaded and distributed programming language -- in that there is support for \q{spawn}ing new threads of activity and there is support for coordinating threads.
+
+\go threads share program code and instances of classes; but do not share logical variables. In that sense, \go's thread system is not a replacement for coroutining or parallel execution of programs.
+
+\go has support for thread synchronization -- see Section~\vref{action:sync} -- and there are also some higher-level support for thread \emph{coordination} by means of message passing.
+
+\subsection{\q{spawn} Sub-thread}
+\label{action:spawn}
+
+\index{\q{spawn} sub-thread}
+\index{action!\q{spawn} sub-thread}
+\index{operator!\q{spawn}}
+\index{multi-threaded programming}
+The \q{spawn} action spawns a sub-thread; it is similar to the \q{spawn} expression -- see Section~\vref{expression:spawn} -- except that the identity of the spawned sub-thread is not returned in the \q{spawn} action.
+
+The form of a \q{spawn} action is:
+\begin{alltt}
+spawn \{ \emph{Action} \}
+\end{alltt}
+The type inference rule for \q{spawn} action shows that a \q{spawn} action is type safe if the embedded actions are:
+\begin{equation}
+\AxiomC{\safeact{E}{A\sub1;\ldots;A\subn}}
+\UnaryInfC{\safeact{\emph{Env}}{\q{spawn\{A\sub1;\ldots;A\subn\}}}}
+\DisplayProof
+\end{equation}
+The sub-thread executes its action independently of the invoking thread; and may terminate after or before the `parent'. 
+
+\subsection{Process Synchronization}
+\label{action:sync}
+
+All multi-threaded applications need to solve two related but separate problems: sharing resources between the processes and coordination between processes.
+
+\index{\q{sync} action}
+\index{action!\q{sync} action}
+\index{operator!\q{sync}}
+\index{Synchronized action}
+
+\index{shared resources}
+\index{objects!sharing}
+The purpose of the \q{sync} action is to effectively \emph{sequentialize} the actions that access and manipulate a shared resource; that way, the applications programmer can be guaranteed that while one thread is using the resource, other threads are locked out of accessing the resource. That, in turn, makes it easier to ensure that the resource's state is always well-formed.
+
+\begin{aside}
+Although synchronized access is a powerful technique that permits processes to share resources, two important caveats are required: for synchronized access to be effective \emph{all} accesses to the shared resource must be synchronized and it is sadly easy to mis-program synchronized actions and end up with dead-lock situations.
+
+Dead-lock occurs when more than one resource is being \q{sync}hr\-o\-ni\-zed on, and there is contention amongst the sharing processes -- some have one resource and others have the other resource and neither process can proceed. Such deadlocks can be avoided by ensuring that the \emph{order} of synchronization on resources is the same for all processes.
+
+We recommend the use of higher-level mechanisms, such as the message mailbox package \q{go.mbox} described in Chapter~\vref{message}.
+\end{aside}
+
+\noindent
+The effect of the \q{sync} action is to block other \q{sync}hronized actions -- on the same resource -- from being entered for the duration of the \q{sync} action. Thus it can be used to allow multiple threads of activity to safely share resources: without an equivalent of \q{sync} two threads could simultaneously access and modify a shared object without being aware of each other.
+
+\begin{aside}
+\index{synchronizing statefull objects}
+\go permits synchronization only on statefull objects. Unfortunately, it is not always possible to determine if an expression denoting an object is statefull at compile-time. This can lead to a run-time error exception.
+\end{aside}
+
+The simplest form of the \q{sync} action is:
+\begin{alltt}
+sync\{ \emph{Action} \}
+\end{alltt}
+This form of action is valid \emph{within} the definition of a method belonging to the shared object itself. The effect of this action is to ensure that only the current process is currently able to access \q{this} object in a synchronized mode during the course of executing \emph{Action}.
+
+If another process attempts to execute a \q{sync} action within the same object then it will be blocked until the \emph{Action} has either terminated normally or terminated via an exception.
+
+It is possible to \q{sync} on an `external' object, either within a method or completely outside any classes, using the form:
+\begin{alltt}
+sync(\meta{Object})\{ \emph{Action} \}
+\end{alltt}
+This version attempts to access the object \meta{Object} in a synchronized way. Again, this will only be possible if neither an internal method, nor any other program on another process has already sucessfully entered a \q{sync}hronized action.
+
+For example, the following action ensures that the \q{cell} variable \q{X} is only modified  while the thread has exclusive access to it:\footnote{This example is actually redundant as \q{cell} already implements this functionality.}
+\begin{alltt}
+\ldots;sync(X)\{X.set(\emph{newValue})\};\ldots
+\end{alltt}
+
+\paragraph{Multiple choice guarded synchronized}
+The `full' version of the \q{sync} action allows for the possibility of multiple guards and a \q{timeout}. Within a class, this form of \q{sync} takes the form:
+\begin{alltt}
+sync\{
+  \emph{Guard\sub1} -> \emph{Action\sub1}
+| \emph{Guard\sub2} -> \emph{Action\sub2}
+\ldots
+\} timeout (\emph{timeExp} -> \emph{TimeoutAction})
+\end{alltt}
+and when attempting to synchronize an external object the form is:
+\begin{alltt}
+sync(\emph{O})\{
+  \emph{Guard\sub1} -> \emph{Action\sub1}
+| \emph{Guard\sub2} -> \emph{Action\sub2}
+\ldots
+\} timeout (\emph{timeExp} -> \emph{TimeoutAction})
+\end{alltt}
+
+A simple \q{sync} action
+\begin{alltt}
+sync\{ \emph{Action} \}
+\end{alltt}
+is, in fact, equivalent to:
+\begin{alltt}
+sync(this)\{ true -> \emph{Action} \}
+\end{alltt}
+
+Note that the \q{timeout} clause is optional; if given the \emph{timeExp} should refer to an absolute time -- preferably in the future. 
+
+The operational semantics of the full form of \q{sync} action is somewhat complex. Associated with every \q{synchronized} object is an internal lock value which is the key structure needed to implement synchronized access. The process of entering and executing a \q{sync} action follows the algorithm:
+\begin{enumerate}
+\item Attempt to acquire the lock associated with the synchronized object.
+\label{step1}
+This attempt has three possible outcomes:
+\begin{enumerate}
+\item The attempt is successful, and the thread has the lock.
+\item The lock is not available, and the requested \q{timeout} \emph{timeExp} is in the future, in which case the thread suspends waiting for either the timeout to expire or for the lock to become available.
+\item The lock is not available and the \q{timeout} has expired; in which case the attempt \emph{fails}. This in turn causes the timeout action to be taken.
+
+The timeout value is not recalculated; it is calculated once and for all at the start of the \q{sync} action. The effect is that the \q{timeout} clause will be activated at a fixed time no matter how many times the guards are attempted.
+
+Note that the lock is \emph{not} owned by the thread during the execution of the \q{timeout} action. Therefore, the timeout action should not attempt to modify or access the shared resource. A suitable action for the \q{timeout} clause is, in fact, to raise an exception.
+\end{enumerate}
+\item If the lock has been acquired in step~\ref{step1}, then each of the guards associated with the \q{sync} choice is attempted in order.
+\item If one of those guards succeeds, the corresponding action is executed and execution continues with step~\ref{stepX}
+\item If none of the guards succeeds, the lock is relinquished, and a fresh attempt is made to acquire the lock with a given timeout. This enables other processes to `step in' and synchronize with the object -- with the possibility of somehow adjusting the state of the object so that one of the guards will succeed on a subsequent attempt.
+
+The relinquishing thread is only rescheduled for execution when \emph{another} thread releases the lock on the object. This ensures that the system is not kept in a busy cycle as it tests the predicates of the guards.
+
+\item \label{stepX}
+On successful completion of the selected synchronized action, the lock is released.
+\item 
+Finally, if an error occurs anywhere within the synchronized action that is not handled within the action then the lock is released before `exporting' the exception to the outer context.
+\end{enumerate}
+
+The overall effect of this complex operation is quite simple: one of the guarded actions in the \q{sync} action will be executed. The precondition being that the shared resource denoted by the lock is available and that the corresponding guard condition is satisfied.
+
+\begin{aside}[Hint]
+\index{thread-safe libraries}
+Using \q{sync} judiciously will enable the programmer to construct \emph{thread-safe} libraries. Recall that all threads that are \q{spawn}ed that have access to any read/write variables that are in scope effectively see the same read/variable. Since this can obviously lead to contention problems when two threads attempt to access and/or update a shared read/write variable, a key motivation of the \q{sync} operator is to prevent this.
+
+A thread-safe library is a program that is written to ensure that any threads which can access shared read/write variables defined within the thread properly `gate' access to the variables with \q{sync} statements.
+\end{aside}
+

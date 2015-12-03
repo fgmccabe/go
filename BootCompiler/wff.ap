@@ -1,0 +1,1738 @@
+/*
+ * A well-formedness checker for Go!
+ */
+
+#include "go.ah";
+
+module
+  import {
+  interface <stdio.af> and
+  interface "abstract.af" and
+  interface "errors.af" and
+  interface "misc.af" and
+  interface "st-types.af" and
+  interface "keywords.af"
+  }
+in
+{
+  checkWff(E,F) => WffModule(E,F);
+
+  WffModule(M,F) => valof{
+    if BRACE(Lc,ModName,[B]).=M then{
+      verifyModuleName(F,ModName,ModName);
+      valis BRACE(Lc,ModName,WffThetaEnv(B))
+    }
+    else{
+      reportError("body missing from module ",Context(M));
+      valis VOID;
+    }
+  };
+
+  extractPackageName(Fl) => valof{
+    if Pre<>".go".=Fl then{
+      valis last(expand(Pre,"/"))
+    }
+    else
+      valis last(expand(Fl,"/"))
+  };
+
+  last(L) => L#listlen(L);
+    
+  verifyModuleName(Fl,M,Mod){
+    F = extractPackageName(Fl);
+    case M in {
+      APPLY(_,IDEN(_,"."),[L,R]) -> 
+        verifyModuleName(F,R,Mod)
+    | IDEN(Lc,Nm) -> {
+        if F!=Nm then
+
+          reportError("package name ["<>display(Mod)<>"] should be consistent with the file name "<>Fl,
+                      Lc)
+      }
+    | _ ->{
+        reportError("invalid module name: "++display(M),Context(M));
+      }
+    }
+  };
+
+  WffPackageName(M) => case M in {
+    APPLY(Lc,IDEN(Lc1,"."),[L,R]) => valof{
+      lM = WffPackageName(L);
+      rM = WffPackageName(R);
+      if lM!=VOID then{
+        if rM!=VOID then
+          valis APPLY(Lc,IDEN(Lc1,"."),[lM,rM])
+        else
+          valis lM
+      }
+      else
+        valis rM
+    }
+  | IDEN(_,_) => M
+  | _ => valof{
+      reportError("invalid module name: "++display(M),Context(M));
+      valis VOID
+    }
+  };
+    
+  WffLookAhead(El) => case El in{
+    IDEN(_,_) => El
+  | ST(_,_) => El
+  | APPLY(Lc0,IDEN(Lc,","),[L,R]) => APPLY(Lc0,IDEN(Lc,","),[WffLookAhead(L),WffLookAhead(R)])
+  | APPLY(_,IDEN(_,",.."),_) => El
+  | _ => valof{
+      reportError("only terminals allowed, not: "<>display(El),Context(El));
+      valis El
+    }
+  };
+
+  WffGrCaseRule(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,"-->"),[L,R]) => APPLY(Lc0,IDEN(Lc,"-->"),[WffPtn(L),WffGrBody(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) => APPLY(Lc0,IDEN(Lc,"|"),[WffGrCaseRule(L),WffGrCaseRule(R)])
+  | _ => valof{
+      reportError("invalid case rule",Context(El));
+      valis VOID
+    }
+  };
+
+  WffGrBody(B) => case B in {
+    IDEN(_,"[]") => B
+  | IDEN(_,"eof") => B
+  | APPLY(Lc0,IDEN(Lc,","),[L,R]) => APPLY(Lc0,IDEN(Lc,","),[WffGrBody(L),WffGrBody(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[T,L]),R]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[WffGrBody(T),WffGrBody(L)]),WffGrBody(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[WffGrBody(L),WffGrBody(R)])
+  | APPLY(Lc0,IDEN(Lc,"::"),[A,B]) => 
+      APPLY(Lc0,IDEN(Lc,"::"),[WffGrBody(A),WffGoal(B)])
+  | APPLY(Lc0,IDEN(Lc,"{}"),[A]) => APPLY(Lc0,IDEN(Lc,"{}"),[WffGoal(A)])
+  | APPLY(Lc0,IDEN(Lc,",.."),[L,R]) => WffPtn(B) -- APPLY(Lc0,IDEN(Lc,",.."),[WffPtn(L),WffGrBody(R)])
+  | APPLY(Lc0,IDEN(Lc,"onerror"),[Gl,Err]) =>
+      APPLY(Lc0,IDEN(Lc,"onerror"),[WffGrBody(Gl),WffGrCaseRule(Err)])
+  | APPLY(Lc0,IDEN(Lc,"raise"),[E]) =>
+      APPLY(Lc0,IDEN(Lc,"raise"),[WffExp(E)])
+  | BRACE(Lc0,IDEN(Lc,"action"),[G]) =>
+      BRACE(Lc0,IDEN(Lc,"action"),[WffAction(G)])
+  | APPLY(Lc0,IDEN(Lc,"case"),[C]) => valof{
+      if APPLY(Lc1,IDEN(Lc2,"in"),[Exp,Cases]).=C then
+        valis APPLY(Lc0,IDEN(Lc,"case"),[APPLY(Lc1,IDEN(Lc2,"in"),
+					       [WffExp(Exp),
+						WffGrCaseRule(Cases)])])
+      else{
+        reportError("case grammar takes the form case Exp in ( Ptn --> ... )",Lc);
+        valis VOID
+      }
+    }
+  | ST(Lc,_) => WffExp(B)
+  | APPLY(Lc0,IDEN(Lc,"!"),[A]) => APPLY(Lc0,IDEN(Lc,"!"),[WffGrBody(A)])
+  | APPLY(Lc0,IDEN(Lc,"\\+"),[A]) => APPLY(Lc0,IDEN(Lc,"\\+"),[WffGrBody(A)])
+  | APPLY(Lc0,IDEN(Lc,"\\="),[L,R]) => APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc0,IDEN(Lc,"!="),[WffExp(L),WffExp(R)])])
+  | APPLY(Lc0,IDEN(Lc,"!="),[L,R]) => APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc0,IDEN(Lc,"!="),[WffExp(L),WffExp(R)])])
+  | APPLY(Lc0,IDEN(Lc,"="),[L,R]) => APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc0,IDEN(Lc,"="),[WffExp(L),WffExp(R)])])
+  | APPLY(Lc0,IDEN(Lc,".="),[L,R]) => APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc0,IDEN(Lc,".="),[WffPtn(L),WffExp(R)])])
+  | APPLY(Lc0,IDEN(Lc,"*"),[NT,APPLY(Lc2,IDEN(Lc1,"^"),[Exp,Lst])]) =>
+      APPLY(Lc0,IDEN(Lc,"*"),[WffGrBody(NT),APPLY(Lc2,IDEN(Lc1,"^"),[WffExp(Exp),WffExp(Lst)])])
+  | APPLY(Lc0,IDEN(Lc,"*"),[NT]) => APPLY(Lc0,IDEN(Lc,"*"),[WffGrBody(NT)])
+  | APPLY(Lc0,IDEN(Lc,"+"),[NT,APPLY(Lc2,IDEN(Lc1,"^"),[Exp,Lst])]) =>
+      APPLY(Lc0,IDEN(Lc,"+"),[WffGrBody(NT),APPLY(Lc2,IDEN(Lc1,"^"),[WffExp(Exp),WffExp(Lst)])])
+  | APPLY(Lc0,IDEN(Lc,"."),[Rc,G]) => valof{
+      if APPLY(Lc2,IDEN(Lc1,NT),A).=G then{
+        if isKeyword(NT) then{
+          reportError("unexpected keyword: "<>NT,Lc);
+          valis VOID
+        }
+        else
+          valis APPLY(Lc0,IDEN(Lc,"."),[WffExp(Rc),
+					APPLY(Lc2,IDEN(Lc1,NT),A//WffExp)])
+      }
+      else{
+        reportError("invalid form of dot grammar condition: "<>display(B),Lc);
+        valis VOID
+      }
+    }
+
+  | APPLY(Lc0,IDEN(Lc,"#"),[P,G]) => valof{
+      if APPLY(Lc2,IDEN(Lc1,NT),A).=G then{
+        if isKeyword(NT) then{
+          reportError("unexpected keyword: "<>NT,Lc);
+          valis VOID
+        }
+        else
+          valis APPLY(Lc0,APPLY(Lc2,IDEN(Lc,"#"),[WffPackageName(P),IDEN(Lc1,NT)]),A//WffExp)
+      }
+      else{
+        reportError("invalid form of package grammar condition: "<>display(B),Lc);
+        valis VOID
+      }
+    }
+  | APPLY(Lc,F,A) => APPLY(Lc,WffExp(F),A//WffExp)
+  | _ => valof{
+      Cxt = valof{
+        try{
+          valis Context(B)
+        } onerror{
+          _ -> valis noLoc
+        }
+      };
+      reportError("Invalid element: "++display(B)++" in grammar rule body",Cxt);
+      valis B
+    }
+  };
+
+  -- Actions
+
+  WffAction(Act) => case Act in {
+    APPLY(Lc0,IDEN(Lc,";"),[L,R]) => APPLY(Lc0,IDEN(Lc,";"),[WffAction(L),WffAction(R)])
+  | APPLY(Lc0,IDEN(Lc,";"),[A]) => APPLY(Lc0,IDEN(Lc,";"),[WffAction(A)])
+  | IDEN(Lc,"{}") => IDEN(Lc,"{}")
+  | APPLY(Lc0,IDEN(Lc,"{}"),[G]) => APPLY(Lc0,IDEN(Lc,"{}"),[WffGoal(G)])
+  | APPLY(Lc0,IDEN(Lc,"::"),[L,R]) => APPLY(Lc0,IDEN(Lc,"::"),[WffAction(L),WffGoal(R)])
+  | APPLY(Lc0,IDEN(Lc,"="),[L,R]) => APPLY(Lc0,IDEN(Lc,"="),[WffExp(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,".="),[L,R]) => APPLY(Lc0,IDEN(Lc,".="),[WffPtn(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,":="),[L,R]) => APPLY(Lc0,IDEN(Lc,":="),[WffIdent(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,"!"),[L]) => APPLY(Lc0,IDEN(Lc,"!"),[WffGoal(L)])
+  | APPLY(Lc0,IDEN(Lc,"\\+"),[L]) => APPLY(Lc0,IDEN(Lc,"\\+"),[WffGoal(L)])
+  | APPLY(Lc0,IDEN(Lc,"valis"),[L]) => APPLY(Lc0,IDEN(Lc,"valis"),[WffExp(L)])
+  | APPLY(Lc0,IDEN(Lc,"istrue"),[L]) => APPLY(Lc0,IDEN(Lc,"istrue"),[WffGoal(L)])
+  | APPLY(Lc0,IDEN(Lc,"*>"),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"*>"),[WffGoal(A),WffAction(B)])
+  | APPLY(Lc0,IDEN(Lc,"case"),[C]) => valof{
+      if APPLY(Lc2,IDEN(Lc1,"in"),[Exp,Cases]).=C then
+        valis APPLY(Lc0,IDEN(Lc,"case"),
+		    [APPLY(Lc2,IDEN(Lc1,"in"),[WffExp(Exp),
+					       WffCaseRule(Cases)])])
+      else{
+        reportError("case action takes the form case Exp in ( Ptn -> ... )",Lc);
+        valis VOID
+      }
+    }
+
+  | BRACE(Lc0,IDEN(Lc,"spawn"),[G])=>
+      BRACE(Lc0,IDEN(Lc,"spawn"),[WffAction(G)])
+  | BRACE(Lc,APPLY(Lc0,IDEN(Lc,"sync"),[APPLY(Lc2,IDEN(Lc1,"::"),[R,G])]),[]) =>
+      BRACE(Lc,APPLY(Lc0,IDEN(Lc,"sync"),[WffExp(R)]),
+	    [APPLY(Lc2,IDEN(Lc,"->"),
+		   [WffGoal(G),IDEN(Lc,"{}")])])
+  | BRACE(Lc,APPLY(Lc0,IDEN(Lc,"sync"),[R]),[]) =>
+      BRACE(Lc,APPLY(Lc0,IDEN(Lc,"sync"),[WffExp(R)]),
+	    [APPLY(Lc0,IDEN(Lc,"->"),
+		   [IDEN(Lc,"true"),IDEN(Lc,"{}")])])
+  | BRACE(Lc0,IDEN(Lc,"sync"),[]) =>
+      BRACE(Lc0,APPLY(Lc,IDEN(Lc,"sync"),
+		      [IDEN(Lc,"this")]),
+	    [APPLY(Lc,IDEN(Lc,"->"),
+		   [IDEN(Lc,"true"),IDEN(Lc,"{}")])])
+
+  | BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),[R]),
+	  [A::(APPLY(_,IDEN(_,"|"),
+		     [LL::(!APPLY(_,IDEN(_,"?"),_).=LL),RR]).=A || 
+	       APPLY(_,IDEN(_,"->"),_).=A)]) =>
+      BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),[WffExp(R)]),[WffSync(A)])
+
+  | BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),
+		    [APPLY(Lc3,IDEN(_,"::"),[R,G])]),[A]) =>
+      BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),[WffExp(R)]),
+	    [APPLY(Lc3,IDEN(Lc1,"->"),
+		   [WffGoal(G),WffAction(A)])])
+  | BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),[R]),[G]) => 
+      BRACE(Lc0,APPLY(Lc1,IDEN(Lc2,"sync"),[WffExp(R)]),
+	    [APPLY(Lc1,IDEN(Lc2,"->"),
+		   [IDEN(Lc2,"true"),WffAction(G)])])
+  | BRACE(Lc0,IDEN(Lc1,"sync"),[A::(APPLY(_,IDEN(_,"|"),
+                                     [LL::(!APPLY(_,IDEN(_,"?"),_).=LL),RR]).=A
+                             || APPLY(_,IDEN(_,"->"),_).=A)]) =>
+      BRACE(Lc0,APPLY(Lc1,IDEN(Lc1,"sync"),[IDEN(Lc1,"this")]),[WffSync(A)])
+  | BRACE(Lc0,IDEN(Lc,"sync"),[G]) =>
+      BRACE(Lc0,APPLY(Lc,IDEN(Lc,"sync"),[IDEN(Lc,"this")]),
+	    [APPLY(Lc,IDEN(Lc,"->"),
+		   [IDEN(Lc,"true"),WffAction(G)])])
+  | APPLY(Lc0,IDEN(Lc,"onerror"),[A,E]) =>
+      APPLY(Lc0,IDEN(Lc,"onerror"),[WffAction(A),WffCaseRule(E)])
+  | APPLY(Lc0,IDEN(Lc,"raise"),[L]) => APPLY(Lc0,IDEN(Lc,"raise"),[WffExp(L)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[T,A1]),A2]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[WffGoal(T),WffAction(A1)]),WffAction(A2)])
+  | APPLY(Lc0,IDEN(Lc,"?"),[T,A1]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc0,IDEN(Lc,"?"),[WffGoal(T),WffAction(A1)]),IDEN(Lc,"{}")])
+  | APPLY(Lc0,IDEN(Lc1,"timeout"),[L,R]) => valof{
+      if APPLY(Lc2,IDEN(Lc3,"->"),[T,A]).=R then{
+        valis APPLY(Lc0,IDEN(Lc1,"timeout"),
+		    [WffAction(L),
+		     APPLY(Lc2,IDEN(Lc3,"->"),[WffExp(T),WffAction(A)])])
+      }
+      else{
+        reportError("invalid timeout clause: "<>display(R),Lc0);
+        valis VOID
+      }
+    }
+
+  | APPLY(Lc0,IDEN(Lc1,"#"),[P,G]) => valof{
+      if APPLY(Lc2,IDEN(Lc3,NT),A).=G then{
+        if isKeyword(NT) then{
+          reportError("unexpected keyword: "<>NT,Lc3);
+          valis VOID
+        }
+        else
+          valis APPLY(Lc0,APPLY(Lc2,IDEN(Lc1,"#"),
+				[WffPackageName(P),IDEN(Lc3,NT)]),A//WffExp)
+      }
+      else if APPLY(Lc2,Pr,A).=G then
+	valis APPLY(Lc2,reformPackageDots(WffPackageName(P),Pr),A//WffExp)
+      else{
+        reportError("invalid form of package action: "<>display(Act),Lc0);
+        valis VOID
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,","),_) => valof{
+      reportError("Use semicolons not commas to separate actions in: "++display(Act),Lc);
+      valis Act
+    }
+  | APPLY(Lc0,F:: !(IDEN(_,Nm).=F && isKeyword(Nm)),A) => APPLY(Lc0,WffExp(F),A//WffExp)
+  | _ => valof{
+      reportError("ill-formed action: `"++display(Act)++"' in process rule body",Context(Act));
+      valis Act
+    }
+  };
+
+  reformPackageDots(Pkg,El) => case El in {
+    APPLY(Lc0,IDEN(L0,"."),[L,F]) => 
+      APPLY(Lc0,IDEN(L0,"."),[reformPackageDots(Pkg,L),F])
+  | IDEN(L0,Fld) => APPLY(L0,IDEN(L0,"#"),[Pkg,IDEN(L0,Fld)])
+  };
+
+  WffCaseRule(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,"->"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"->"),[WffPtn(L),WffAction(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"|"),[WffCaseRule(L),WffCaseRule(R)])
+  | _ => valof{
+      reportError("invalid case rule",Context(El));
+      valis VOID
+    }
+  };
+
+  WffSync(B) => case B in {
+    APPLY(Lc0,IDEN(Lc1,"->"),[G,A]) =>
+      APPLY(Lc0,IDEN(Lc1,"->"),[WffGoal(G),WffAction(A)])
+  | APPLY(Lc0,IDEN(Lc1,"|"),[Lhs,Rhs]) => 
+      APPLY(Lc0,IDEN(Lc1,"|"),[WffSync(Lhs),WffSync(Rhs)])
+  | _ =>valof{
+      reportError("Invalid sync body: "++display(B),Context(B));
+      valis B
+    }
+  };
+
+  WffExp(X) => case X in {
+    IDEN(Loc,"_") => IDEN(Loc,genNew("_$"))
+  | IDEN(_,"[]") => X
+  | IDEN(_,"false") => X
+  | IDEN(_,"true") => X
+  | IDEN(Lc,Id) :: isKeyword(Id) => valof{
+      reportError("unexpected keyword: "++display(X),Lc);
+      valis X
+    }
+  | IDEN(_,_) => X
+  | INT(_,_) => X
+  | FLT(_,_) => X
+  | CHR(_,_) => X
+  | ST(_,_) => X
+  | SYM(_,_) => X
+
+    -- Guarded term
+  | APPLY(Lc0,IDEN(Lc,"::"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"::"),[WffExp(L),WffGoal(R)])
+    
+    -- explicit type annotation
+  | APPLY(Lc0,IDEN(Lc,":"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,":"),[WffExp(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc,"."),[E,F]) => APPLY(Lc0,IDEN(Lc,"."),[WffExp(E),WffExp(F)])
+
+  | APPLY(Lc0,IDEN(Lc1,"#"),[P,R]) => valof{
+      if APPLY(Lc2,IDEN(Lc3,Rf),A).=R then
+	valis APPLY(Lc0,APPLY(Lc2,IDEN(Lc1,"#"),
+			      [WffPackageName(P),IDEN(Lc3,Rf)]),A//WffExp)
+      else if IDEN(_,Rf).=R then
+	valis APPLY(Lc0,IDEN(Lc1,"#"),[WffPackageName(P),R])
+      else{
+	reportError("invalid package expression: "<>display(X),Lc0);
+	valis VOID
+      }
+    }
+    
+    -- conditional expression
+  | APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[G,A]),B]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[APPLY(Lc1,IDEN(Lc2,"?"),[WffGoal(G),WffExp(A)]),WffExp(B)])
+
+  | APPLY(Lc0,IDEN(Lc,"case"),[C]) => valof{
+      if APPLY(Lc2,IDEN(Lc1,"in"),[Exp,Cases]).=C then
+        valis APPLY(Lc0,IDEN(Lc,"case"),
+		    [APPLY(Lc2,IDEN(Lc1,"in"),[WffExp(Exp),
+					       WffCaseExp(Cases)])])
+      else{
+        reportError("case expression takes the form case Exp in ( Ptn => ... )",Lc);
+        valis VOID
+      }
+    }
+      					
+    -- list term
+  | APPLY(Lc0,IDEN(Lc,",.."),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,",.."),[WffExp(L),WffExp(R)])
+
+    -- tuple term
+  | APPLY(Lc0,IDEN(Lc,","),[E,F]) => APPLY(Lc0,IDEN(Lc,","),[WffExp(E),WffExp(F)])
+
+    -- unary minus
+  | APPLY(Lc0,IDEN(Lc,"-"),[INT(L0,N)]) => INT(L0,-N)
+
+  | APPLY(Lc0,IDEN(Lc,"-"),[FLT(L0,N)]) => FLT(L0,-N)
+
+  | APPLY(Lc0,IDEN(Lc,"-"),[A]) => APPLY(Lc0,IDEN(Lc,"-"),[WffExp(A)])
+
+    -- binary minus
+  | APPLY(Lc0,IDEN(Lc,"-"),[L,R]) => APPLY(Lc0,IDEN(Lc,"-"),[WffExp(L),WffExp(R)])
+
+    -- binary plus
+  | APPLY(Lc0,IDEN(Lc,"+"),[L,R]) => APPLY(Lc0,IDEN(Lc,"+"),[WffExp(L),WffExp(R)])
+
+    -- binary times
+  | APPLY(Lc0,IDEN(Lc,"*"),[L,R]) => APPLY(Lc0,IDEN(Lc,"*"),[WffExp(L),WffExp(R)])
+
+    -- binary division
+  | APPLY(Lc0,IDEN(Lc,"/"),[L,R]) => APPLY(Lc0,IDEN(Lc,"/"),[WffExp(L),WffExp(R)])
+
+    -- recursive set expression
+  | APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc2,IDEN(Lc1,".."),[E,S])]) =>
+      APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc2,IDEN(Lc1,".."),[WffExp(E),WffSetMem(S)])])
+
+    -- fix an issue with operator priorities
+  | APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc2,IDEN(Lc1,","),[APPLY(Lc4,IDEN(Lc3,".."),[E,L]),R])]) =>
+      WffExp(APPLY(Lc0,IDEN(Lc,"{}"),
+		   [APPLY(Lc4,IDEN(Lc3,".."),[E,APPLY(Lc2,IDEN(Lc1,","),[L,R])])]))
+
+    -- bag expression
+  | APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc1,IDEN(Lc2,"||"),[T,G])]) =>
+      APPLY(Lc0,IDEN(Lc,"{}"),[APPLY(Lc1,IDEN(Lc2,"||"),[WffExp(T),WffGoal(G)])])
+
+  | BRACE(Lc0,IDEN(Lc,"valof"),[G]) => 
+      BRACE(Lc0,IDEN(Lc,"valof"),[WffAction(G)])
+
+  | BRACE(Lc0,IDEN(Lc,"spawn"),[G]) =>
+      BRACE(Lc0,IDEN(Lc,"spawn"),[WffAction(G)])
+
+  | APPLY(Lc0,IDEN(Lc2,"^"),[E]) => 
+      APPLY(Lc0,APPLY(Lc0,IDEN(Lc2,"."),[WffExp(E),IDEN(Lc2,"show")]),[])
+  | APPLY(Lc0,IDEN(Lc,"raise"),[E]) => APPLY(Lc0,IDEN(Lc,"raise"),[WffExp(E)])
+  | APPLY(Lc0,IDEN(Lc,"onerror"),[E,R]) => APPLY(Lc0,IDEN(Lc,"onerror"),[WffExp(E),WffExpErrorRule(R)])
+
+  | APPLY(Lc0,IDEN(Lc,"$"),[A]) => APPLY(Lc0,IDEN(Lc,"$"),[WffExp(A)])
+
+  | APPLY(Lc0,IDEN(Lc,"@@"),[L,R]) => APPLY(Lc0,IDEN(Lc,"@@"),[WffIdent(L),WffGoal(R)])
+    
+  | APPLY(Lc0,IDEN(Lc,"@"),[L,R]) => APPLY(Lc0,IDEN(Lc,"@"),[WffExp(L),WffGoal(R)])
+    
+  | APPLY(Lc0,IDEN(Lc,"@"),[R]) => APPLY(Lc0,IDEN(Lc,"@"),[IDEN(Lc,genNew("_$")),WffGoal(R)])
+
+  | APPLY(Lc0,IDEN(Lc,"$meta"),[M]) => APPLY(Lc0,IDEN(Lc,"$meta"),[wffMeta(M)])
+
+    -- anonymous class expression
+  | APPLY(Lc0,IDEN(Lc,".."),[T,Th]) => valof{
+      wTh = valof{
+        if APPLY(_,IDEN(_,"{}"),[B]).=Th then 
+          valis WffThetaEnv(B)
+        else{
+          reportError("class body expected in anonymous class expression: "<>display(Th),Lc);
+          valis []
+        }
+      };
+      
+      if APPLY(Lc2,IDEN(Lc1,":"),[C,Tp]).=T then
+        valis APPLY(Lc0,IDEN(Lc,".."),
+		    [APPLY(Lc2,IDEN(Lc1,":"),[WffExp(C),WffTypeExp(Tp)]),
+		     APPLY(Lc0,IDEN(Lc,"{}"),wTh)])
+      else if APPLY(Lc2,IDEN(Lc1,":"),[Tp]).=T then
+        valis APPLY(Lc0,IDEN(Lc,".."),[APPLY(Lc2,IDEN(Lc1,":"),[WffTypeExp(Tp)]),
+				       APPLY(Lc0,IDEN(Lc,"{}"),wTh)])
+      else
+        valis APPLY(Lc0,IDEN(Lc,".."),[WffExp(T),APPLY(Lc0,IDEN(Lc,"{}"),wTh)])
+    }
+
+    -- parse expression
+  | APPLY(Lc0,IDEN(Lc,"%%"),[IDEN(Lc1,G),APPLY(Lc3,IDEN(Lc2,"~"),[L,R])]) => 
+      APPLY(Lc0,IDEN(Lc,"%%"),
+	    [IDEN(Lc1,G),APPLY(Lc3,IDEN(Lc2,"~"),[WffExp(L),WffExp(R)])])
+
+  | APPLY(Lc0,IDEN(Lc,"%%"),[IDEN(Lc1,G),R]) => 
+      APPLY(Lc0,IDEN(Lc,"%%"),[IDEN(Lc1,G),WffExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc,"%%"),[L,R]) => valof{
+      reportError("lhs: "<>display(L)<>" of %% expression: "<>display(X)<>" should be an "
+                  "indentifier",Lc);
+      valis VOID
+    }
+  | APPLY(Lc0,F:: !(IDEN(_,K).=F && isKeyword(K)),A) => 
+      APPLY(Lc0,WffExp(F),A//WffExp)
+  | APPLY(Lc0,IDEN(Lc,K)::isKeyword(K),_) => valof{
+      reportError("unexpected keyword "<>K,Lc);
+      valis X
+    }
+  | _ => valof{
+      reportError("expression: "++display(X)++" not well formed",Context(X));
+      valis X
+    }
+  };
+
+
+  WffIdent(El) => case El in {
+    IDEN(Lc,Nm) => valof{
+      if isKeyword(Nm) then
+	reportError("unexpected keyword "++Nm,Lc);
+      valis El
+    }
+  | _ => valof{
+     reportError("identifier expected: "<>display(El),Context(El));
+      valis VOID
+    }
+  }; 
+
+  wffMeta(El) => El;
+
+  WffSetMem(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,"in"),[L,R]) => APPLY(Lc0,IDEN(Lc,"in"),[WffPtn(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,","),[L,R]) => APPLY(Lc0,IDEN(Lc,","),[WffSetMem(L),WffSetMem(R)])
+  | _ => valof{
+      reportError("invalid set membership condition: "<>display(El),Context(El));
+      valis VOID
+    }
+  };
+
+  WffCaseExp(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,"=>"),[L,R]) => APPLY(Lc0,IDEN(Lc,"=>"),[WffPtn(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) => APPLY(Lc0,IDEN(Lc,"|"),[WffCaseExp(L),WffCaseExp(R)])
+  | _ => valof{
+      reportError("invalid case expression rule",Context(El));
+      valis VOID
+    }
+  };
+
+  WffExpErrorRule(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,"=>"),[L,R]) => APPLY(Lc0,IDEN(Lc,"=>"),[WffExp(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) => APPLY(Lc0,IDEN(Lc,"|"),[WffExpErrorRule(L),WffExpErrorRule(R)])
+  | _ => valof{
+      reportError("invalid error handler",Context(El));
+      valis VOID
+    }
+  };
+
+  WPtn(X) => case X in {
+    IDEN(Lc,"_") => IDEN(Lc,genNew("_$"))
+  | IDEN(_,_) => X
+  | INT(_,_) => X
+  | FLT(_,_) => X
+  | APPLY(_,IDEN(Lc,"-"),[INT(L0,N)]) => INT(L0,-N)
+  | APPLY(_,IDEN(Lc,"-"),[FLT(L0,N)]) => FLT(L0,-N)
+  | CHR(_,_) => X
+  | ST(_,_) => X
+  | SYM(_,_) => X
+  | APPLY(Lc0,IDEN(Lc,"::"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"::"),[WPtn(L),WffGoal(R)])
+
+  | APPLY(Lc0,IDEN(Lc,",.."),[L,R]) => APPLY(Lc0,IDEN(Lc,",.."),[WPtn(L),WPtn(R)])
+
+  | APPLY(Lc0,IDEN(Lc,":"),[L,R]) => APPLY(Lc0,IDEN(Lc,":"),[WPtn(L),WffTypeExp(R)])
+
+    -- tuple term
+  | APPLY(Lc0,IDEN(Lc,","),[E,F]) => APPLY(Lc0,IDEN(Lc,","),[WPtn(E),WPtn(F)])
+
+  | APPLY(Lc0,IDEN(Lc,"@"),[L,R]) => APPLY(Lc0,IDEN(Lc,"@"),[WffExp(L),WffGoal(R)])
+    
+  | APPLY(Lc0,IDEN(Lc,"@"),[R]) => APPLY(Lc0,IDEN(Lc,"@"),[IDEN(Lc,genNew("_$")),WffGoal(R)])
+
+  | APPLY(Lc0,IDEN(Lc,"#"),[P,R]) => valof{
+      if APPLY(Lc1,IDEN(L0,Rf),A).=R then
+	valis APPLY(Lc0,APPLY(Lc1,IDEN(Lc,"#"),[WffPackageName(P),IDEN(L0,Rf)]),A//WPtn)
+      else if IDEN(L0,Rf).=R then
+	valis APPLY(Lc0,IDEN(Lc,"#"),[WffPackageName(P),IDEN(L0,Rf)])
+      else{
+	reportError("invalid package pattern: "<>display(X),Lc);
+	valis VOID
+      }
+    }
+    
+  | APPLY(Lc0,IDEN(Lc,Nm::isKeyword(Nm)),A) => valof{
+      reportError("unexpected keyword "++Nm++" in pattern",Lc);
+      valis APPLY(Lc0,IDEN(Lc,Nm),A//WPtn)
+    }
+
+  | APPLY(Lc0,IDEN(Lc,Nm),A) => APPLY(Lc0,IDEN(Lc,Nm),A//WPtn)
+
+  | APPLY(Lc0,F,A) => WffExp(X)
+      
+  | _ => valof{
+      reportError("ill-formed pattern: "++display(X),Context(X));
+      valis X
+    }
+  };
+
+  WffPtn(Ptn) => valof{
+    (nP,nG) = liftAts(Ptn,IDEN(noLoc,"true"));
+    if !IDEN(_,"true").=nG then
+      valis WPtn(APPLY(noLoc,IDEN(noLoc,"::"),[nP,nG]))
+    else
+      valis WPtn(Ptn)
+  };
+
+--  WffPtn(Ptn) => WPtn(Ptn);
+
+  liftAts(Exp,Guard) => case Exp in {
+    IDEN(_,_) => (Exp,Guard)
+  | INT(_,_) => (Exp,Guard)
+  | FLT(_,_) => (Exp,Guard)
+  | CHR(_,_) => (Exp,Guard)
+  | ST(_,_) => (Exp,Guard)
+  | SYM(_,_) => (Exp,Guard)
+
+    -- Guarded term
+  | APPLY(Lc0,IDEN(Lc,"::"),[L,R]) => valof{
+      (nL,nG) = liftAts(L,Guard);
+      valis (APPLY(Lc0,IDEN(Lc,"::"),[nL,R]),nG)
+    }
+    
+  | APPLY(Lc0,IDEN(Lc,",.."),[L,R]) => valof{
+      (nL,G0) = liftAts(L,Guard);
+      (nR,G1) = liftAts(R,G0);
+      valis (APPLY(Lc0,IDEN(Lc,",.."),[nL,nR]),G1)
+    }
+
+  | APPLY(Lc0,IDEN(Lc,","),[L,R]) => valof{
+      (nL,G0) = liftAts(L,Guard);
+      (nR,G1) = liftAts(R,G0);
+      valis (APPLY(Lc0,IDEN(Lc,","),[nL,nR]),G1)
+    }
+
+  | APPLY(Lc0,IDEN(Lc,"@"),[L,APPLY(Lc1,P,AR)]) => valof{
+      (nL,G0) = liftAts(L,Guard);
+      if IDEN(_,"true").=G0 then
+	valis (nL,APPLY(Lc1,APPLY(Lc0,IDEN(Lc,"."),[nL,P]), AR))
+      else
+	valis (nL,APPLY(Lc0,IDEN(Lc,","),[APPLY(Lc1,
+						APPLY(Lc0,IDEN(Lc,"."),[nL,P]),
+						AR),G0]))
+    }
+
+  | APPLY(Lc0,IDEN(Lc,"@"),[APPLY(Lc1,P,AR)]) => valof{
+      nL = IDEN(Lc0,genNew("_$"));
+      if IDEN(_,"true").=Guard then
+	valis (nL,APPLY(Lc0,APPLY(Lc1,IDEN(Lc,"."),[nL,P]),AR))
+      else
+	valis (nL,APPLY(Lc0,IDEN(Lc,","),[APPLY(Lc0,
+						APPLY(Lc1,IDEN(Lc,"."),[nL,P]),
+						AR),Guard]))
+    }
+
+  | APPLY(Lc0,IDEN(Lc,"#"),[L,R]) => (Exp,Guard)
+
+    -- explicit type annotation
+  | APPLY(Lc0,IDEN(Lc,":"),[L,R]) => valof{
+      (nL,nG) = liftAts(L,Guard);
+      valis (APPLY(Lc0,IDEN(Lc,":"),[nL,R]),nG)
+    }
+
+  | APPLY(Lc0,IDEN(Lc,Nm),Args) => valof{
+      G0 : Guard;
+      nArgs = collect{
+	for A in Args do{
+	  (nA,nG) = liftAts(A,G0);
+	  G0 := nG;
+	  elemis nA
+	}
+      };
+      valis (APPLY(Lc0,IDEN(Lc,Nm),nArgs),G0)
+    }
+
+  | X => valof{
+      reportError("pattern: "++display(X)++" not well formed",Context(X));
+      valis (X,Guard)
+    }
+  };
+
+  
+  WffGoal(G) => case G in {
+    IDEN(Lc,"true") => G
+  | IDEN(Lc,"{}") => IDEN(Lc,"true")
+  | IDEN(Lc,"false") => G
+  | IDEN(Lc,"fail") => IDEN(Lc,"false")
+  | IDEN(Lc,_) => APPLY(Lc,IDEN(Lc,"="),[G,IDEN(Lc,"true")])
+  | APPLY(Lc0,IDEN(Lc,","),[L,R]) => APPLY(Lc0,IDEN(Lc,","),[WffGoal(L),WffGoal(R)])
+  | APPLY(Lc0,IDEN(Lc,"@@"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"@@"),[WffIdent(L),WffGoal(R)])
+  | APPLY(Lc0,IDEN(Lc,"!"),[One]) =>
+      APPLY(Lc0,IDEN(Lc,"!"),[WffGoal(One)])
+  | APPLY(Lc0,IDEN(Lc,"\\+"),[Neg]) =>
+      APPLY(Lc0,IDEN(Lc,"\\+"),[WffGoal(Neg)])
+  | APPLY(Lc0,IDEN(Lc,"="),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"="),[WffExp(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,"\\="),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"!="),[WffExp(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,"=="),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"=="),[WffExp(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,"!="),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"!="),[WffExp(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,".="),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,".="),[WffPtn(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,"in"),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"in"),[WffPtn(A),WffExp(B)])
+  | APPLY(Lc0,IDEN(Lc,"<="),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"<="),[WffExp(L),WffExp(R)])
+  | APPLY(Lc0,IDEN(Lc,"-->"),[NT,APPLY(Lc1,IDEN(L1,"~"),[Str,Rst])]) =>
+      APPLY(Lc0,IDEN(Lc,"-->"),[WffGrBody(NT),APPLY(Lc1,IDEN(L1,"~"),[WffExp(Str),WffExp(Rst)])])
+  | APPLY(Lc0,IDEN(Lc,"-->"),[NT,Str]) =>
+      APPLY(Lc0,IDEN(Lc,"-->"),[WffGrBody(NT),WffExp(Str)])
+  | APPLY(Lc0,IDEN(Lc,"?"),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"?"),[WffGoal(A),WffGoal(B)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"|"),[WffGoal(A),WffGoal(B)])
+  | APPLY(Lc0,IDEN(Lc,"*>"),[A,B]) =>
+      APPLY(Lc0,IDEN(Lc,"*>"),[WffGoal(A),WffGoal(B)])
+  | APPLY(Lc0,IDEN(Lc,"."),[_,IDEN(_,_)]) => WffGoal(APPLY(Lc0,IDEN(Lc,"="),[G,IDEN(Lc,"true")]))
+  | APPLY(Lc0,IDEN(Lc,"."),[E,F]) => APPLY(Lc0,IDEN(Lc,"."),[WffExp(E),WffGoal(F)])
+  | APPLY(Lc0,IDEN(Lc,"#"),[P,R]) => valof{
+      if APPLY(Lc1,IDEN(L0,Rf),A).=R then
+	valis APPLY(Lc0,APPLY(Lc1,IDEN(Lc,"#"),[WffPackageName(P),IDEN(L0,Rf)]),A//WffExp)
+      else if IDEN(L0,Rf).=R then
+	valis APPLY(Lc0,IDEN(Lc,"#"),[WffPackageName(P),IDEN(L0,Rf)])
+      else{
+	reportError("invalid package goal: "<>display(G),Lc);
+	valis VOID
+      }
+    }
+  | APPLY(Lc0,IDEN(Lc,"onerror"),[Gl,Err]) =>
+      APPLY(Lc0,IDEN(Lc,"onerror"),[WffGoal(Gl),WffGoalErrorRule(Err)])
+  | APPLY(Lc0,IDEN(Lc,"raise"),[A]) =>
+      APPLY(Lc0,IDEN(Lc,"raise"),[WffExp(A)])
+  | APPLY(Lc0,IDEN(Lc,"{}"),[Gl]) => WffGoal(Gl)
+  | BRACE(Lc0,IDEN(Lc,"action"),[G]) =>
+      BRACE(Lc0,IDEN(Lc,"action"),[WffAction(G)])
+  | APPLY(Lc0,IDEN(Lc,Nm::isKeyword(Nm)),A) => valof{
+      reportError("unexpected keyword "++Nm++" in goal",Lc);
+      valis APPLY(Lc0,IDEN(Lc,Nm),A//WffExp)
+    }
+  | APPLY(Lc0,L,R) => APPLY(Lc0,WffExp(L),R//WffExp)
+  | _ => valof{
+      reportError("Invalid goal: "++display(G),Context(G));
+      valis G
+    }
+  };
+
+  WffGoalErrorRule(El) => case El in {
+    APPLY(Lc0,IDEN(Lc,":-"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,":-"),[WffExp(L),WffGoal(R)])
+  | APPLY(Lc0,IDEN(Lc,"|"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc,"|"),[WffGoalErrorRule(L),WffGoalErrorRule(R)])
+  | _ => valof{
+      reportError("invalid error handler",Context(El));
+      valis VOID
+    }
+  };
+
+  privatize(L,Lc) => collect{
+    for E in L do{
+      case E in {
+        APPLY(Lc0,Fun,[A,B]) ->
+          elemis APPLY(Lc0,Fun,[A,APPLY(Lc,IDEN(Lc,"private"),[B])])
+      | _ ->
+          elemis E
+      }
+    }
+  };
+
+  equalize(L) => case L in {
+    [APPLY(Lc0,IDEN(Lc1,"private"),[
+             APPLY(Lc2,IDEN(Lc3,"::="),[IDEN(Lc4,Nm),Tp])]),..Lx] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc4)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc4);
+      valis privatize(constructorTypeDef(SQUARE(Lc4,IDEN(Lc4,Nm),[]),Tp),Lc0)<>equalize(Lx)
+    }
+
+  | [APPLY(Lc,IDEN(_,"private"),[
+             APPLY(Lc1,IDEN(_,"::="),[SQUARE(Lc3,IDEN(Lc2,Nm),A),Tp])]),..Lx] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc2)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc2);
+      valis privatize(constructorTypeDef(SQUARE(Lc3,IDEN(Lc2,Nm),WffTypeArgs(A)),Tp),Lc)<>equalize(Lx)
+    }
+
+  | [APPLY(Lc,IDEN(Lc2,"private"),[E]),..LL] => valof{
+      RR = equalize([E,..LL]);
+
+      if [APPLY(Lc1,Fun,[A,B]),..Lx].=RR then
+        valis [APPLY(Lc1,Fun,[A,APPLY(Lc,IDEN(Lc2,"private"),[B])]),..Lx]
+      else
+        valis RR
+    }
+
+  | [APPLY(Lc,IDEN(Lc0,"=>"), [APPLY(Lc1,IDEN(Lc2,":"),[IDEN(Lc3,Nm),A]),R]),..Lx] =>
+      equalize([APPLY(Lc,IDEN(Lc2,":"),[IDEN(Lc3,Nm),APPLY(Lc,IDEN(Lc0,"=>"),[A,R])]),..Lx])
+
+  | [APPLY(Lc,IDEN(_,"=>"),
+           [APPLY(_,IDEN(_,"::"),[APPLY(_,IDEN(Lc1,Nm),_),_]),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractFun(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"=>"),[APPLY(_,IDEN(Lc1,Nm),_),_]),.._] =>valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractFun(Lc,Nm,L)
+    }
+
+  | [APPLY(Lc,IDEN(_,":-"),
+           [APPLY(_,IDEN(_,"::"),
+                  [APPLY(_,IDEN(Lc1,Nm),_),_]),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractRel(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,":-"),[APPLY(_,IDEN(Lc1,Nm),_),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractRel(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,":--"),
+           [APPLY(_,IDEN(_,"::"),
+                  [APPLY(_,IDEN(Lc1,Nm),_),_]),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractStrongRel(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,":--"),[APPLY(_,IDEN(Lc1,Nm),_),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractStrongRel(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"-->"),
+           [APPLY(L0,IDEN(L1,":"),[IDEN(L2,Nm),A]),R]),..Lx] =>
+      equalize([APPLY(L0,IDEN(L1,":"),[IDEN(L2,Nm),APPLY(Lc,IDEN(Lc,"-->"),[A,R])]),..Lx])
+  | [APPLY(Lc,IDEN(_,"-->"),[APPLY(_,IDEN(_,","),[APPLY(_,IDEN(Lc1,Nm),_),_]),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractGrammar(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"-->"),[APPLY(_,IDEN(Lc1,Nm),_),_]),..LL] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractGrammar(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"->"),[APPLY(_,IDEN(_,"::"),
+                                [APPLY(_,IDEN(Lc1,Nm),_),_]),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractProcess(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"->"),[APPLY(_,IDEN(Lc1,Nm),_),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractProcess(Lc,Nm,L)
+    }
+    
+  | [APPLY(Lc,IDEN(_,"<="),[APPLY(_,IDEN(Lc1,Nm),_),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractClass(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(_,"<="),[IDEN(Lc1,Nm),_]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractClass(Lc,Nm,L)
+    }
+  | [APPLY(Lc,IDEN(Lc1,".."),[Hd,Bdy]),..Lr] => valof{
+      if IDEN(_,Nm).=Hd then
+        valis extractClass(Lc,Nm,L)
+      else if APPLY(_,IDEN(_,":"),[H,_]).=Hd then{
+	if IDEN(_,Nm).=H then
+	  valis extractClass(Lc,Nm,L)
+	else if APPLY(_,IDEN(_,Nm),_).=H then
+	  valis extractClass(Lc,Nm,L)
+	else{
+	  reportError("invalid form of class head: "<>display(Hd),Lc);
+	  valis equalize(Lr)
+	}
+      }
+      else if APPLY(_,IDEN(_,Nm),_).=Hd then
+        valis extractClass(Lc,Nm,L)
+      else{
+        reportError("invalid form of class head: "<>display(Hd),Lc);
+        valis equalize(Lr)
+      }
+    }
+
+    -- type definitions
+  | [APPLY(Lc,IDEN(_,"<~"),[IDEN(Lc1,Nm),Tp]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractTypeDef(Lc,Nm,L)
+    }
+
+  | [APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,IDEN(Lc1,Nm),A),Tp]),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis extractTypeDef(Lc,Nm,L)
+    }
+
+  | [APPLY(Lc,IDEN(_,"::="),[IDEN(Lc1,Nm),Tp]),..Lx] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis constructorTypeDef(SQUARE(Lc1,IDEN(Lc1,Nm),[]),Tp)<>equalize(Lx)
+    }
+
+  | [APPLY(Lc,IDEN(_,"::="),[SQUARE(Lc2,IDEN(Lc1,Nm),A),Tp]),..Lx] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis constructorTypeDef(SQUARE(Lc2,IDEN(Lc1,Nm),
+				      WffTypeArgs(A)),Tp)<>equalize(Lx)
+    }
+
+  | [APPLY(Lc,IDEN(_,"="),
+	   [APPLY(Lc0,IDEN(Lc1,":"),[IDEN(Lc2,Nm),iTp]),Vl]),..Lr] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc2)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc2);
+
+      valis [APPLY(Lc0,IDEN(Lc1,":"),[IDEN(Lc2,Nm),WffTypeExp(iTp)]),
+             APPLY(Lc,IDEN(Lc1,"="),[IDEN(Lc2,Nm),WffExp(Vl)]),..equalize(Lr)]
+    }
+
+  | [APPLY(Lc,IDEN(_,"="),[IDEN(Lc1,Nm),Vl]),..Lr] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+
+      valis [APPLY(Lc,IDEN(Lc,"="),[IDEN(Lc1,Nm),WffExp(Vl)]),..equalize(Lr)]
+    }
+
+  | [APPLY(Lc,IDEN(_,"="),[lhs,Vl]),..Lr] => valof{
+      reportError("lhs "++display(lhs)++" of equality definition should be an "
+                  "identifier",Lc);
+      valis equalize(Lr)
+    }
+
+  | [APPLY(Lc,IDEN(Lc0,":="),
+	   [APPLY(Lc1,IDEN(Lc2,":"),[IDEN(Lc3,Nm),iTp]),Vl]),..Lr] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc3)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc3);
+
+      valis [APPLY(Lc,IDEN(Lc2,":"),[IDEN(Lc3,Nm),WffTypeExp(iTp)]),
+             APPLY(Lc,IDEN(Lc0,":="),[IDEN(Lc3,Nm),WffExp(Vl)]),..equalize(Lr)]
+    }
+
+  | [APPLY(Lc,IDEN(Lc0,":="),[IDEN(Lc1,Nm),Vl]),..Lr] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+
+      valis [APPLY(Lc,IDEN(Lc0,":="),[IDEN(Lc1,Nm),WffExp(Vl)]),..equalize(Lr)]
+    }
+
+  | [APPLY(Lc,IDEN(_,":="),[lhs,Vl]),..Lr] => valof{
+      reportError("invalid lhs "++display(lhs)++" of assignment definition",Lc);
+      valis equalize(Lr)
+    }
+
+  | [APPLY(Lc,IDEN(Lc0,"import"),[Pkg]),..Lr] => 
+      [APPLY(Lc,IDEN(Lc0,"import"),[WffPackageName(Pkg)]),..equalize(Lr)]
+
+  | [APPLY(Lc,IDEN(_,"$"),[APPLY(_,IDEN(_,"{}"),[Act])]),..Lr] => 
+      extractInit(Lc,Lr,WffAction(Act))
+
+  | [APPLY(Lc,IDEN(Lc0,":"),[L,T]),..Lr] => valof{
+      if IDEN(_,_).=L then
+        valis [APPLY(Lc,IDEN(Lc0,":"),[L,WffTypeExp(T)]),..equalize(Lr)]
+      else{
+        reportError("lhs of declaration: "<>display(L)<>" should be an identifier",Lc);
+        valis equalize(Lr)
+      }
+    }
+
+  | [APPLY(Lc,IDEN(Lc1,Nm),_),.._] => valof{
+      if isKeyword(Nm) then
+        reportError("not permitted to define keyword: "<>Nm,Lc1)
+      else if isEscape(Nm) then
+        reportWarn("redefining builtin: "<>Nm,Lc1);
+      valis  extractRel(Lc,Nm,L)
+    }
+  | [END,..L] => equalize(L)
+  | [] => []
+  | [XX,..Y] => valof{
+      Cxt = valof{
+          try{
+            valis Context(XX)
+        } onerror{
+          _ -> valis noLoc
+        }
+      };
+      
+      reportError("invalid entry "++display(XX)++" found",Cxt);
+      valis equalize(Y)
+    }
+  };
+
+  -- pick out a type definition
+  extractTypeDef(Lc,Nm,L) => valof{
+    (Defs,Rest) = extTypes(Nm,L);
+    if [APPLY(Lc0,IDEN(Lc1,"<~"),[Lhs,APPLY(Lc2,IDEN(Lc3,"{}"),_)])].=Defs then
+      valis [APPLY(Lc0,IDEN(Lc1,"<~"),
+                   [IDEN(Lc,Nm),TPL(Lc,[
+                                      APPLY(Lc0,IDEN(Lc1,"<~"),
+					    [Lhs,
+					     SQUARE(Lc3,
+						    IDEN(Lc3,"thing"),[])]),..
+                                      Defs])]),..equalize(Rest)]
+    else
+      valis [APPLY(Lc,IDEN(Lc,"<~"),[IDEN(Lc,Nm),TPL(Lc,Defs)]),..equalize(Rest)]
+  };
+
+  extTypes(Nm,Seq) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,!Nm),tpBody]),..Lx] => valof{
+      (Defs,Rest) = extTypes(Nm,Lx);
+      valis ([APPLY(Lc0,IDEN(Lc1,"<~"),[SQUARE(Lc2,IDEN(Lc2,Nm),[]),
+					typeBody(tpBody)]),..Defs],Rest)
+    }
+  | [APPLY(Lc0,IDEN(Lc1,"<~"),[SQUARE(Lc3,
+				      IDEN(Lc2,!Nm),A),tpBody]),..Lx] => valof{
+      (Defs,Rest) = extTypes(Nm,Lx);
+      valis ([APPLY(Lc0,IDEN(Lc1,"<~"),[SQUARE(Lc3,IDEN(Lc2,Nm),WffTypeArgs(A)),
+					typeBody(tpBody)]),..Defs],Rest)
+    }
+  | L => ([],L)
+  };
+
+  typeBody(Tp) => case Tp in {
+    APPLY(Lc0,IDEN(Lc1,"{}"),[L]) => APPLY(Lc0,IDEN(Lc1,"{}"),
+					   listIfy(L,". ")//WffFieldDef)
+  | IDEN(Lc,"{}") => APPLY(Lc,IDEN(Lc,"{}"),[])
+  | APPLY(Lc,IDEN(_,"::"),_) => 
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,":"),_) => 
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,"|"),_) => 
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,"=>"),_) => 
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,"-->"),_) => 
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,"$"),[I]) =>
+      APPLY(Lc,IDEN(Lc,"{}"),[WffFieldDef(Tp)])
+  | APPLY(Lc,IDEN(_,". "),_) => APPLY(Lc,IDEN(Lc,"{}"),
+				      listIfy(Tp,". ")//WffFieldDef)
+  | _ => WffTypeExp(Tp)
+  };
+
+  WffFieldDef(X) => case X in {
+    APPLY(Lc,IDEN(Lc1,":"),[IDEN(Lc2,Fld),fTp]) => valof{
+      if isKeyword(Fld) then
+        reportError("not permitted to define keyword: "<>Fld,Lc2)
+      else if isEscape(Fld) then
+        reportWarn("redefining builtin: "<>Fld,Lc2);
+
+      valis APPLY(Lc,IDEN(Lc1,":"),[IDEN(Lc2,Fld),WffTypeExp(fTp)])
+    }
+  | APPLY(Lc0,IDEN(Lc1,"=>"),[APPLY(Lc2,IDEN(Lc3,":"),
+				    [IDEN(Lc4,Fld),Lhs]),fTp]) => 
+      WffFieldDef(APPLY(Lc2,IDEN(Lc3,":"),
+			[IDEN(Lc4,Fld),APPLY(Lc0,IDEN(Lc1,"=>"),[Lhs,fTp])]))
+  | APPLY(Lc0,IDEN(Lc1,"-->"),[APPLY(Lc2,IDEN(Lc3,":"),
+				     [IDEN(Lc4,Fld),Lhs]),fTp]) => 
+      WffFieldDef(APPLY(Lc2,IDEN(Lc3,":"),
+			[IDEN(Lc4,Fld),APPLY(Lc0,IDEN(Lc1,"-->"),[Lhs,fTp])]))
+  | APPLY(Lc0,IDEN(Lc1,"::"),[Lhs,Grd]) => valof{
+      APPLY(Lcx,IDEN(Lcy,":"),[Id,Tp]).=WffFieldDef(Lhs);
+      valis APPLY(Lcx,IDEN(Lcy,":"),
+		  [Id,APPLY(Lc0,IDEN(Lc1,"::"),[Tp,WffAssertion(Grd)])])
+    }
+  | APPLY(Lc0,IDEN(Lc,"$"),[I]) =>
+      APPLY(Lc0,IDEN(Lc,"$"),[WffGoal(I)])
+  | _ => valof{
+      reportError("invalid field definition: "<>display(X),Context(X));
+      valis VOID
+    }
+  };
+
+  WffAssertion(Grd) => case Grd in {
+    APPLY(Lc0,IDEN(Lc,"-:"),[G,R]) => 
+      APPLY(Lc0,IDEN(Lc,"-:"),[WffGoal(G),WffGoal(R)])
+  | _ => valof{
+      Lc = Context(Grd); 
+      valis APPLY(Lc,IDEN(Lc,"-:"),[WffGoal(Grd),IDEN(Lc,"true")])
+    }
+  };
+
+  -- Constructor-based type definition.
+  -- tp[A1,..,An] ::= enums | cons(T1,...,Tk)
+  -- is mapped to a raft of definitions:
+  -- tp[A1,..,An] <~ {}
+  -- enum:tp[A1,...,An] .. {}
+  -- cons(X1:T1,..,Xk:Tk):tp[A1,..,An]..{}
+
+  constructorTypeDef(SQUARE(Lc0,IDEN(Lc1,Nm),A),Tp) => collect{
+    elemis APPLY(Lc1,IDEN(Lc1,"<~"),
+                 [IDEN(Lc1,Nm),
+                  TPL(Lc1,[APPLY(Lc1,IDEN(Lc1,"<~"),
+                                 [SQUARE(Lc0,IDEN(Lc1,Nm),A),
+                                  APPLY(Lc1,IDEN(Lc1,"{}"),
+                                        [TPL(Lc1,[
+                                               APPLY(Lc1,IDEN(Lc1,":"),[
+                                                       IDEN(Lc1,"show"),
+                                                       APPLY(Lc1,IDEN(Lc1,"=>"),
+                                                             [TPL(Lc1,[]),
+                                                              SQUARE(Lc0,
+								     IDEN(Lc1,"list"),
+                                                                     [IDEN(Lc1,"char")])])]),
+                                               APPLY(Lc1,IDEN(Lc1,":"),[
+                                                       IDEN(Lc1,"meta"),
+                                                       APPLY(Lc1,IDEN(Lc1,"=>"),
+                                                             [TPL(Lc1,[]),
+                                                              SQUARE(Lc0,IDEN(Lc1,"meta"),
+                                                                     [])])])
+                                               ])])]),
+                           APPLY(Lc1,IDEN(Lc1,"<~"),
+                                 [SQUARE(Lc0,IDEN(Lc1,Nm),A),
+                                  SQUARE(Lc0,IDEN(Lc1,"thing"),[])])])]);
+    for El in listIfy(Tp,"|") do{
+      case El in {
+        IDEN(Lc,En) ->{
+          elemis APPLY(Lc,IDEN(Lc,":"),[IDEN(Lc,En),
+					APPLY(Lc,IDEN(Lc,"@="),[TPL(Lc,[]),
+								SQUARE(Lc,IDEN(Lc1,Nm),A)])]);
+          elemis APPLY(Lc,IDEN(Lc,"<$"),
+		       [IDEN(Lc,En),
+			TPL(Lc,[
+			      APPLY(Lc,IDEN(Lc,"<="),
+				    [IDEN(Lc,En),IDEN(Lc,"thing")]),
+			      APPLY(Lc,IDEN(Lc,".."),
+				    [IDEN(Lc,En),
+				     APPLY(Lc,IDEN(Lc,"{}"),[
+					     APPLY(Lc,IDEN(Lc,"=>"),
+						   [IDEN(Lc,"show"),
+						    TPL(Lc,[
+							  APPLY(Lc,IDEN(Lc,"=>"),[
+								  APPLY(Lc,IDEN(Lc,"show"),[]),
+								  ST(Lc,En)])])])
+					     ])])])]);
+        }
+      | APPLY(Lc0,IDEN(Lc,Fn),CX) -> {
+          cArgs = CX//((_)=>IDEN(Lc,genNew("_")));
+          cTps = collect{ for c in CX do elemis WffTypeExp(c) };
+
+          showExp = valof{
+            O : ST(Lc,")");
+            Sep : VOID;
+
+            for cV in rev(cArgs) do{
+              E = APPLY(Lc0,APPLY(Lc0,IDEN(Lc,"."),[cV,IDEN(Lc,"show")]),[]);
+              if Sep == VOID then{
+                O := APPLY(Lc0,IDEN(Lc,"<>"),[E,O]);
+                Sep := ST(Lc,",");
+              }
+              else
+                O := APPLY(Lc0,IDEN(Lc,"<>"),
+			   [E,APPLY(Lc0,IDEN(Lc,"<>"),[Sep,O])])
+            };
+            valis APPLY(Lc0,IDEN(Lc,"<>"),[ST(Lc,Fn<>"("),O])
+          };
+
+          elemis APPLY(Lc0,IDEN(Lc,":"),
+		       [IDEN(Lc,Fn),APPLY(Lc0,IDEN(Lc,"@="),
+					  [TPL(Lc,cTps),
+					   SQUARE(Lc1,IDEN(Lc1,Nm),A)])]);
+          elemis APPLY(Lc0,IDEN(Lc,"<$"),
+                       [IDEN(Lc,Fn),
+                        TPL(Lc,[
+			      APPLY(Lc0,IDEN(Lc,"<="),
+				    [APPLY(Lc0,IDEN(Lc,Fn),cArgs),
+				     IDEN(Lc,"thing")]),
+			      APPLY(Lc0,IDEN(Lc,".."),
+                                      [APPLY(Lc0,IDEN(Lc,Fn),cArgs),
+                                       APPLY(Lc0,IDEN(Lc,"{}"),[
+                                               APPLY(Lc0,IDEN(Lc,"=>"),
+						     [IDEN(Lc,"show"),
+						      TPL(Lc,[
+							    APPLY(Lc0,IDEN(Lc,"=>"),[
+								    APPLY(Lc0,IDEN(Lc,"show"),[]),
+                                                                                  showExp])
+                                                                          ])])]
+                                            )])])])
+        }
+      | _ -> reportError("invalid type constructor definition: "<>display(El),Context(El))
+      }
+    }
+  };
+
+
+  -- pick out a function's equations and collect them, checking for well-formed-formedness
+  extractFun(Lc,Fn,L) => valof {
+    (Eqns,Rest) = extFun(Fn,L);
+    valis [APPLY(Lc,IDEN(Lc,"=>"),[IDEN(Lc,Fn),TPL(Lc,Eqns)]),..equalize(Rest)]
+  };
+
+  extFun(Nm,Seq) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,"=>"),[APPLY(Lc2,IDEN(Lc3,"::"),
+				     [APPLY(Lc4,IDEN(Lc5,!Nm),A),G]),R]),..L] => valof{
+      (Eqns,Rest) = extFun(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"=>"),
+                    [APPLY(Lc2,IDEN(Lc3,"::"),[
+                             APPLY(Lc4,IDEN(Lc5,Nm),A//WffPtn),
+                             WffGoal(G)]),
+                     WffExp(R)]),..Eqns],Rest)
+    }
+  | [APPLY(Lc0,IDEN(Lc1,"=>"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),R]),..L]=> valof{
+      (Eqns,Rest) = extFun(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"=>"),
+		    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),WffExp(R)]),..Eqns],Rest)
+    }
+  | L => ([],L)
+  };
+
+  -- Pick out a relation's clauses (regular form), also checking for wff-ness
+
+  extractRel(Lc,Fn,L) => valof {
+    (Clses,Rest) = extRel(Fn,L);
+    valis [APPLY(Lc,IDEN(Lc,":-"),[IDEN(Lc,Fn),TPL(Lc,Clses)]),..equalize(Rest)]
+  };
+
+  extRel(Nm,Seq) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,":-"),
+           [APPLY(Lc2,IDEN(Lc3,"::"),
+                  [APPLY(Lc4,IDEN(Lc5,!Nm),A),G]),R]),..L] =>
+      valof{
+      (Clses,Rest) = extRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":-"),
+		    [APPLY(Lc4,IDEN(Lc5,Nm),A//WffPtn),
+		     APPLY(Lc2,IDEN(Lc3,","),
+			   [WffGoal(G),WffGoal(R)])]),..Clses],Rest)
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,":-"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),R]),..L]=> valof{
+      (Clses,Rest) = extRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":-"),
+		    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),WffGoal(R)]),..Clses],
+	     Rest)
+    }
+  | [APPLY(Lc0,IDEN(Lc1,":--"),
+           [APPLY(Lc2,IDEN(Lc3,"::"),
+                  [APPLY(Lc4,IDEN(Lc5,!Nm),A),G]),R]),..L] => valof{
+      reportError("may not mix strong and regular clauses",Lc0);
+      valis extRel(Nm,L);
+    }
+
+  | [APPLY(Lc0,IDEN(_,":--"),[APPLY(_,IDEN(_,!Nm),A),R]),..L] => valof{
+      reportError("may not mix strong and regular clauses",Lc0);
+      valis extRel(Nm,L);
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,"::"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),G]),..L] => valof{
+      (Clses,Rest) = extRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":-"),
+		    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),WffGoal(G)]),..Clses],
+	     Rest)
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,!Nm),A),..L] => valof{
+      (Clses,Rest) = extRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":-"),
+		    [APPLY(Lc0,IDEN(Lc1,Nm),A//WffPtn),
+		     IDEN(Lc1,"true")]),..Clses],Rest)
+    }
+      
+  | L => ([],L)
+  };
+
+  extractStrongRel(Lc,Fn,L) => valof {
+    (Clses,Rest) = extStrongRel(Fn,L);
+    valis [APPLY(Lc,IDEN(Lc,":--"),
+		 [IDEN(Lc,Fn),TPL(Lc,Clses)]),..equalize(Rest)]
+  };
+
+  extStrongRel(Nm,Seq) => case Seq in {
+    [APPLY(Lc,IDEN(_,":-"),
+           [APPLY(_,IDEN(_,"::"),
+                  [APPLY(_,IDEN(_,!Nm),A),G]),R]),..L] => valof{
+      reportError("may not mix strong and regular clauses",Lc);
+      valis  extStrongRel(Nm,L);
+    }
+
+  | [APPLY(Lc,IDEN(_,":-"),[APPLY(_,IDEN(_,!Nm),A),R]),..L]=> valof{
+      reportError("may not mix strong and regular clauses",Lc);
+      valis extStrongRel(Nm,L);
+    }
+  | [APPLY(Lc0,IDEN(Lc1,":--"),
+           [APPLY(Lc2,IDEN(Lc3,"::"),
+                  [APPLY(Lc4,IDEN(Lc5,!Nm),A),G]),R]),..L] => valof{
+      (Clses,Rest) = extStrongRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":--"),
+                    [APPLY(Lc2,IDEN(Lc3,"::"),
+			   [APPLY(Lc4,IDEN(Lc3,Nm),A//WffPtn),WffGoal(G)]),
+                     WffGoal(R)]),..Clses],Rest)
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,":--"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),R]),..L] =>
+      valof{
+      (Clses,Rest) = extStrongRel(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,":--"),
+		    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),WffGoal(R)]),..Clses],
+	     Rest)
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,"::"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),G]),..L] => valof{
+      reportError("may not mix strong and regular clauses",Lc3);
+      valis extStrongRel(Nm,L);
+    }
+
+  | [APPLY(Lc,IDEN(_,!Nm),A),..L] => valof{
+      reportError("may not mix strong and regular clauses",Lc);
+      valis extStrongRel(Nm,L);
+    }
+      
+  | L => ([],L)
+  };
+
+  extractGrammar(Lc,Fn,L) => valof {
+    (Rules,Rest) = extGrammar(Fn,L);
+    valis [APPLY(Lc,IDEN(Lc,"-->"),
+		 [IDEN(Lc,Fn),TPL(Lc,Rules)]),..equalize(Rest)]
+  };
+
+  extGrammar(Nm,Seq) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,"-->"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),B]),..L] =>
+      valof{
+      (Rules,Rest) = extGrammar(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"-->"),
+		    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),WffGrBody(B)]),..Rules],
+	     Rest)
+    }
+
+  | [APPLY(Lc0,IDEN(Lc1,"-->"),[APPLY(Lc2,IDEN(Lc3,","),
+				      [APPLY(Lc4,IDEN(Lc5,!Nm),A),PB]),
+				B]),..L] =>
+      valof{
+      (Rules,Rest) = extGrammar(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"-->"),
+		    [APPLY(Lc2,IDEN(Lc3,","),
+			   [APPLY(Lc4,IDEN(Lc5,Nm),A//WffPtn),
+			    WffLookAhead(PB)]),WffGrBody(B)]),..Rules],Rest)
+    }
+
+  | _ => ([],Seq)
+  };
+
+  extractProcess(Lc,Fn,L) => valof {
+    (Rules,Rest) = extProc(Fn,L);
+    valis [APPLY(Lc,IDEN(Lc,"->"),[IDEN(Lc,Fn),TPL(Lc,Rules)]),..equalize(Rest)]
+  };
+
+  extProc(Nm,Seq) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,"->"),[APPLY(Lc2,IDEN(Lc3,"::"),
+				     [APPLY(Lc4,IDEN(Lc5,!Nm),A),
+				      G]),R]),..L] => valof{
+      (Rules,Rest) = extProc(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"->"),[
+                      APPLY(Lc2,IDEN(Lc3,"::"),
+			    [APPLY(Lc4,IDEN(Lc5,Nm),A//WffPtn),WffGoal(G)]),
+                      WffAction(R)]),..Rules],Rest)
+    }
+  | [APPLY(Lc0,IDEN(Lc1,"->"),[APPLY(Lc2,IDEN(Lc3,!Nm),A),R]),..L] => valof{
+      (Rules,Rest) = extProc(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"->"),[
+                      APPLY(Lc2,IDEN(Lc2,"::"),
+			    [APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),
+			     IDEN(Lc3,"true")]),
+                      WffAction(R)]),..Rules],Rest)
+    }
+  | _ => ([],Seq)
+  };
+
+  /* Collect initialization actions into a single segment */
+
+  extractInit(Lc,L,Act) => valof{
+    (Actions,Rest) = extInit(L,Act);
+    valis [APPLY(Lc,IDEN(Lc,"$"),[Actions]),..equalize(Rest)]
+  };
+
+  extInit(Seq,Acts) => case Seq in {
+    [APPLY(Lc0,IDEN(Lc1,"$"),[APPLY(Lc2,IDEN(_,"{}"),[Act])]),..L] =>
+      extInit(L,APPLY(Lc0,IDEN(Lc2,";"),[Acts,WffAction(Act)]))
+  | [El,..L] => valof{
+      (Actions,Rest) = extInit(L,Acts);
+      valis (Actions,[El,..Rest])
+    }
+  | [] => (Acts,[])
+  };
+
+  extractClass(Lc,Fn,L) => valof{
+    (Rules,Rest,Body) = extClass(Fn,L);
+    
+    if VOID.=Body then
+      valis [APPLY(Lc,IDEN(Lc,"<$"),
+		   [IDEN(Lc,Fn),TPL(Lc,Rules)]),..equalize(Rest)]
+    else{                                         -- we auto-generate an inheritance rule
+      if Fn!="thing" && Rules==[] then{
+	if APPLY(_,IDEN(_,".."),[Hd,_]).=Body then{
+	  case Hd in {
+	    APPLY(Lc1,IDEN(_,":"),[IDEN(Lc2,Id),_]) ->	
+	      valis [APPLY(Lc,IDEN(Lc,"<$"),[IDEN(Lc,Fn),
+					     TPL(Lc,[APPLY(Lc1,IDEN(Lc1,"<="),
+							   [IDEN(Lc2,Id),
+							    IDEN(Lc,"thing")])]<>
+					      [Body])]),..equalize(Rest)]
+	  | APPLY(Lc0,IDEN(_,":"),[APPLY(Lc2,Id,A),_]) ->
+	      valis [APPLY(Lc,IDEN(Lc,"<$"),
+			   [IDEN(Lc,Fn),
+			    TPL(Lc,[APPLY(Lc0,IDEN(Lc,"<="),
+					  [APPLY(Lc2,Id,
+						 (A//(_=>IDEN(Lc,genNew("_"))))),
+					   IDEN(Lc,"thing")])]<>[Body])]) ,..equalize(Rest)]
+	  | IDEN(Lc0,Id) -> 
+	      valis [APPLY(Lc,IDEN(Lc,"<$"),[IDEN(Lc,Fn),
+					  TPL(Lc,[APPLY(Lc0,IDEN(Lc,"<="),
+							[IDEN(Lc0,Id),IDEN(Lc,"thing")])]<>
+					      [Body])]),..equalize(Rest)]
+	  | APPLY(Lc0,Id,A) ->
+	      valis [APPLY(Lc,IDEN(Lc,"<$"),
+			   [IDEN(Lc,Fn),
+			    TPL(Lc,[APPLY(Lc0,IDEN(Lc,"<="),
+					  [APPLY(Lc0,Id,(A//(_=>IDEN(Lc,genNew("_"))))),
+					   IDEN(Lc,"thing")])]<>[Body])]) ,..equalize(Rest)]
+	  | _ ->
+	      valis [APPLY(Lc,IDEN(Lc,"<$"),
+			   [IDEN(Lc,Fn),TPL(Lc,Rules<>[Body])]),..equalize(Rest)]
+	  }
+	}
+      }
+      else
+        valis [APPLY(Lc,IDEN(Lc,"<$"),
+		     [IDEN(Lc,Fn),TPL(Lc,Rules<>[Body])]),..equalize(Rest)]
+    }
+  };
+
+  isClassHead(Hd,Nm) => case Hd in {
+    IDEN(_,!Nm) => true
+  | APPLY(_,IDEN(_,!Nm),_)=>true
+  | APPLY(_,IDEN(_,":"),[H,_]) => isClassHead(H,Nm)
+  | _ => false
+  };
+
+  extClass(Nm,LL) => case LL in {
+    [APPLY(Lc0,IDEN(Lc1,"<="),[APPLY(Lc2,IDEN(Lc3,!Nm),A),R]),..L] => valof{
+      (Rules,Rest,Body) = extClass(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"<="),[APPLY(Lc2,IDEN(Lc3,Nm),A//WffPtn),
+					WffExp(R)]),..Rules],Rest,Body)
+    }
+  | [APPLY(Lc0,IDEN(Lc1,"<="),[IDEN(Lc2,!Nm),R]),..L] => valof{
+      (Rules,Rest,Body) = extClass(Nm,L);
+      valis ([APPLY(Lc0,IDEN(Lc1,"<="),
+		    [IDEN(Lc2,Nm),WffExp(R)]),..Rules],Rest,Body)
+    }
+  
+  | [APPLY(Lc0,IDEN(Lc1,".."),[APPLY(Lc2,IDEN(Lc3,":"),[
+				       Hd::isClassHead(Hd,Nm),
+				       Tp]),B]),..L] => valof{
+      (Rules,Rest,Body) = extClass(Nm,L);
+
+      if !VOID.=Body then
+      	reportError("too many class bodies for "<>Nm,Lc0);
+
+      if IDEN(Lc4,Nm).=Hd then{
+	nRest = [APPLY(Lc2,IDEN(Lc3,":"),[Hd,APPLY(Lc2,IDEN(Lc1,"@="),
+						   [IDEN(Lc2,"[]"),
+						    WffTypeExp(Tp)])]),..Rest];
+	if APPLY(LcA,IDEN(LcB,"{}"),[cB]).=B then
+	  valis (Rules,nRest,APPLY(Lc0,IDEN(Lc1,".."),
+				   [WffPtn(APPLY(Lc2,IDEN(Lc3,":"),
+						 [Hd,WffTypeExp(Tp)])),
+				    APPLY(LcA,IDEN(LcB,"{}"),WffThetaEnv(cB))]))
+	else if IDEN(LcB,"{}").=B then
+	  valis (Rules,nRest,
+		 APPLY(Lc0,IDEN(Lc1,".."),
+		       [WffPtn(APPLY(Lc2,IDEN(Lc3,":"),
+				     [Hd,WffTypeExp(Tp)])),
+			APPLY(LcB,IDEN(LcB,"{}"),[])]))
+	else{
+	  reportError("body of class not well formed: "<>display(B),Context(B));
+	  valis (Rules,Rest,VOID)
+	}
+      }
+      else if APPLY(LcA,IDEN(LcB,Nm),Args).=Hd then {
+	aTps = extractConstructorTypes(Args,LcA);
+
+	nRest = { if listlen(listIfy(aTps,",.."))==listlen(Args) then
+	    [APPLY(LcA,IDEN(LcA,":"),[IDEN(Lc0,Nm),
+				  APPLY(LcA,IDEN(LcA,"@="),
+					[aTps,
+					 WffTypeExp(Tp)])]),..Rest]
+	  else
+	    Rest };
+	  
+	if APPLY(LcX,IDEN(LcY,"{}"),[cB]).=B then
+	  valis (Rules,nRest,APPLY(Lc0,IDEN(Lc1,".."),
+				   [WffPtn(APPLY(Lc2,IDEN(Lc3,":"),
+						 [Hd,WffTypeExp(Tp)])),
+				    APPLY(LcX,IDEN(LcY,"{}"),WffThetaEnv(cB))]))
+	else if IDEN(LcX,"{}").=B then
+	  valis (Rules,nRest,
+		 APPLY(Lc0,IDEN(Lc1,".."),[WffPtn(APPLY(Lc1,IDEN(Lc2,":"),
+						   [Hd,WffTypeExp(Tp)])),
+				      APPLY(LcX,IDEN(LcX,"{}"),[])]))
+	else{
+	  reportError("body of class not well formed: "<>display(B),Context(B));
+	  valis (Rules,Rest,VOID)
+	}
+      }
+      else{
+	reportError("invalid class constructor",Lc0);
+	valis extClass(Nm,L)
+      }
+    }
+  | [APPLY(Lc0,IDEN(Lc1,".."),[Hd::isClassHead(Hd,Nm),B]),..L] => valof{
+      (Rules,Rest,Body) = extClass(Nm,L);
+      
+      if !VOID.=Body then
+      	reportError("too many class bodies for "<>Nm,Lc0);
+
+      if APPLY(LcB,IDEN(_,"{}"),[cB]).=B then
+        valis (Rules,Rest,APPLY(Lc0,IDEN(Lc1,".."),[WffPtn(Hd),
+					       APPLY(LcB,IDEN(LcB,"{}"),WffThetaEnv(cB))]))
+      else if IDEN(LcB,"{}").=B then
+        valis (Rules,Rest,APPLY(Lc0,IDEN(Lc1,".."),
+				[WffPtn(Hd),APPLY(LcB,IDEN(LcB,"{}"),[])]))
+      else{
+        reportError("body of class not well formed: "<>display(B),Lc0);
+        valis (Rules,Rest,VOID)
+      }
+    }
+  | _ => ([],LL,VOID)
+  };
+
+  extractConstructorTypes(Args,Lc) => valof{
+    aTps : IDEN(Lc,"[]");
+
+    for A in rev(Args) do{
+      if APPLY(Lc0,IDEN(Lc1,":"),[Arg,aTp]).=A then{
+	if IDEN(_,_).=Arg then{
+	  aTps := APPLY(Lc0,IDEN(Lc1,",.."),[WffTypeExp(aTp),aTps]);
+	}
+	else
+	  reportError("identifier expected as constructor parameter, not "<>
+		      display(Arg),Lc0);
+      }
+      else
+	valis IDEN(Lc,"[]")			  -- bomb out
+    };
+    valis aTps
+  };
+
+  -- Process the contents of a class body (and of a package)
+  WffThetaEnv(X) => equalize(listIfy(X,". "));
+
+  WffTypeArgs(X) => X//WffTypeArg;
+
+  WffTypeArg(X) => case X in {
+    IDEN(Lc,"_") => IDEN(Lc,genNew("_$"))
+  | IDEN(_,_) => X
+  | APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Id),Tp]) => 
+      APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Id),WffTypeExp(Tp)])
+  | _ => valof{
+      reportError("type template argument `"++display(X)++
+		  "' should only contain type variables",Context(X));
+      valis X
+    }
+  };
+
+  listOfIdens(L) => case L in {
+    IDEN(_,_) => L
+  | APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Vr),Tp]) => 
+      APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Vr),WffTypeExp(Tp)])
+  | APPLY(Lc0,IDEN(Lc1,",.."),[L,R]) => APPLY(Lc0,
+					      IDEN(Lc1,",.."),
+					      [listOfIdens(L),listOfIdens(R)])
+  | _ => valof{
+      reportError("invalid quantifier expression: "<>display(L),Context(L));
+      valis VOID
+    }
+  };
+
+  -- Type expressions whow up where a type is referenced in a program
+  
+  WffTypeExp(X) => case X in {
+    IDEN(Lc,"_") => IDEN(Lc,genNew("_$"))
+  | IDEN(Lc,"{}") => APPLY(Lc,IDEN(Lc,"{}"),[])
+  | IDEN(Lc,"()") => APPLY(Lc,IDEN(Lc,"()"),[])
+  | IDEN(_,_) => X
+
+  | APPLY(Lc0,IDEN(Lc1,"-"),[L,R]) => 
+      APPLY(Lc0,IDEN(Lc1,"-"),[listOfIdens(L),WffTypeExp(R)]) 
+
+  | SQUARE(Lc0,IDEN(Lc,Nm),A) => SQUARE(Lc0,IDEN(Lc,Nm),A//WffTypeExp)
+
+  | BRACE(Lc,L,[]) => BRACE(Lc,WffArgTpl(L),[])
+
+  | APPLY(Lc0,IDEN(Lc1,","),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,","),[WffTypeExp(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"#"),[P,R]) => valof{
+      if SQUARE(Lc3,IDEN(Lc2,Rf),A).=R then
+	valis SQUARE(Lc3,APPLY(Lc0,IDEN(Lc1,"#"),
+			   [WffPackageName(P),IDEN(Lc2,Rf)]),A//WffTypeExp)
+      else if IDEN(_,Rd).=R then
+	valis APPLY(Lc0,IDEN(Lc1,"#"),[WffPackageName(P),R])
+      else{
+	reportError("invalid package type reference: "<>display(X),Lc0);
+	valis VOID
+      }
+    }
+
+  | APPLY(Lc0,IDEN(Lc1,"=>"),[APPLY(Lc2,IDEN(Lc3,"-"),[V,L]),R]) => 
+      WffTypeExp(APPLY(Lc2,IDEN(Lc3,"-"),[V,APPLY(Lc0,IDEN(Lc1,"=>"),[L,R])]))
+
+  | APPLY(Lc0,IDEN(Lc1,"$="),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,"@="),[WffArgTpl(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"@="),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,"@="),[WffArgTpl(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"@>"),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,"@>"),[WffArgTpl(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"=>"),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,"=>"),[WffArgTpl(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"-->"),[APPLY(Lc2,IDEN(Lc3,"-"),[V,L]),R]) => 
+      WffTypeExp(APPLY(Lc2,IDEN(Lc3,"-"),[V,APPLY(Lc0,IDEN(Lc1,"-->"),[L,R])]))
+
+  | APPLY(Lc0,IDEN(Lc1,"-->"),[L,R]) =>
+      APPLY(Lc0,IDEN(Lc1,"-->"),[WffArgTpl(L),WffTypeExp(R)])
+
+  | APPLY(Lc0,IDEN(Lc1,"*"),[L]) =>
+      APPLY(Lc0,IDEN(Lc1,"*"),[WffArgTpl(L)])
+
+  | APPLY(Lc0,IDEN(Lc1,"{}"),[L]) => 
+      APPLY(Lc0,IDEN(Lc1,"{}"),wffFaceTypes(listIfy(L,". ")))
+
+  | APPLY(Lc0,IDEN(Lc1,". "),_) =>
+      APPLY(Lc0,IDEN(Lc1,"{}"),wffFaceTypes(listIfy(X,". ")))
+
+  | APPLY(Lc0,IDEN(_,":"),_) => 
+      APPLY(Lc0,IDEN(Lc0,"{}"),wffFaceTypes([X]))
+
+  | APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Nm),Tp]) =>
+      APPLY(Lc0,IDEN(Lc1,"<~"),[IDEN(Lc2,Nm),WffTypeExp(Tp)])
+
+  | _ => valof{
+      reportError("ill-formed type expression: "<>display(X),Context(X));
+      valis X
+    }
+  };
+
+  wffFaceTypes(L) => collect{
+    for T in L do{
+      case T in {
+	APPLY(Lc0,IDEN(Lc1,":"),[IDEN(Lc2,Fld),fTp]) ->
+	  elemis APPLY(Lc0,IDEN(Lc1,":"),[IDEN(Lc2,Fld),WffTypeExp(fTp)])
+      | APPLY(Lc0,IDEN(Lc1,"=>"),
+	      [APPLY(Lc2,IDEN(Lc3,":"),[IDEN(Lc4,Fld),Lhs]),Rhs]) ->
+	  elemis APPLY(Lc2,IDEN(Lc3,":"),[IDEN(Lc4,Fld),
+					  WffTypeExp(APPLY(Lc0,IDEN(Lc1,"=>"),
+							   [Lhs,Rhs]))])
+      | APPLY(Lc0,IDEN(Lc1,"-->"),
+	      [APPLY(Lc2,IDEN(Lc3,":"),[IDEN(Lc4,Fld),Lhs]),Rhs]) ->
+	  elemis APPLY(Lc2,IDEN(Lc3,":"),[IDEN(Lc4,Fld),
+					  WffTypeExp(APPLY(Lc0,IDEN(Lc1,"-->"),
+							   [Lhs,Rhs]))])
+      | _ ->
+	  reportError("ill-formed field definition: "<>display(T),Context(T))
+      }
+    }
+  };
+
+  WffTypeArg(X) => case X in {
+    APPLY(Lc0,IDEN(Lc,"+"),[L]) => 
+      APPLY(Lc0,IDEN(Lc,"+"),[WffTypeExp(L)])	  -- input mode
+
+  | APPLY(Lc0,IDEN(Lc,"-"),[L]) => 
+      APPLY(Lc0,IDEN(Lc,"-"),[WffTypeExp(L)])	  -- output mode
+
+  | APPLY(Lc0,IDEN(Lc,"-+"),[L]) => 
+      APPLY(Lc0,IDEN(Lc,"-+"),[WffTypeExp(L)])	  -- input/output mode
+
+  | APPLY(Lc0,IDEN(Lc,"+-"),[L]) => 
+      APPLY(Lc0,IDEN(Lc,"-+"),[WffTypeExp(L)])	  -- input/output mode
+
+  | APPLY(Lc0,IDEN(Lc,"++"),[L]) => 
+      APPLY(Lc0,IDEN(Lc,"++"),[WffTypeExp(L)])	  -- super input mode
+
+  | _ => WffTypeExp(X)				  -- just a type
+  };
+
+  WffArgTpl(X) => case X in {
+    APPLY(Lc0,IDEN(Lc,","),_) =>
+      TPL(Lc0,collect{
+            reportWarn("use of () for argument types is deprecated",Lc0);
+            for E in listIfy(X,",") do{
+              if !IDEN(_,"()").=E then
+                elemis WffTypeArg(E)
+            }
+          })
+  | APPLY(Lc0,IDEN(_,",.."),_) =>
+      TPL(Lc0,collect{
+            for E in listIfy(X,",..") do{
+              if !IDEN(_,"[]").=E then
+                elemis WffTypeArg(E)
+            }
+          })
+  | IDEN(Lc,"[]") => TPL(Lc,[])
+  | IDEN(Lc,"()") => valof{
+      reportWarn("use of () as argument types is deprecated",Lc);
+      valis TPL(Lc,[])
+    }
+  | _ => TPL(Context(X),[WffTypeArg(X)])
+  };
+
+} export (checkWff);

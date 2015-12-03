@@ -1,0 +1,504 @@
+gossl.lo gossl.o: gossl.c ../config.h ../Engine/Headers/go.h \
+  /usr/include/stdlib.h /usr/include/sys/cdefs.h /usr/include/_types.h \
+  /usr/include/sys/_types.h /usr/include/machine/_types.h \
+  /usr/include/i386/_types.h /usr/include/sys/wait.h \
+  /usr/include/sys/signal.h /usr/include/sys/appleapiopts.h \
+  /usr/include/machine/signal.h /usr/include/i386/signal.h \
+  /usr/include/sys/resource.h /usr/include/machine/endian.h \
+  /usr/include/i386/endian.h /usr/include/sys/_endian.h \
+  /usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stdint.h \
+  /usr/include/libkern/OSByteOrder.h \
+  /usr/include/libkern/i386/OSByteOrder.h /usr/include/alloca.h \
+  /usr/include/machine/types.h /usr/include/i386/types.h \
+  ../Engine/Headers/dbgflags.h /opt/nar/ooio/include/logical.h \
+  ../Headers/local.h /opt/nar/ooio/include/ooio.h \
+  /opt/nar/ooio/include/io.h /opt/nar/ooio/include/retcode.h \
+  /opt/nar/ooio/include/integer.h /opt/nar/ooio/include/number.h \
+  /opt/nar/ooio/include/integer.h /opt/nar/ooio/include/logical.h \
+  /opt/nar/ooio/include/object.h /opt/nar/ooio/include/logical.h \
+  /opt/nar/ooio/include/number.h /opt/nar/ooio/include/retcode.h \
+  /usr/include/pthread.h /usr/include/pthread_impl.h /usr/include/sched.h \
+  /usr/include/time.h /usr/include/machine/_limits.h \
+  /usr/include/i386/_limits.h /opt/nar/ooio/include/unicode.h \
+  /opt/nar/ooio/include/integer.h /opt/nar/ooio/include/retcode.h \
+  /opt/nar/ooio/include/logical.h /opt/nar/ooio/include/formio.h \
+  /opt/nar/ooio/include/io.h /opt/nar/ooio/include/file.h \
+  /opt/nar/ooio/include/io.h /opt/nar/ooio/include/url.h \
+  /opt/nar/ooio/include/unicode.h /opt/nar/ooio/include/io.h \
+  /opt/nar/ooio/include/iostr.h /opt/nar/ooio/include/unicode.h \
+  /opt/nar/ooio/include/ioTcp.h /opt/nar/ooio/include/file.h \
+  /opt/nar/ooio/include/pool.h /usr/include/sys/types.h \
+  /opt/nar/ooio/include/hosts.h /opt/nar/ooio/include/pipe.h \
+  /opt/nar/ooio/include/file.h /opt/nar/ooio/include/bytes.h \
+  /opt/nar/ooio/include/unicode.h /opt/nar/ooio/include/hash.h \
+  /opt/nar/ooio/include/retcode.h /opt/nar/ooio/include/integer.h \
+  ../Engine/Headers/word.h /usr/include/math.h \
+  /usr/include/architecture/i386/math.h /usr/include/assert.h \
+  ../Engine/Headers/heap.h ../Engine/Headers/list.h \
+  ../Engine/Headers/word.h ../Engine/Headers/vars.h \
+  ../Engine/Headers/word.h ../Engine/Headers/floats.h \
+  ../Engine/Headers/word.h /usr/include/string.h \
+  ../Engine/Headers/symbols.h ../Engine/Headers/lock.h \
+  ../Engine/Headers/word.h ../Engine/Headers/char.h \
+  ../Engine/Headers/word.h ../Engine/Headers/cons.h \
+  ../Engine/Headers/word.h ../Engine/Headers/code.h \
+  ../Engine/Headers/word.h ../Headers/opcodes.h ../Headers/instructions.h \
+  ../Engine/Headers/str.h ../Engine/Headers/heap.h \
+  ../Engine/Headers/global.h ../Engine/Headers/heap.h \
+  ../Engine/Headers/symbols.h ../Engine/Headers/errors.h \
+  ../Engine/Headers/eval.h ../Engine/Headers/process.h \
+  ../Engine/Headers/heap.h /opt/nar/ooio/include/objectP.h \
+  /opt/nar/ooio/include/object.h /opt/nar/ooio/include/pool.h \
+  /usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stdarg.h \
+  /opt/nar/ooio/include/managedP.h /opt/nar/ooio/include/retcode.h \
+  /opt/nar/ooio/include/logical.h /opt/nar/ooio/include/managed.h \
+  /opt/nar/ooio/include/retcode.h /opt/nar/ooio/include/logical.h \
+  /opt/nar/ooio/include/object.h /opt/nar/ooio/include/objectP.h \
+  /opt/nar/ooio/include/object.h /opt/nar/ooio/include/pool.h \
+  ../Engine/Headers/lock.h ../Engine/Headers/stats.h \
+  ../Engine/Headers/str.h ../Engine/Headers/dict.h \
+  ../Engine/Headers/signals.h /usr/include/signal.h \
+  ../Engine/Headers/debug.h ../Engine/Headers/fileio.h \
+  /usr/include/sys/time.h gosslP.h /opt/nar/ooio/include/iosockP.h \
+  /opt/nar/ooio/include/fileP.h /opt/nar/ooio/include/ioP.h \
+  /opt/nar/ooio/include/managedP.h /opt/nar/ooio/include/io.h \
+  /opt/nar/ooio/include/file.h /opt/nar/ooio/include/ioTcp.h gossl.h \
+  /usr/include/openssl/ssl.h /usr/include/openssl/e_os2.h \
+  /usr/include/openssl/opensslconf.h /usr/include/openssl/comp.h \
+  /usr/include/openssl/crypto.h /usr/include/stdio.h \
+  /usr/include/openssl/stack.h /usr/include/openssl/safestack.h \
+  /usr/include/openssl/opensslv.h /usr/include/openssl/symhacks.h \
+  /usr/include/openssl/bio.h /usr/include/openssl/x509.h \
+  /usr/include/openssl/buffer.h \
+  /usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stddef.h \
+  /usr/include/openssl/evp.h /usr/include/openssl/ossl_typ.h \
+  /usr/include/openssl/md2.h /usr/include/openssl/md4.h \
+  /usr/include/openssl/md5.h /usr/include/openssl/sha.h \
+  /usr/include/openssl/ripemd.h /usr/include/openssl/des.h \
+  /usr/include/openssl/des_old.h /usr/include/openssl/ui_compat.h \
+  /usr/include/openssl/ui.h /usr/include/openssl/rc4.h \
+  /usr/include/openssl/rc2.h /usr/include/openssl/rc5.h \
+  /usr/include/openssl/blowfish.h /usr/include/openssl/cast.h \
+  /usr/include/openssl/mdc2.h /usr/include/openssl/aes.h \
+  /usr/include/openssl/rsa.h /usr/include/openssl/asn1.h \
+  /usr/include/openssl/bn.h /usr/include/openssl/dsa.h \
+  /usr/include/openssl/dh.h /usr/include/openssl/objects.h \
+  /usr/include/openssl/obj_mac.h /usr/include/openssl/x509_vfy.h \
+  /usr/include/openssl/lhash.h /usr/include/openssl/pkcs7.h \
+  /usr/include/openssl/kssl.h /usr/include/openssl/pem.h \
+  /usr/include/openssl/pem2.h /usr/include/openssl/ssl2.h \
+  /usr/include/openssl/ssl3.h /usr/include/openssl/tls1.h \
+  /usr/include/openssl/ssl23.h /usr/include/sys/stat.h \
+  /usr/include/sys/socket.h /usr/include/machine/param.h \
+  /usr/include/i386/param.h /usr/include/netinet/in.h \
+  /usr/include/netinet6/in6.h /usr/include/netdb.h \
+  /usr/include/arpa/inet.h /usr/include/sys/param.h \
+  /usr/include/sys/syslimits.h \
+  /usr/lib/gcc/i686-apple-darwin8/4.0.1/include/limits.h \
+  /usr/lib/gcc/i686-apple-darwin8/4.0.1/include/syslimits.h \
+  /usr/include/limits.h /usr/include/machine/limits.h \
+  /usr/include/i386/limits.h /usr/include/unistd.h \
+  /usr/include/sys/unistd.h /usr/include/sys/select.h \
+  /usr/include/errno.h /usr/include/sys/errno.h
+
+../config.h:
+
+../Engine/Headers/go.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/_types.h:
+
+/usr/include/sys/_types.h:
+
+/usr/include/machine/_types.h:
+
+/usr/include/i386/_types.h:
+
+/usr/include/sys/wait.h:
+
+/usr/include/sys/signal.h:
+
+/usr/include/sys/appleapiopts.h:
+
+/usr/include/machine/signal.h:
+
+/usr/include/i386/signal.h:
+
+/usr/include/sys/resource.h:
+
+/usr/include/machine/endian.h:
+
+/usr/include/i386/endian.h:
+
+/usr/include/sys/_endian.h:
+
+/usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stdint.h:
+
+/usr/include/libkern/OSByteOrder.h:
+
+/usr/include/libkern/i386/OSByteOrder.h:
+
+/usr/include/alloca.h:
+
+/usr/include/machine/types.h:
+
+/usr/include/i386/types.h:
+
+../Engine/Headers/dbgflags.h:
+
+/opt/nar/ooio/include/logical.h:
+
+../Headers/local.h:
+
+/opt/nar/ooio/include/ooio.h:
+
+/opt/nar/ooio/include/io.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/opt/nar/ooio/include/integer.h:
+
+/opt/nar/ooio/include/number.h:
+
+/opt/nar/ooio/include/integer.h:
+
+/opt/nar/ooio/include/logical.h:
+
+/opt/nar/ooio/include/object.h:
+
+/opt/nar/ooio/include/logical.h:
+
+/opt/nar/ooio/include/number.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/usr/include/pthread.h:
+
+/usr/include/pthread_impl.h:
+
+/usr/include/sched.h:
+
+/usr/include/time.h:
+
+/usr/include/machine/_limits.h:
+
+/usr/include/i386/_limits.h:
+
+/opt/nar/ooio/include/unicode.h:
+
+/opt/nar/ooio/include/integer.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/opt/nar/ooio/include/logical.h:
+
+/opt/nar/ooio/include/formio.h:
+
+/opt/nar/ooio/include/io.h:
+
+/opt/nar/ooio/include/file.h:
+
+/opt/nar/ooio/include/io.h:
+
+/opt/nar/ooio/include/url.h:
+
+/opt/nar/ooio/include/unicode.h:
+
+/opt/nar/ooio/include/io.h:
+
+/opt/nar/ooio/include/iostr.h:
+
+/opt/nar/ooio/include/unicode.h:
+
+/opt/nar/ooio/include/ioTcp.h:
+
+/opt/nar/ooio/include/file.h:
+
+/opt/nar/ooio/include/pool.h:
+
+/usr/include/sys/types.h:
+
+/opt/nar/ooio/include/hosts.h:
+
+/opt/nar/ooio/include/pipe.h:
+
+/opt/nar/ooio/include/file.h:
+
+/opt/nar/ooio/include/bytes.h:
+
+/opt/nar/ooio/include/unicode.h:
+
+/opt/nar/ooio/include/hash.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/opt/nar/ooio/include/integer.h:
+
+../Engine/Headers/word.h:
+
+/usr/include/math.h:
+
+/usr/include/architecture/i386/math.h:
+
+/usr/include/assert.h:
+
+../Engine/Headers/heap.h:
+
+../Engine/Headers/list.h:
+
+../Engine/Headers/word.h:
+
+../Engine/Headers/vars.h:
+
+../Engine/Headers/word.h:
+
+../Engine/Headers/floats.h:
+
+../Engine/Headers/word.h:
+
+/usr/include/string.h:
+
+../Engine/Headers/symbols.h:
+
+../Engine/Headers/lock.h:
+
+../Engine/Headers/word.h:
+
+../Engine/Headers/char.h:
+
+../Engine/Headers/word.h:
+
+../Engine/Headers/cons.h:
+
+../Engine/Headers/word.h:
+
+../Engine/Headers/code.h:
+
+../Engine/Headers/word.h:
+
+../Headers/opcodes.h:
+
+../Headers/instructions.h:
+
+../Engine/Headers/str.h:
+
+../Engine/Headers/heap.h:
+
+../Engine/Headers/global.h:
+
+../Engine/Headers/heap.h:
+
+../Engine/Headers/symbols.h:
+
+../Engine/Headers/errors.h:
+
+../Engine/Headers/eval.h:
+
+../Engine/Headers/process.h:
+
+../Engine/Headers/heap.h:
+
+/opt/nar/ooio/include/objectP.h:
+
+/opt/nar/ooio/include/object.h:
+
+/opt/nar/ooio/include/pool.h:
+
+/usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stdarg.h:
+
+/opt/nar/ooio/include/managedP.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/opt/nar/ooio/include/logical.h:
+
+/opt/nar/ooio/include/managed.h:
+
+/opt/nar/ooio/include/retcode.h:
+
+/opt/nar/ooio/include/logical.h:
+
+/opt/nar/ooio/include/object.h:
+
+/opt/nar/ooio/include/objectP.h:
+
+/opt/nar/ooio/include/object.h:
+
+/opt/nar/ooio/include/pool.h:
+
+../Engine/Headers/lock.h:
+
+../Engine/Headers/stats.h:
+
+../Engine/Headers/str.h:
+
+../Engine/Headers/dict.h:
+
+../Engine/Headers/signals.h:
+
+/usr/include/signal.h:
+
+../Engine/Headers/debug.h:
+
+../Engine/Headers/fileio.h:
+
+/usr/include/sys/time.h:
+
+gosslP.h:
+
+/opt/nar/ooio/include/iosockP.h:
+
+/opt/nar/ooio/include/fileP.h:
+
+/opt/nar/ooio/include/ioP.h:
+
+/opt/nar/ooio/include/managedP.h:
+
+/opt/nar/ooio/include/io.h:
+
+/opt/nar/ooio/include/file.h:
+
+/opt/nar/ooio/include/ioTcp.h:
+
+gossl.h:
+
+/usr/include/openssl/ssl.h:
+
+/usr/include/openssl/e_os2.h:
+
+/usr/include/openssl/opensslconf.h:
+
+/usr/include/openssl/comp.h:
+
+/usr/include/openssl/crypto.h:
+
+/usr/include/stdio.h:
+
+/usr/include/openssl/stack.h:
+
+/usr/include/openssl/safestack.h:
+
+/usr/include/openssl/opensslv.h:
+
+/usr/include/openssl/symhacks.h:
+
+/usr/include/openssl/bio.h:
+
+/usr/include/openssl/x509.h:
+
+/usr/include/openssl/buffer.h:
+
+/usr/lib/gcc/i686-apple-darwin8/4.0.1/include/stddef.h:
+
+/usr/include/openssl/evp.h:
+
+/usr/include/openssl/ossl_typ.h:
+
+/usr/include/openssl/md2.h:
+
+/usr/include/openssl/md4.h:
+
+/usr/include/openssl/md5.h:
+
+/usr/include/openssl/sha.h:
+
+/usr/include/openssl/ripemd.h:
+
+/usr/include/openssl/des.h:
+
+/usr/include/openssl/des_old.h:
+
+/usr/include/openssl/ui_compat.h:
+
+/usr/include/openssl/ui.h:
+
+/usr/include/openssl/rc4.h:
+
+/usr/include/openssl/rc2.h:
+
+/usr/include/openssl/rc5.h:
+
+/usr/include/openssl/blowfish.h:
+
+/usr/include/openssl/cast.h:
+
+/usr/include/openssl/mdc2.h:
+
+/usr/include/openssl/aes.h:
+
+/usr/include/openssl/rsa.h:
+
+/usr/include/openssl/asn1.h:
+
+/usr/include/openssl/bn.h:
+
+/usr/include/openssl/dsa.h:
+
+/usr/include/openssl/dh.h:
+
+/usr/include/openssl/objects.h:
+
+/usr/include/openssl/obj_mac.h:
+
+/usr/include/openssl/x509_vfy.h:
+
+/usr/include/openssl/lhash.h:
+
+/usr/include/openssl/pkcs7.h:
+
+/usr/include/openssl/kssl.h:
+
+/usr/include/openssl/pem.h:
+
+/usr/include/openssl/pem2.h:
+
+/usr/include/openssl/ssl2.h:
+
+/usr/include/openssl/ssl3.h:
+
+/usr/include/openssl/tls1.h:
+
+/usr/include/openssl/ssl23.h:
+
+/usr/include/sys/stat.h:
+
+/usr/include/sys/socket.h:
+
+/usr/include/machine/param.h:
+
+/usr/include/i386/param.h:
+
+/usr/include/netinet/in.h:
+
+/usr/include/netinet6/in6.h:
+
+/usr/include/netdb.h:
+
+/usr/include/arpa/inet.h:
+
+/usr/include/sys/param.h:
+
+/usr/include/sys/syslimits.h:
+
+/usr/lib/gcc/i686-apple-darwin8/4.0.1/include/limits.h:
+
+/usr/lib/gcc/i686-apple-darwin8/4.0.1/include/syslimits.h:
+
+/usr/include/limits.h:
+
+/usr/include/machine/limits.h:
+
+/usr/include/i386/limits.h:
+
+/usr/include/unistd.h:
+
+/usr/include/sys/unistd.h:
+
+/usr/include/sys/select.h:
+
+/usr/include/errno.h:
+
+/usr/include/sys/errno.h:

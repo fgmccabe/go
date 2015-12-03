@@ -1,0 +1,246 @@
+/*
+ * Handle the second phase of type inference, where the hidden type 
+ * arguments are computed
+ */
+#include "go.ah";
+
+module
+ import {
+  interface <stdio.af> and
+  interface "display.af" and
+  interface "errors.af" and
+  interface "types.af" and
+  interface "findvars.af" and
+  interface "misc.af"
+}
+in{
+/* reQuantify adds additional quantifiers relating to run-time type variables */
+
+  reQuantify(N,Env) => reQuan(N,Env);
+
+  reQuan(N::node(El,Tp,Lc).=N,Env) => {case El in {
+      cls(Nm,Q,lhs,goal) => valof{
+        xQ = varsInList(goal,varsInList(lhs,Q,Env),Env);
+
+        valis node(cls(Nm,xQ,lhs,goal),Tp,Lc)
+      }
+    | scls(Nm,Q,lhs,G,goal) => valof{
+        xQ = varsInList(G,varsInList(goal,varsInList(lhs,Q,Env),Env),Env);
+        
+        valis node(scls(Nm,xQ,lhs,G,goal),Tp,Lc)
+      }
+
+    | fun(Id,Vis,Arity,Eqns) => node(fun(Id,Vis,Arity,Eqns//(X=>reQuan(X,Env))),Tp,Lc)
+
+    | eqn(Nm,Q,lhs,rhs,goal) => valof{
+        xQ = varsInList(goal,varsIn(rhs,varsInList(lhs,Q,Env),Env),Env);
+
+        valis node(eqn(Nm,xQ,lhs,rhs,goal),Tp,Lc)
+      }
+    | grl(Q,lhs,PB,Body) => valof{
+        xQ = varsIn(Body,varsIn(PB,varsInList(lhs,Q,Env),Env),Env);
+        
+        valis node(grl(xQ,lhs,PB,Body),Tp,Lc)
+      }
+    | prl(Q,lhs,Tst,Body) => valof{
+        xQ = varsInList(Body,varsInList(Tst,varsInList(lhs,Q,Env),Env),Env);
+        
+        valis node(prl(xQ,lhs,Tst,Body),Tp,Lc)
+      }
+
+    | cse(E,R) => node(cse(reQuan(E,Env),R//(X=>reQuan(X,Env))),Tp,Lc)
+
+    | sync(R,A,T) => node(sync(R,A,reQuan(T,Env)),Tp,Lc)
+
+    | tmout(Q,T,A) => valof{
+        xQ = varsInList(A,varsIn(T,Q,Env),Env);
+
+        valis node(tmout(xQ,T,A),Tp,Lc)
+      }
+      
+    | clss(Q,C,H,Th) => valof{
+    	sEnv = collect {
+          elemis ("this",varBind,Tp);         -- Add this to the outer variables
+    	  for node(tEl,Typ,_) in Th do{
+            case tEl in {
+              asg(Nm,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | def(Nm,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | rel(Nm,_,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | srel(Nm,_,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | fun(Nm,_,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | grm(Nm,_,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | prc(Nm,_,_,_) ->
+                elemis (Nm,varBind,Typ)
+            | class(Nm,_,_,_) -> 
+                elemis (Nm,varBind,Typ)
+            | tpe(Nm,_,_) -> 
+                elemis (Nm,typeBind,Typ)
+            | _ -> {}
+            }
+    	  }
+    	} <> Env;
+        
+        xQ = varsInList(Th,varsIn(H,[],sEnv),sEnv);
+        
+        valis node(clss(xQ,C,H,Th),Tp,Lc)
+      }
+    | crle(Q,lhs,supr) => valof{
+        xQ = varsIn(supr,varsIn(lhs,Q,Env),Env);
+        valis node(crle(xQ,lhs,supr),Tp,Lc)
+      }
+    | def(L,V,R) => node(def(L,V,reQuan(R,Env)),Tp,Lc)
+    | asg(L,V,R) => node(asg(L,V,reQuan(R,Env)),Tp,Lc)
+    | mtc(L,R) => node(mtc(reQuan(L,Env),reQuan(R,Env)),Tp,Lc)
+    | bag(Q,E,goal) => valof{
+        xQ = varsIn(goal,varsIn(E,Q,Env),Env);
+
+        valis node(bag(xQ,E,goal),Tp,Lc)
+      }
+
+    | _ =>  N
+    }
+  };
+
+  reQuanList(L,Q) => collect{
+    for X in L do
+      elemis reQuan(X,Q)
+  };
+    
+  varsIn(Nd::node(N,T,_).=Nd,QV,Env) => case N in {
+    iden("_") => QV                     -- anonymous variables are not put into varlist
+  | iden("{}") => QV
+  | iden("fail") => QV
+  | iden("true") => QV
+  | iden(Nm)::(Nm,_,_) in Env => QV
+  | iden(Nm)::(Nm,_) in QV => QV
+  | iden(Nm) => [(Nm,T),..QV]
+  | sym(_) => QV
+  | enu(_) => QV
+  | int(_) => QV
+  | flt(_) => QV
+  | str(_) => QV
+  | chr(_) => QV
+  | dot(R,_) => varsIn(R,QV,Env)
+  | pkrf(_,E) => varsIn(E,QV,Env)
+  | eqn(_,SQ,A,R,G) => valof {
+      sEnv = xtnd(SQ,Env);
+      valis varsInList(G,varsIn(R,varsInList(A,QV,sEnv),sEnv),sEnv)
+    }
+  | cls(_,SQ,H,G) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsInList(G,varsInList(H,QV,sEnv),sEnv)
+    }
+  | scls(_,SQ,H,G,B) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsInList(B,varsInList(G,varsInList(H,QV,sEnv),sEnv),sEnv)
+    }
+  | grl(SQ,H,PB,GL) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsIn(GL,varsIn(PB,varsInList(H,QV,sEnv),sEnv),sEnv)
+    }
+  | prl(SQ,H,Tst,GL) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsInList(GL,varsInList(Tst,varsInList(H,QV,sEnv),sEnv),sEnv)
+    }
+  | cse(E,R) => 
+      varsIn(E,varsInList(R,QV,Env),Env)
+  | tmout(SQ,T,A) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsIn(T,varsInList(A,QV,sEnv),sEnv)
+    }
+  | bnd(SQ,E,VS) => QV
+
+/*valof {
+      sEnv = xtnd(SQ,Env);
+      VV : varsIn(E,QV,sEnv);
+
+
+      for (V,S) in VS do{
+        VV := varsIn(S,varsIn(V,VV,sEnv),Env)
+      };
+
+      valis VV
+    }
+*/
+  | def(Vr,_,V) => varsIn(node(iden(Vr),ndType(V),noLoc),varsIn(V,QV,Env),Env)
+  | asg(Vr,_,V) => varsIn(node(iden(Vr),ndType(V),noLoc),varsIn(V,QV,Env),Env)
+  | mtc(Vr,V) => varsIn(Vr,varsIn(V,QV,Env),Env)
+  | app(F,A) => varsIn(F,varsInList(A,QV,Env),Env)
+  | con(F,AL) => varsInList(AL,QV,Env)
+  | prd(F,A) => varsIn(F,varsInList(A,QV,Env),Env)
+  | act(F,A) => varsIn(F,varsInList(A,QV,Env),Env)
+  | nt(F,A) => varsIn(F,varsInList(A,QV,Env),Env)
+  | itr(SQ,E,V,S) => valof {
+      sEnv = xtnd(SQ,Env);
+      valis varsIn(V,varsIn(E,varsIn(S,QV,Env),sEnv),sEnv);
+    }
+  | grd(T,G) => varsInList(G,varsIn(T,QV,Env),Env)
+  | lzy(T,G) => varsInList(G,varsIn(T,QV,Env),Env)
+  | cnj(L) => varsInList(L,QV,Env)
+  | seq(L) => varsInList(L,QV,Env)
+  | dsj(A,B) => varsIn(B,varsIn(A,QV,Env),Env)
+  | iff(A,B,C) => varsIn(A,varsIn(B,varsIn(C,QV,Env),Env),Env)
+  | frll(SQ,A,B) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsInList(B,varsInList(A,QV,sEnv),sEnv)
+    }
+  | one(A) => varsInList(A,QV,Env)
+  | neg(A) => varsInList(A,QV,Env)
+  | vlof(Q,A) => varsInList(A,QV,xtnd(Q,Env))
+  | vlis(A) => varsIn(A,QV,Env)
+  | err(G,E) => varsInList(E,varsIn(G,QV,Env),Env)
+  | exc(A) => varsIn(A,QV,Env)
+  | sync(R,A,T) => varsIn(T,varsIn(R,varsInList(A,QV,Env),Env),Env)
+  | vde => QV
+  | bag(SQ,E,G) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsIn(G,varsIn(E,QV,sEnv),sEnv)
+    }
+  | frk(SQ,A) =>valof{
+      sEnv = xtnd(SQ,[("self",varBind,voidType)]<>Env);
+      valis varsInList(A,QV,sEnv)
+    }
+  | crle(SQ,H,G) => valof{
+      sEnv = xtnd(SQ,Env);
+      valis varsIn(G,varsIn(H,QV,sEnv),sEnv)
+    }
+  | clss(SQ,_,H,Th) => valof{
+      sEnv = xtnd(SQ,Env);
+    	
+      valis varsIn(H,QV,sEnv)
+    }
+  | class(Id,Mode,_,Defs) => 
+      varsInList(Defs,QV,Env)
+  | onew(F) => varsIn(F,QV,Env)
+  | flow(E,_) => varsIn(E,QV,Env)
+  | _ => exception error("Problem in finding vars "++N^0,'fail)
+  };
+  
+  varsInList(L,QV,Env) => valof{
+    QQ : QV;
+    for X in L do
+      QQ := varsIn(X,QQ,Env);
+    valis QQ;
+  };
+
+  varsInMethods(L,QV,Env) => valof{
+    QQ : QV;
+    for (_,_,X) in L do
+      QQ := varsIn(X,QQ,Env);
+    valis QQ;
+  };
+
+  xtnd(Q,Env) => valof{
+    E : Env;
+    for (Nm,Tp) in Q do
+      E := [(Nm,varBind,Tp),..E];
+    valis E
+  };
+
+} export (reQuantify);

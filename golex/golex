@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Execute the golex lexical generator
+
+export PATH=/opt/go/bin:${PATH}
+export GO_DIR=/opt/go/go/:/opt/go/go/golex/
+
+exec go golex $*

@@ -1,0 +1,144 @@
+module
+  import 
+{
+  interface "canon.af" and
+  interface "misc.af" and
+  interface "ground.af" and
+  interface <stdio.af>
+} in {
+
+  countVarsInClse(clse(_,H,B,_)) =>
+    countVarsInTerms(H,countVarsInCalls(B,[]));
+
+  countVarsInCall(Call,Q) => case Call in {
+    defn(V,Vl,_) => countVarsInTerm(V,countVarsInTerm(Vl,Q))
+  | call(_,Args,_) => countVarsInTerms(Args,Q)
+  | ocall(O,G,T) => countVarsInTerm(O,countVarsInTerm(G,countVarsInTerm(T,Q)))
+  | suspc(V,Vl,_) => countVarsInTerm(V,countVarsInTerm(Vl,Q))
+  | rais(V,_) => countVarsInTerm(V,Q)
+  | fail(_) => Q
+  | neck(_) => Q
+  | trpBegin => Q
+  | trpEnd => Q
+--  | errr(E,Q) => countVarsInCalls(E,Q)
+  };
+
+  countVarsInCalls(Calls,Q) => valof{
+    QQ : Q;
+    for C in Calls do
+      QQ := countVarsInCall(C,QQ);
+    valis QQ
+  };
+
+  countVarsInTerm(Term,Q) => case Term in {
+    idnt(N) => increment(idnt(N),Q)
+  | symb(_) => Q
+  | intgr(_) => Q
+  | float(_) => Q
+  | ch(_) => Q
+  | strg(_) => Q
+  | mtch(T) => countVarsInTerm(T,Q)			  -- match, don't unify
+  | bild(T) => countVarsInTerm(T,Q)			  -- an output-only mode
+  | cons(string,A) => countVarsInTerms(A,Q)
+  | code(_,_,T) => countVarsInTerms(T,Q)	  -- chunk of compiled code
+  | vdel => Q
+  };
+
+  countVarsInTerms(Terms,Q) => valof{
+    QQ:Q;
+    for e in Terms do
+      QQ := countVarsInTerm(e,QQ);
+    valis QQ
+  };
+
+  increment(T,Q) => case Q in {
+    [] => [(T,1)]
+  | [(!T,Count),..QQ] => [(T,Count+1),..QQ]
+  | [E,..QQ] => [E,..increment(T,QQ)]
+  };
+
+  decrement(T,Q) => case Q in {
+    [] => []
+  | [(!T,Count),..QQ] => [(T,Count-1),..QQ]
+  | [E,..QQ] => [E,..decrement(T,QQ)]
+  };
+
+  partitionBody(Body) => case Body in {
+    [] => []
+  | [neck(Lc),..rBody] => [[neck(Lc)],..partitionBody(rBody)]
+  | [Call,..rBody] => partition(rBody,[Call])
+  };
+
+  partition(Body,soFar) => case Body in {
+    [] => [rev(soFar)]
+  | [neck(Lc),..rBody] => [rev(soFar),neck(Lc),..partitionBody(rBody)]
+  | [Call,..rBody] => partition(rBody,[Call,..soFar])
+  };
+
+  elimEquals(Cl::clse(Q,H,B,Lc).=Cl) => valof{
+    Groups = partitionBody([call("**",H,Lc),..B]);
+    Vars = countVarsInClse(Cl);
+    
+    BodyGroups = shuffleDefns([],Groups,Vars);
+  };
+
+  shuffleDefns(Front,Back) => case Back in {
+    [] => Front
+  | [[neck(Lc)],..rBack] => shuffleDefns([[neck(Lc)],..Front],rBack)
+  | [Group,..rGroups] => 
+      shuffleDefns([shuffleGroup(Group,Group,Front,rGroups),..Front],
+		   rGroups)
+  };
+
+  shuffleGroup(Gp,Group,aHead,bHind) => case Gp in {
+    [] => []
+  | [neck(Lc)] => [neck(Lc)]
+  | [defn(Vr,Vl,Lc),..rGrp] => valof{
+      
+    }
+  | [Call,..rGrp] => [Call,..shuffleGroup(rGrp,Group,aHead,bHind)]
+  }
+
+moveDefsForward([],Group,aHead,bHind);
+
+  moveDefsForward(Fr,Group,aHead,bHind) => case Group in {
+    [] => 
+  };
+  
+
+  removeFromBody(Body,Vr,X,Ex) => collect{
+    for G in Body do
+      elemis removeFrom(G,Vr,X,Ex)
+  };
+
+  removeFromBack(Body,Vr,X,Ex,Lc,Tp) =>  -- we dont go back past a call
+    case Body in {
+    [] => []
+    | [G,..BB] => {
+      case G in {
+	defn(_,_,_) =>
+	  [removeFrom(G,Vr,X,Ex),..removeFromBack(BB,Vr,X,Ex,Lc,Tp)]
+      | _ =>
+	  [removeFrom(G,Vr,X,Ex),..BB]
+      }
+    }
+  };
+
+  removeFrom(Trm,Vr,X,Ex) => case Trm in {
+    call(P,A,Lc) => call(removeFrom(P,Vr,X,Ex),removeFromList(A,Vr,X,Ex),Lc)
+  | idnt(!Vr):: !(!Vr) in Ex => X
+  | list(H,T) => list(removeFrom(H,Vr,X,Ex),removeFrom(T,Vr,X,Ex))
+  | defn(V,Vl,Lc) => defn(removeFrom(V,Vr,X,Ex),removeFrom(Vl,Vr,X,Ex),Lc)
+  | cons(F,A) => cons(F,removeFromList(A,Vr,X,Ex))
+  | clse(Q,H,B,Lc) => valof{
+      Exx = (Q//(idnt(N)=>N))<>Ex;
+      valis clse(Q,removeFromList(H,Vr,X,Exx),removeFromBody(B,Vr,X,Exx),Lc)
+    }
+  | rais(A,Lc) => rais(removeFrom(A,Vr,X,Ex),Lc)
+  | seqn(A) => seqn(A//((e)=>removeFrom(e,Vr,X,Ex)))
+    
+  | _ => Trm
+  };
+  
+  removeFromList(L,Vr,X,Ex) => L//(El=>removeFrom(El,Vr,X,Ex));
+}

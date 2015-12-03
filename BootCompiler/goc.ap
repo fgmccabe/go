@@ -1,0 +1,287 @@
+/*
+ * The Go! compiler ... top level driver
+*/
+#include "go.ah";
+
+program
+  import (interface "grammar.af" and
+          interface "abstract.af" and
+          interface "display.af" and
+          interface "wff.af" and
+          interface "types.af" and
+          interface "typeof.af" and
+          interface "st-types.af" and
+          interface "canon.af" and
+          interface "canonicalize.af" and
+          interface "compile.af" and
+          interface "ground.af" and
+          interface "errors.af" and
+          interface "encode.af" and
+          interface "misc.af" and
+          interface "url.af"
+         ) in
+{
+  main()
+  {
+    (files,Opts) = Options();
+
+    for f in files do{
+      (ref,fn) .= mapURI(fpwd(),f);
+--      "P">>stdout;
+      C = parse(ref,ref,Opts);
+
+      out = valof{
+	Vr = valof{
+	  if version(V) in Opts && V!="*" then
+	    valis "."++V
+	  else
+	    valis ""
+	};
+
+        if P++".go".=ref then
+          valis P++Vr++".goc"
+        else
+          valis ref++Vr++".goc"
+      };
+
+      if errCount()==0 then {                     -- no parse errors
+        for T in C do {
+--	  "W">>stdout;
+          NT = checkWff(T,f);
+
+          if wffOnly in Opts then 
+            "Wff'd expression is "++display(NT)++"\n">>stdout
+          else if errCount()==0 then{             -- no wff errors
+            try{
+--	      "T">>stdout;
+              Prog = typeOfProgram(NT,standardTypes,Opts);
+
+              if dbgType in Opts then
+                "Type of package exports is "<>showType(ndType(Prog))<>"\n">>stdout;
+              
+              if typeCheckOnly in Opts then
+                "Program is "++disp(Prog)++"\n">>stdout
+              else if errCount() == 0 then {      -- no type errors
+--		"C">>stdout;
+                NNd = trProgram(Prog,Opts);
+                if showCanon in Opts || noCodeGen in Opts then
+                  "\n\e[31mCanonical form\e[0m is "++showCP(NNd)++"\n">>stdout;
+                
+                if noCodeGen in Opts then
+                  "Canonical form generated\n">>stdout
+                else{
+
+                  if errCount()==0 then{          -- no canonicalize errors
+--		    "X">>stdout;
+                    (mName,Vers,Imps,mExp,mProgs) = compProgram(NNd,Opts);
+		    
+                    if !isGroundType(faceType(mExp),[]) then
+                      reportError("Type exported by package: "<>
+				  showType(faceType(mExp))<>"should be ground",noLoc);
+
+                    if errCount()==0 then{
+                      outFile = valof{
+                        if codeFile(OF) in Opts then
+                          valis fopen(OF,_create_write)
+                        else if "file://"++OF.=out then{
+                          valis fopen(OF,_create_write)
+                          onerror
+                            _ -> valis fopen(OF,_open_write)
+                        }
+                        else
+                          exception error("cant handle non-standard file "++out,'fail)
+                      };
+
+                      " Encoding "++out++" ...">>stdout;
+                      
+                      {
+                        
+                        outbytes(outFile,encodeTerm(symb(mName))); -- write out the module name
+
+                        outbytes(outFile,encodeTerm(symb(Vers)));
+
+                        outbytes(outFile,encodeType(faceType(mExp))); -- write out the exported type information
+
+			outbytes(outFile,encodeType(faceType(reexportTypes(mExp,Imps))));
+                        
+                        outbytes(outFile,encodeTerm(listToCanon(
+						      Imps//((.(X,_,V).)=>
+							       cons(strct("go.stdlib#,",2),[symb(X),
+										   symb(V)]))))); -- write out the dependencies
+			
+                        outbytes(outFile,encodeTerm(listToCanon( -- Write out the list of programs in this package
+                                                         mProgs//((.(N,_).)=> N))));
+
+                        
+                        for (pName,pCode) in mProgs do{ -- write out the implemented elements
+                          outbytes(outFile,encodeTerm(cons(strct("go.stdlib#,",2),[pName,pCode])));
+                        }
+                      }
+                      onerror{
+                        error(M,C) -> {
+                          M++" when trying to encode "++ref++"\n">>stdout;
+                          exception error(M,C)
+                        }
+                      };
+                      fclose(outFile);
+                      " ok\n">>stdout;
+                      if genGOF in Opts then{
+                        gofFile = valof{
+                          if "file://"++OF++".go".=ref then{
+                            valis fopen(OF++".gof",_create_write)
+                            onerror
+                              _ -> valis fopen(OF++".gof",_open_write)
+                          }
+                          else
+                            exception error("cant handle non-standard file "++ref,'fail)
+                        };
+                        "/* Exported programs from "++ref++" * /\n">>gofFile;
+                        "/* Automatically generated, do NOT edit * /\n">>gofFile;
+                        mName++{if version(V) in Opts then V else "*"}++"{\n">>gofFile;
+                        showType(faceType(mExp))++"\n">>gofFile;
+                        "}\n">>gofFile;
+                        fclose(gofFile);
+                        if dbgComp in Opts then
+                          "Interface file written\n">>stdout;
+                      }
+                    }
+                    else
+                      "Code file not written\n">>stdout;
+                  }
+                }
+              }
+            }onerror{
+              error(Msg,C) -> {
+                "Error: "++Msg++", when trying to compile ["++ref++"]\n">>stdout;
+                exit(1)
+              }
+                
+            | failed -> "Internal function failed\n">>stdout
+            }
+          }
+        }
+      };
+        
+      if errCount()>0 then{
+        errCount()^0++" errors found\n">>stdout;
+        if warnCount()>0 then{
+          warnCount()^0++" warnings found\n">>stdout;
+        };
+        exit(1);                        -- report an error exit
+      }
+    };
+    
+    fflush(stderr);
+    fflush(stdout);
+  };
+
+  Options() => valof{
+    fn : [];
+    path : [{try endSlash(getenv("GO_DIR")) onerror {_ => "/opt/go/"}},fpwd()];
+    Opts = collect{
+      oL : _args();
+      while oL!=[] do{
+
+        if [C,..opt].=head(oL) && (C == ''- || C==''+) then{
+          case opt in {
+            "gb" -> {
+              oL := tail(oL,1);
+              elemis dbg(head(oL))
+            }
+
+	  | "gn" -> {
+              oL := tail(oL,1);
+              elemis noDbg(head(oL))
+            }
+
+	  | "g" ->
+	      elemis dbg("*")
+	  | "p" -> elemis genProfile
+          | "P" -> {
+              oL := tail(oL,1);
+              path := [head(oL),..path];
+            }
+          | "nostdlib" -> elemis noStdLib         -- do not automatically import stdlib
+          | "dx" -> elemis noCodeGen
+          | "dw" -> elemis wffOnly
+          | "dt" -> elemis typeCheckOnly
+          | "dP" -> elemis dbgParse
+	  | "dp" -> elemis dbgToken
+          | "dD" -> elemis dbgDeps      -- debug dependency analysis
+          | "dT" -> elemis dbgType
+          | "dc" -> elemis showCanon
+          | "dC" -> elemis dbgCanon      -- debug the canonicalizer
+          | "dO" -> elemis dbgOpt      -- debug the optimizer
+          | "dX" -> elemis dbgComp      -- debug the compiler
+	  | "dG" -> elemis genGOF		  -- generate interface file
+
+          | "O" -> elemis decOpt        -- generate decision trees
+          | "o" -> {					-- select a non-standard output
+              oL := tail(oL,1);
+              elemis codeFile(head(oL));
+            }
+          | "b" -> {                              -- request a break point
+              oL := tail(oL,1);
+              elemis bkPt(head(oL));
+            }
+
+	  |"n" -> {
+              oL := tail(oL,1);
+              elemis noAssert(head(oL));
+            }
+
+	  |"na" -> {
+              elemis noAssert("*");
+            }
+
+          | "ve" -> {
+              oL := tail(oL,1);
+              elemis version(head(oL));
+            }
+          | _ -> {
+              "unknown option: "++opt++"\n"
+              "-ve version -- specify which version this package is\n"
+              "-gb prog  -- enable symbolic debugging of prog\n"
+              "-gn prog  -- disable symbolic debugging of prog\n"
+              "-g  -- enable symbolic debugging on all programs\n"
+              "-P dir -- add dir to classpath\n"
+	      "-p   -- generate profiling code\n"
+              "-O   -- decision tree optimization\n"
+              "-o file -- send output to file\n"
+              "-b Name  -- request a break point at entrance to Name\n"
+              "-n Name  -- suppress assertion testing for Name\n"
+              "-na  -- supress assertion testing for all programs\n"
+              "-dx  -- do not generate code\n"
+              "-dw  -- only show result of well formed formedness\n"
+              "-dt  -- only type check\n"
+              "-dP  -- debug parsing\n"
+              "-dD  -- debug dependency analysis\n"
+              "-dT  -- debug type checking\n"
+              "-dC  -- debug canonicalization\n"
+              "-dO  -- debug code transformation\n"
+              "-dc  -- show output of canonicalization phase\n"
+              "-dX  -- debug code generation\n" 
+              "-dG  -- generate interface description file\n" 
+	      >> stderr
+            }
+          }
+        }
+        else
+          fn := fn<>[head(oL)];
+
+        oL := tail(oL,1);
+      }
+    };
+
+    adjustedOpts = collect{
+      elemis classPath(path);
+      if !version(_) in Opts then
+        elemis version("*");
+    }<>Opts;
+
+    valis (fn,adjustedOpts)
+  };
+
+  endSlash(P) => if P#listlen(P)==''/ then P else P<>"/";
+
+} execute main;

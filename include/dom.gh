@@ -1,0 +1,5 @@
+  xmlAttr ::= xmlAtt(symbol,symbol,string).
+  xmlDOM ::= 
+     xmlElement(symbol,symbol,list[xmlAttr],list[xmlDOM])
+   | xmlPI(string)
+   | xmlText(string).

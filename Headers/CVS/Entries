@@ -1,0 +1,12 @@
+/.cvsignore/1.1.1.1/Sat Aug  2 22:20:10 2003//
+/Makefile.am/1.1.1.1/Sat Aug  2 22:20:12 2003//
+/encoded.h/1.1.1.1/Sat Aug  2 22:20:10 2003//
+/local.h/1.1.1.1/Sat Aug  2 22:20:12 2003//
+/opcodes.h/1.1.1.1/Sat Aug  2 22:20:12 2003//
+/encoding.h/1.3/Sun Aug 17 05:35:25 2003//
+/dll.h/1.2/Tue Sep  9 05:15:04 2003//
+/signature.h/1.2/Sun Dec  7 01:32:34 2003//
+/escapes.h/1.8/Tue Jun 29 05:46:35 2004//
+/instructions.h/1.4/Tue Jun 29 04:04:18 2004//
+/operators.h/1.7/Tue Jun 29 17:05:32 2004//
+D

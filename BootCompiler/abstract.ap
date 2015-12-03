@@ -1,0 +1,340 @@
+/*
+ * A module to display an op_tree expression in a way that looks nice
+ */
+
+#op('//+,infix,840);                              -- Map a list to a string
+
+#include "go_tok.ah";
+#include "ops.ah";
+
+module
+import{
+  interface "ops.af" and
+  interface "misc.af" and
+  interface <stdio.af>
+}
+in
+{
+
+  NameToStr = {
+    [] => ""
+  | [C,..L] => strChr(C)++NameToStr(L)
+  };
+
+  strChr = {
+    ''\a => "\\a"
+  | ''\b => "\\b"
+  | ''\d => "\\d"
+  | ''\e => "\\e"
+  | ''\f => "\\f"
+  | ''\n => "\\n"
+  | ''\r => "\\r"
+  | ''\t => "\\t"
+  | ''\v => "\\v"
+  | ''\' => "\\'"
+  | ''\" => "\\\""
+  | ''\\ => "\\\\"
+  | X => string%%X
+  };
+
+  dispName(N) => {
+    if (_,P::P!=10000,_).=infixPr(N) ||
+    (P::P!=10000,_).=prefixPr(N) ||
+    (_,P::P!=10000).=postfixPr(N) then
+      "("++NameToStr(N)++")"
+    else
+      NameToStr(N)
+  };
+
+  showParen(XP,prior,P) => {
+    if XP>prior then
+      P
+    else
+      ""
+  };
+
+  displayExp(E,prior,indent) => {
+    case E in {
+      IDEN(_,N) => dispName(N)
+    | INT(_,N) => N^0
+    | FLT(_,N) => N^0
+    | CHR(_,C) => "`"++strChr(C)
+    | ST(_,S) => "\""++NameToStr(S)++"\""
+    | SYM(_,Nm) => "'"++NameToStr(Nm)++"'"
+    | VOID => "<<void>>"
+    | END => "<<end>>"
+    | APPLY(_,IDEN(_,",.."),[H,T]) => {
+        "[" ++
+         displayExp(H,999,indent)++ valof{
+	   L : T;
+	   Str : "";
+	   while APPLY(_,IDEN(_,",.."),[HH,TT]).=L do{
+	     Str := Str++", "++
+	       displayExp(HH,999,indent);
+	     L := TT;
+	   };
+	   if !IDEN(_,"[]").=L then {
+	     Str:=Str++",.."++
+	       displayExp(L,999,indent);
+	   };
+           valis Str
+	 }++"]"
+      }
+
+    | SQUARE(_,IDEN(_,","),[L,R]) => valof{
+        (XL,XP,XR) = infixPr(",");
+        out : "("++displayExp(L,XL,indent)++",";
+
+        RR : R;
+
+        while SQUARE(_,IDEN(_,","),[eR,rR]).=RR do{
+          out := out++displayExp(eR,XL,indent)++",";
+          RR := rR
+        };
+
+        valis out<>displayExp(R,XR,indent)++")";
+      }
+
+    | SQUARE(_,F,A) => displayExp(F,0,indent)++displayExpList(A,"[",",","]",indent)
+
+    | APPLY(_,IDEN(_,"in"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr("in");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " in "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"=>"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("=>");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          " => "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"$="),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("$=");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          " $= "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"@>"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("@>");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          " @> "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"@="),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("@=");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          " @= "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"-->"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("-->");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          " --> "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(Lc,"*"),[TPL(_,H)]) => valof {
+        (XL,XP,XR) = infixPr("*");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"[",",","]",indent)++
+          "*"++
+          showParen(XP,prior,")");
+      }
+    | BRACE(_,TPL(_,H),[]) => 
+        displayExpList(H,"[",",","]",indent)++ "{}"
+
+    | APPLY(_,IDEN(Lc,"=>"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr("=>");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " => "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+
+    | APPLY(_,IDEN(Lc,":-"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr(":-");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"(",",",")",indent)++
+          " :- "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+    | APPLY(_,IDEN(Lc,":-"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr(":-");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " :- "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+    | APPLY(_,IDEN(Lc,":--"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr(":--");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"(",",",")",indent)++
+          " :-- "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+    | APPLY(_,IDEN(Lc,":--"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr(":--");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " :-- "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+
+    | APPLY(_,IDEN(Lc,"-->"),[TPL(_,H),T]) => valof {
+        (XL,XP,XR) = infixPr("-->");
+        valis showParen(XP,prior,"(")++
+        displayExpList(H,"(",",",")",indent)++
+          " --> "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+    | APPLY(_,IDEN(Lc,"-->"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr("-->");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " --> "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+
+    | APPLY(_,IDEN(Lc,"->"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr("->");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+	" -> "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")")++"@"++showLocation(Lc);
+      }
+
+    | APPLY(_,IDEN(_,"<$"),[H,T]) => valof {
+        (XL,XP,XR) = infixPr("<=");
+        valis showParen(XP,prior,"(")++
+          displayExp(H,XL,indent)++
+          " <$ "++
+          displayExp(T,XR,indent)++
+          showParen(XP,prior,")");
+      }
+
+    | APPLY(_,IDEN(_,".."),[Exp,APPLY(_,IDEN(_,"{}"),[Th])]) => 
+	indent++displayExp(Exp,819,indent++"  ")++"..{"++ displayTheta(Th,indent)++ indent++"\n}"
+  
+    | APPLY(_,N,[APPLY(_,IDEN(_,"{}"),[Act])]) => 
+	displayExp(N,0,indent)++"{"++ displayExp(Act,0,indent)++"}"
+
+    | BRACE(_,TPL(_,L),R) => 
+        displayExpList(L,"(",",",")",indent)++displayExpList(R,"{",",","}",indent)
+
+    | BRACE(_,L,R) => 
+        displayExp(L,0,indent)++ displayExpList(R,"{",",","}",indent)
+
+    | TPL(_,L) => displayExpList(L,"(.",",",".)",indent)
+       
+    | APPLY(_,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,T]),E]) :: (XL,XP,XR).=infixPr("?") =>
+        "("++displayExp(G,XL,indent)++"?"++displayExp(T,XR,indent)++"|"++displayExp(E,XR,indent)++")"
+
+    | APPLY(_,IDEN(_,"|"),[L,R]) :: (XL,XP,XR).=infixPr("|") =>
+        showParen(XP,prior,"(")++
+        displayExp(L,XL,indent)++
+      "\n"++indent++"| "++
+        displayExp(R,XR,indent)++
+        showParen(XP,prior,")")
+    | APPLY(_,IDEN(_,N),[L,R]) :: (XL,XP,XR).=infixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        displayExp(L,XL,indent)++
+        " "++
+        string%%N++
+        " "++
+        displayExp(R,XR,indent)++
+        showParen(XP,prior,")")
+    | APPLY(_,IDEN(_,N),[R]) :: (XP,XR).=prefixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        string%%N++
+        " "++
+        displayExp(R,XR,indent)++
+        showParen(XP,prior,")")
+    | APPLY(_,IDEN(_,N),[L]) :: (XL,XP).=postfixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        displayExp(L,XL,indent)++
+        " "++
+        string%%N++
+        showParen(XP,prior,")")
+    | APPLY(_,IDEN(_,"{}"),[A]) => "{"++displayExp(A,2000,indent)++"}"
+    | APPLY(_,L,R) => 
+        displayExp(L,0,indent)++
+        displayExpList(R,"(",",",")",indent)
+    }
+  };
+  
+  displayExpList(L,pre,sep,pst,indent) => valof {
+    Str : pre;
+    Sp : "";
+    
+    for X in L do{
+      Str := Str++Sp++displayExp(X,999,indent);
+      Sp := sep;
+    };
+    valis Str++pst
+  };
+
+  displayTheta(Th,indent) => { case Th in {
+      APPLY(_,IDEN(_,". "),[L,R]) => 
+      displayTheta(L,indent++"  ")++".\n"++indent++displayTheta(R,indent)
+    | APPLY(_,IDEN(_,". "),[L]) => indent++displayTheta(L,indent++"  ")++".\n"
+    | _ => displayExp(Th,1900,indent++"  ")
+    }
+  };
+
+  display(E) =>
+    displayExp(E,900,"");
+
+  __debug_display__(X) => {
+    try{
+      case X in {
+	any(T) => display(T)
+      | any(string?S) => "\""++S++"\""
+      |	any(LN) => "["++(LN//+(X=>display(X)++","))++"]"
+      | any(Z) => Z^0
+      }
+    } onerror{
+      error(_,_) => X^0
+    }
+  };
+
+  Context = {
+    IDEN(Loc,_) => Loc
+  | INT(Loc,_) => Loc
+  | FLT(Loc,_) => Loc
+  | CHR(Loc,_) => Loc
+  | SYM(Loc,_) => Loc
+  | ST(Loc,_) => Loc
+  | BRACE(Loc,L,A) => Loc
+  | APPLY(Lc,L,A) => Lc
+  | SQUARE(Lc,L,A) => Lc
+  | TPL(Lc,_) => Lc
+  | X => exception error("Cant find context of "++display(X),'system)
+  };
+
+} export (Context,display,dispName,strChr,NameToStr/*,__debug_display__*/);

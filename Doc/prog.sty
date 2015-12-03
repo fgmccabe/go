@@ -1,0 +1,41 @@
+
+
+\def\listofprograms{\@restonecolfalse\if@twocolumn\@restonecoltrue\onecolumn
+ \fi\chapter*{List of programs\@mkboth
+ {List of programs}{List of programs}}\@starttoc{lop}\if@restonecol\twocolumn
+ \fi}
+\let\l@program\l@figure
+
+\newcounter{program}[section]
+\def\theprogram{\thesection.\@arabic\c@program}
+\def\theHprogram{\theHsection.\@arabic\c@program}
+\def\fps@program{htb}
+\def\ftype@program{1}
+\def\ext@program{lop}
+\def\fnum@program{Program \theprogram}
+\@namedef{program*}{\@dblfloat{program}}
+\@namedef{endprogram*}{\end@dblfloat}
+
+\def\program{\@float{program}}
+\let\endprogram\end@float
+
+\def\listofexamples{\@restonecolfalse\if@twocolumn\@restonecoltrue\onecolumn
+ \fi\chapter*{List of examples\@mkboth
+ {List of examples}{List of examples}}\@starttoc{loe}\if@restonecol\twocolumn
+ \fi}
+\let\l@example\l@figure
+
+\newcounter{example}[chapter]
+\def\theexample{\thechapter.\@arabic\c@example}
+\def\theHexample{\theHchapter.\@arabic\c@example}
+\def\fps@example{htb}
+\def\ftype@example{1}
+\def\ext@example{loe}
+\def\fnum@example{Example \theexample}
+\@namedef{example*}{\@dblfloat{example}}
+\@namedef{endexample*}{\end@dblfloat}
+
+\def\example{\@float{example}}
+\let\endexample\end@float
+
+\renewenvironment{boxed}{\begin{boxedminipage}{\textwidth}}{\end{boxedminipage}}

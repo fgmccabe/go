@@ -1,0 +1,271 @@
+\chapter{Debugging \go programs}
+\label{debugging}
+
+The \go system supports debugging using a combination of two core techniques: the compiler insert additional code when compiling with the \q{-g} option, and the \go engine supports the monitoring of such programs.
+
+\section{The default debugger}
+\label{debugger:default}
+The default \q{go.debug} package is a simple debugger that may be used to debug \go programs. However, it is very simple in its capabilities; its primary purpose is to facilitate the use of a system such as Emacs to handle the actual debug display and interaction.
+
+In this section we summarize the Emacs interface to using the default debugger.\footnote{This assumes that the Emacs environment has been set up so that \q{Go-mode} is active when you are editing a \go program.}
+
+\subsection{Debugging a package}
+\label{debugger:emacs}
+In order to invoke the debugger on a package, the Emacs command \q{C-C C-D} (control-C control-D) command is used.
+
+There are two arguments to this command: the name of an Emacs buffer containing the program to be debugged and the sequence of arguments to the program.
+
+By default, the currently visited \go buffer is the one that will be debugged. It must have a definition of \q{main} in it.
+
+Arguments are passed to the debugged program in an analogous way to the command line: run-time switches and arguments are typed in to the Emacs mini-buffer and passed to the \go system. The \q{-g} switch itself is not needed: Emacs assumes that you are debugging a program, not just running it! By default, no additional arguments are passed to the debugged program.
+\begin{aside}
+You can use \q{C-P} (control-P) to recall a previously entered set of arguments to pass to the debugged program.
+\end{aside}
+
+Once the program is initialized, the Emacs window is split into two panes: a trace pane and a source pane. The trace pane shows the commands and results going to the debugged program and the source pane shows where in the source of the program you are.
+
+When the debugger is waiting for input, it shows a standard prompt:
+\begin{alltt}
+[\emph{thread}] (go.Debug) ?
+\end{alltt}
+Normally, this prompt is shown just before entering some program or evaluating some expression within a program that has had debugging code enabled. The prompt will not show for programs that are not specially compiled.
+
+The following commands are available:
+\begin{description}
+\item[\q{n}]
+The \q{n} command (typing the \q{n} key) executes the call that the debugger was waiting on and reports the result in the trace window.
+
+Note that if a call has sub-expressions then each of the sub-expressions will be paused on separately.
+
+The source pane shows where in the program the debugged program is currently located.
+
+Note that the trace window only shows an abbreviated form of the call:
+\begin{alltt}
+call foo/2
+\end{alltt}
+To show the whole call, use the \q{x} command. Or use one of \q{1} - \q{9} to show one of the first 9 arguments.
+
+\item[\q{s}]
+The \q{s} command steps into the call, and continues the tracing/debugging cycle within the defined program.
+
+\item[\q{0}]
+The \q{0} command displays the name of the program being called.
+
+\item[\q{1} \ldots \q{9}]
+The \q{1} command shows the first argument. The digits \q{1} through \q{9} result in the corresponding argument of the call being displayed.
+
+\item[\q{x}]
+The \q{x} command displays the whole call.
+
+\item[\q{V}]
+The \q{V} command displays all the variables that are known in the current rule. Not that this may differ slightly from the variables in the source rule as the compiler performs  significant amount of transformation of complex \go rules.
+
+\item[\q{v}]
+The \q{v} command takes a single argument -- the name of a variable -- and displays that variable in the trace pane.
+
+\item[\q{c}]
+The \q{c} command continues the execution of the program with no further tracing -- until a break point is hit; at which point debugging may resume.
+
+No output other than normal output from the program is displayed during this mode.
+
+\item[\q{t}]
+The \q{t} command continue execution in the same way as \q{c}, except that the trace pane displays all the programs as they are entered and left.
+
+\item[\q{q}]
+The \q{q} command terminates the \go program.
+\end{description}
+
+
+
+\section{A debugging strategy}
+\label{debug:strategy}
+The \go compiler uses an auxiliary debug package -- \q{go.debug} -- to implement the run-time aspect of debugging a program. The strategy is very similar to the approach that many programmers have to debugging: they add write statements to the code to figure out what is happening. The only real difference is that the 'write statements' becomes calls to the \q{go.debug} package.
+
+The standard debug package may be replaced with a user-defined one; in particular the \q{-G \emph{pkg}} command line option may be used to override the debugger for a particular execution of a \go program.
+\begin{aside}
+Any alternate implementation of a debugger should \q{import} the standard \q{go.debug} package in order to access the  correct \q{debugger} interface as described below.
+\end{aside}
+
+As with other packages, there is a type interface associated with the debugger. The \q{debugger} type defines the contract between the program being debugged and the debugger:
+\begin{alltt}
+debugger \impl \{
+  line:[string,integer,integer,integer]*.
+  break:[symbol]*.
+
+  evaluate:[symbol,list[thing],symbol,
+            list[(symbol,thing)]]*.
+  value:[symbol,thing,symbol,list[(symbol,thing)]]*.
+  prove:[symbol+,list[thing]+,symbol+,
+         list[(symbol,thing)]+]\{\}.
+  succ:[symbol+,list[thing]+,symbol+,
+        list[(symbol,thing)]+]\{\}.
+  call:[symbol,list[thing],symbol,
+        list[(symbol,thing)]]*.
+  return:[symbol,symbol,list[(symbol,thing)]]*.
+  parse:[symbol+,list[thing],list[thing],symbol,
+         list[(symbol,thing)]]\{\}.
+  parsed:[symbol+,list[thing],symbol,
+          list[(symbol,thing)]]\{\}.
+
+  asgn:[symbol,thing]*.
+  vlis:[thing]*.
+  trigger:[symbol,thing]*.
+  rule:[symbol,integer,list[(symbol,thing)]]*.
+  xrule:[symbol,integer]*.
+\}.
+\end{alltt}
+\begin{description}
+\item[line]
+The \q{line} method is invoked quite liberally by a debugged program. It is intended to be used to inform the user where in the source the program is currently at.
+
+The form of a \q{line} call to the debugger object is:
+\begin{alltt}
+\emph{Dbg}.line(\emph{file},\emph{line},\emph{sPos},\emph{ePos})
+\end{alltt}
+where \q{\emph{Dbg}} is the currently active debugger object.
+
+The \q{\emph{file}} is the name of the source file, as it was identified by the compiler. The integer \q{\emph{line}} identifies the line number where the feature occurs in the source file and the integers \q{\emph{sPos}} and \q{\emph{ePos}} bracket the \emph{character offsets} of the feature from the beginning of the file.
+
+The \q{\emph{sPos}}/\q{\emph{ePos}} pair gives a more precise indication of where the feature is, but is more difficult to interpret manually.
+
+It is the responsibility of the debugger to ensure that the user is made aware of where the program is currently. How that is done will vary of course. The default debugger package (see Section~\vref{debugger:default}) simply prints a message giving the line number.
+
+Note that the debugger should not pause at this point. In particular, it should not wait for user input. The individual program entry methods are used by the debugged program when user input is expected.
+
+\item[break]
+The \q{break} method is invoked if the user requested that a particular function be interrupted with an entry to the debugger. This is useful when trying to focus on a problem in a particular sub-part of the program.
+
+The argument to \q{break} is the name of the stopped program:
+\begin{alltt}
+\emph{Dbg}.break(\emph{Program})
+\end{alltt}
+
+The debugger should respond to this method by enabling debugging if it is not enabled, and by ensuring that the debugger will pause at the next suitable moment.
+
+\item[evaluate]
+The \q{evaluate} method is invoked prior to calling a function. The first argument is the name of the function being evaluated and the second is the list of arguments:
+\begin{alltt}
+\emph{Dbg}.evaluate(\emph{Program},[\emph{A\sub1},\ldots,\emph{A\subn}],\emph{Key},
+              [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+The first argument is the name of the function being called, the second is the list of arguments to the function call. The third argument is a \emph{Key} that is unique in the package to this call and the final argument is a list of \q{symbol}/value pairs that gives the current values of the variables that are in scope.
+
+Some debuggers may choose to display it as a function call, others may choose to only display the function name -- with perhaps the arity.
+
+\begin{aside}
+The reason for displaying the entire call may be obvious. However, if the arguments to the call are large, then the user may be unnecessarily slowed down since a large argument to a function call is quie likely to be followed by large arguments to subsequent calls.
+\end{aside}
+
+The \q{\emph{Key}} argument is a unique symbol that identifies this call to the function. It is used to help match up calls with returns (see the \q{value} method below).
+
+In normal circumstances the debugger should accept some command input from the user and determine the intentions of the user from that input.
+
+\begin{aside}
+The standard debugger only displays the program name and the arity of the call. The reason for this is that a call's arguments can be very large, and to display them every time can quickly become tedious.
+
+The \q{X} command displays the call in its entirety.
+\end{aside}
+
+\item[value]
+The \q{value} method is called after a function has returned. The first argument is the name of the function, and the second is the returned value:
+\begin{alltt}
+\emph{Dbg}.value(\emph{Program},\emph{Value},\emph{Key},
+          [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+The \q{\emph{Key}} argument can be used to resume debugging appropriately if debugging/tracing was suspended for the call to the function. As with the \q{evaluate} method call, the list of variables with their known values reflects the current state, in this case after the call to the function.
+
+
+\item[prove]
+The \q{prove} method is called when trying to prove a predicate condition. Note that this may invoked in failure mode also, in which case the debugger should report that the predicate condition could not be proved. Otherwise, the \q{prove} is analogous to the \q{evaluate} method.
+
+The first argument is the name of the relation being queried, the second is a list of the arguments to the query:
+\begin{alltt}
+\emph{Dbg}.prove(\emph{Program},[\emph{A\sub1},\ldots,\emph{A\subn}],\emph{Key},
+          [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+The \q{\emph{Key}} argument is a unique symbol that identifies this call to a function. It is used to help match up calls with returns (see the \q{value} method below). The \q{(\emph{V\subi},\emph{Val\subi})} list contains all the local variables and their current values.
+
+In normal circumstances the debugger should accept input from the user, determine the intentions of the user from that input.
+
+Note that the failure mode of \q{prove} arises when the predicate condition fails. Since the \q{prove} call is before the actual call to the predicate condition, the failure of the predicate condition will be propagated back into the \q{prove} condition. The standard debugger has two clauses for \q{prove}: the first one handles the case where the predicate is entered into for the first time, and the second one handles the case where the predicate failed.
+
+In the latter case, the debugger prints a message and then fails; propagating the failure back further still: perhaps to a real choice point in the program.
+
+\item[succ]
+The \q{succ} method is called when a predicate condition was successfully proved.  Note that this may invoked in failure mode also, in which case the debugger should report that the predicate condition is going to be re-attempted, and \emph{then the debugger should also fail}.
+
+The argument to \q{succ} is the name of the relation:
+\begin{alltt}
+\emph{Dbg}.succ(\emph{Program},\emph{Key},[(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+The \q{\emph{Key}} argument can be used to resume debugging appropriately if debugging/tracing was suspended for the call to the relation. As with the \q{prove} method call, the list of variables with their known values reflects the current state, in this case after a successful proof.
+
+\item[call]
+The \q{call} method is called when entering an action procedure call. The first argument is the name of the action procedure, and the second is the list of arguments to the call:
+\begin{alltt}
+\emph{Dbg}.call(\emph{Program},[\emph{A\sub1},\ldots,\emph{A\subn}],\emph{Key},
+         [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+
+\item[return]
+The \q{return} method is called when a completing an action procedure call. The argument is the name of the returning action procedure:
+\begin{alltt}
+\emph{Dbg}.return(\emph{Program},\emph{Key},[(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+
+\item[parse]
+The \q{parse} method is called when trying to parse a string. Note that this may invoked in failure mode also, in which case the debugger should report that the grammar non-terminal could not be recognized, and then fail.
+
+The first argument is the name of the grammar non-terminal. The third is the list of arguments to the non-terminal and the second is the stream that is to be parsed. Often, this is a \q{string} but it may be any \q{list}:
+\begin{alltt}
+\emph{Dbg}.parse(\emph{Program},\emph{Stream},[\emph{A\sub1},\ldots,\emph{A\subn}],\emph{Key},
+          [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+
+
+\item[parsed]
+The \q{parsed} method is called when a grammar non-term\-in\-al was successfully recognized.  Note that this may invoked in failure mode also, in which case the debugger should report that the non-terminal is going to be re-attempted, and \emph{then the debugger should also fail}.
+
+The first argument is the name of the parsed non-terminal. The second is the remaining stream:
+\begin{alltt}
+\emph{Dbg}.parsed(\emph{Program},\emph{Stream},\emph{Key},
+            [(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+
+\item[rule]
+The \q{rule} method is called on successful entry to a rule of some kind. Its arguments include a list of all the variables in that rule. The rule may be any of the kinds of rule that \go supports:
+\begin{alltt}
+\emph{Dbg}.rule(\emph{Program},\emph{No},[(\emph{V\sub1},\emph{Val\sub1}),\ldots,(\emph{V\subn},\emph{Val\subn})])
+\end{alltt}
+The \q{\emph{Program}} is the name of the program being entered, and \q{\emph{No}} is the number of the rule being entered -- the first rule is rule 1.
+
+\item[xrule]
+The \q{xrule} method is called when a rule is left normally (i.e., not on failure). The arguments to \q{xrule} are the program name and the rule number:
+\begin{alltt}
+\emph{Dbg}.xrule(\emph{Program},\emph{No})
+\end{alltt}
+
+
+\item[asgn]
+The \q{asgn} method is called when an object variable, or a package variable, is given a value. The first argument is the name of the variable, and the second its value:
+\begin{alltt}
+\emph{Dbg}.asgn(\emph{VarName},\emph{Value})
+\end{alltt}
+
+
+\item[vlis]
+The \q{vlis} method is called when a \q{valis} action is executed, given the value return for that \q{valof} expression. The argument is the value being returned:
+\begin{alltt}
+\emph{Dbg}.vlis(\emph{Value})
+\end{alltt}
+
+\item[trigger]
+The \q{trigger} method is called when a delayed variable is triggered. The two arguments to \q{trigger} are the name of the variable and its value when triggered:
+\begin{alltt}
+\emph{Dbg}.trigger(\emph{VarName},\emph{Value})
+\end{alltt}
+
+\end{description}
+
+
+

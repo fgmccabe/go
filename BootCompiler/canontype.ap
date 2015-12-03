@@ -1,0 +1,54 @@
+/*
+ * Manage the canonicalization of type expressions
+ */
+
+#include "go.ah";
+
+module
+import{
+  interface "misc.af" and
+  interface "st-types.af" and
+  interface <stdio.af>
+} in
+{
+  canonVars(Trm,Q,Free) => case Trm in {
+    idnt(N) => valof{
+      if idnt(N) in Q then
+        valis Q
+      else if idnt(N) in Free then
+        valis Q
+      else if (N,_,_) in standardTypes then
+        valis Q
+      else
+        valis [Trm,..Q]
+    }
+  | intgr(_) => Q
+  | float(_) => Q
+  | ch(_) => Q
+  | strg(_) => Q
+  | symb(_) => Q
+  | mtch(T) => canonVars(T,Q,Free)
+  | bild(T) => canonVars(T,Q,Free)
+  | code(_,_,_) => Q
+  | cons(_,A) => canonVarsList(A,Q,Free)
+  | _ => exception error("problem in canonVars",'internal)
+  };
+
+  canonVarsList(L,Q,Free) => valof{
+    QQ : Q;
+    for El in L do
+      QQ := canonVars(El,QQ,Free);
+    valis QQ;
+  };
+
+  canonType(Tp,Map,Q,Free) => case Tp in {
+    voidType => symb("go.stlib#void")
+  | topType => symb("go.stdlib#top")
+  | tplType(L) => cons(strct("go.stdlib"<>listlen(L)^0<>"#()",listlen(L)),
+		       collect{
+			 for T in L do
+			   elemis canonType(T,Map,Q,Free)
+		       })
+  };
+
+} export(canonVars,canonVarsList)  

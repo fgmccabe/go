@@ -1,0 +1,64 @@
+/*
+ * Lexical rules for the UL parser
+ */
+
+import go.stdparse.
+
+yyTokType ::= PRINT | HALT | INT(integer) | ID(string) | EQUAL | SEMI | LPAR | RPAR
+            | PLUS | MINUS | STAR | SLASH | EOF.
+
+%%
+
+-- identifier rule
+
+[a-zA-Z_][a-zA-Z_0-9]* => ( ID(yyTok) )
+
+-- keyword rules
+"print" =>		( PRINT )
+"halt" =>		( HALT )
+
+-- number rule
+
+"-"?[0-9]+ => ( INT(integerOf%%yyTok) )
+
+-- punctuation rules
+"=" =>			( EQUAL )
+";" =>			( SEMI )
+"(" =>			( LPAR )
+")" =>			( RPAR )
+
+
+-- operators
+"+" => 			( PLUS )
+"-" => 			( MINUS )
+"*" => 			( STAR )
+"/" => 			( SLASH )
+
+
+-- White space and comments
+[ \t\b\r\n]+      		-- ignore white space
+
+"--"[^\n]*"\n"		       	-- line comment
+
+"/*" => <comment>        	-- continuous comment
+
+<comment> "*/" => <initial>
+<comment> .|"\n"         	-- other characters in a comment are ignored
+
+%%
+
+  private parseAll:[yyLexer]*.
+  parseAll(Lx) ->
+    Tok = Lx.nextToken();
+    stdout.outLine("Token is "<>Tok.show());
+    ( Tok.token()!=EOF?
+        parseAll(Lx)
+    ).
+
+  private main([])::stdin.eof() -> {}.
+  main([]) ->
+      parseAll(yyulex(stdin.inLine("\n"),0,0));
+    main([]).
+    
+
+

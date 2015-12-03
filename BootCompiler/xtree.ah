@@ -1,0 +1,17 @@
+/*
+ * Type definition for the and/or tree used in the decision tree analyser 
+ */
+  elType ::=
+     sy(string)					  -- The symbol case
+   | nm(number)					  -- The number case
+   | c(char)					  -- The char case
+   | ls						  -- The list casee
+   | fn(string,number)	                          -- The constructor case, fun sym, arity
+   | oth((canonTree,number)[])			  -- Other kind of term
+   | leaf(number)				  -- End of the list
+;
+
+  xTr ::= empty					  -- null tree
+  | tX(elType,logical,xTr,xTr)                    -- the node label, match, choice, the rest
+  ;
+

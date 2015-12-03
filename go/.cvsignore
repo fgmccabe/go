@@ -1,0 +1,6 @@
+.gdb_history
+*.gof
+*.goc
+Makefile
+Makefile.in
+

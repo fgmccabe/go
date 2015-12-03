@@ -1,0 +1,3799 @@
+/*
+  Module to perform type inference and type check
+  It also constructs an attributed tree from the original parse tree
+
+  (c) 2004-2006 F.G. McCabe
+ 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+  Contact: Francis McCabe <frankmccabe@mac.com>
+ */
+
+#include "go.ah";
+
+module
+ import {
+  interface <stdio.af> and
+  interface "abstract.af" and
+  interface "display.af" and
+  interface "errors.af" and
+  interface "subtype.af" and
+  interface "types.af" and
+  interface "parsetype.af" and
+  interface "findvars.af" and
+  interface "depends.af" and
+  interface "misc.af" and
+  interface "quantify.af" and 
+  interface "import.af" and
+  interface "macro.af" and
+  interface "keywords.af" 
+}
+in{
+
+  typeOfProgram(Prog,Env,Opts) => case Prog in {
+    BRACE(Lc,Mod,Defs) => valof{
+      MPkg = packageName(Mod);
+      Pkg = slashify(MPkg,".");
+      (theta,imports) = thetaEnv(Pkg,Defs,Context(Mod),Env,[],true,true,
+				 [inPkg(Pkg),..Opts]);
+
+      pTypes = faceType(collect{
+			 for (Nm,K,Nd) in theta do
+			   elemis (Nm,K,ndType(Nd))
+		       });
+
+      valis node(mdl(MPkg,imports,theta),pTypes,Lc)
+    }
+  };
+
+  packageName(Mod) => case Mod in {
+    IDEN(Lc,Nm) => [Nm]
+  | APPLY(_,IDEN(_,"."),[L,R]) => packageName(L)<>packageName(R)
+  };
+
+  typeOf(Ex,Env,Opts) => case Ex in {
+    IDEN(Lc,"[]") => node(enu("[]"),uType("go.stdlib","list",[newVar()]),Lc)
+  | IDEN(Lc,Nm) => valof{
+      try{
+        case lookupType(Nm,((M)=>M==varBind),Env) in {    -- pick up the type assocation of Nm in environment
+          (_,varBind,Tp) -> {
+	    (_,fTp).=freshen(Tp);
+            case fTp in {
+	      enuType(rTp) ->
+		valis node(enu(Nm),rTp,Lc)
+            | _ ->
+                valis node(iden(Nm),fTp,Lc)
+            }
+          }
+        }
+      } onerror {
+        error(Bec,'notdef) -> {
+          reportError(Bec,(Lc));
+          valis node(iden(Nm),newVar(),Lc);
+        }
+      }
+    }
+  | INT(Lc,Nm) => node(int(Nm),uType("go.stdlib","integer",[]),Lc)
+
+  | FLT(Lc,Nm) => node(flt(Nm),uType("go.stdlib","float",[]),Lc)
+
+  | SYM(Lc,Sm) => node(sym(Sm),uType("go.stdlib","symbol",[]),Lc)
+
+  | CHR(Lc,Sm) => node(chr(Sm),uType("go.stdlib","char",[]),Lc)
+
+  | ST(Lc,St) => node(str(St),uType("go.stdlib","list",[uType("go.stdlib","char",[])]),Lc)
+
+  | APPLY(Lc,IDEN(_,"."),[Rc,IDEN(LcF,Fld)]) => valof{
+      rcNd = typeOfObject(Rc,Env,Opts);
+
+      if dbgType in Opts then{
+        "Label in dot exp is "<>showTerm(rcNd)<>"\n">>stdout;
+      };
+
+      try{
+        oFlds = fieldsOf(typeInterface(ndType(rcNd),Env));
+
+        if (Fld,Mode,fTp) in oFlds then{
+	  (_,ffTp).=freshen(fTp);
+	  valis node(dot(rcNd,Fld),ffTp,Lc)
+	}
+        else{
+          reportError(showTerm(rcNd)<>" does not implement field: "<>Fld,LcF);
+          valis node(vde,newVar(),Lc)
+        }
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("Expression: "<>showTerm(rcNd)<>" not known to be an object with method name "<>
+		      Fld<>"\nbecause "<>Bec,LcF);
+          valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+          
+  | APPLY(_,IDEN(Lc,"$"),[X]) => valof{
+      rX = typeOf(X,Env,Opts);
+
+      reportWarn("Explicit $ deprecated: "<>show(rX)<>"\n this occ is being ignored",Lc);
+      valis rX
+    }
+
+  | APPLY(Lc,IDEN(_,"#"),[Pkg,IDEN(_,Fn)]) => valof{	  -- package function
+      pkgName = packageReference(Pkg);
+      try{
+        (_,_,pTp) .= lookupType(pkgName,(M=>M==pkgBind),Env);
+        (_,iTp) .= freshen(pTp);
+	Imps = fieldsOf(iTp);
+
+	if (Fn,varBind,Tp) in Imps then{	  -- only the wrapper is from the package
+	  (_,fTp).=freshen(Tp);
+
+	  case fTp in {
+	    enuType(rTp) -> 
+	      valis node(pkrf(pkgName,node(enu(Fn),rTp,Lc)),rTp,Lc)
+	  | _ ->
+	      valis node(pkrf(pkgName,node(iden(Fn),fTp,Lc)),fTp,Lc)
+	  }
+	}
+	else{
+	  reportError(Fn<>" not defined in package "<>pkgName,Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+      onerror{
+        error(Bec,'notdef) -> {
+          reportError("package: "<>display(Pkg)<>" not imported",Lc);
+	  valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(Lc0,".."),[APPLY(Lc1,IDEN(Lc2,":"),[S,T]),APPLY(Lc3,IDEN(Lc4,"{}"),Defs)]) => valof{
+      Id = genNew("anon");
+      (rT,nQ) = realType(T,packageOf(Opts),Env);
+
+      if nQ!=[] then
+        reportWarn("new type variables: "<>showEnv(nQ)<>" in inappropriate context",Lc);
+
+      nCons = APPLY(Lc,IDEN(Lc,Id),[]);
+      sEnv = [(Id,varBind,sconType([],rT)),..nQ<>Env];
+      
+      (Cls,Arity) = typeOfClass([APPLY(Lc,IDEN(Lc1,"<="),[nCons,S]),
+                                 APPLY(Lc,IDEN(Lc2,".."),[nCons,APPLY(Lc3,IDEN(Lc4,"{}"),Defs)])],
+                                Lc,sconType([],rT),sEnv,Opts);
+
+      valis node(onew(node(class(Id,anonymous,Arity,Cls),rT,Lc)),rT,Lc);
+    }
+
+  | APPLY(Lc,IDEN(Lc0,".."),[APPLY(Lc1,IDEN(Lc2,":"),[T]),APPLY(Lc3,IDEN(Lc4,"{}"),Defs)]) => valof{
+      Id = genNew("anon");
+      Pkg = valof{
+	if inPkg(P) in Opts then
+	  valis P
+	else
+	  exception error("No package info",'internal)
+      };
+      (rT,nQ) = realType(T,Pkg,Env);
+
+      if nQ!=[] then
+        reportWarn("new type variables: "<>showEnv(nQ)<>" in inappropriate context",Lc);
+
+      nCons = APPLY(Lc,IDEN(Lc,Id),[]);
+      sEnv = [(Id,varBind,sconType([],rT)),..nQ<>Env];
+
+      (Cls,Arity) = typeOfClass([APPLY(Lc,IDEN(Lc,"<="),[nCons,IDEN(Lc,"thing")]),
+                                 APPLY(Lc,IDEN(Lc,".."),[nCons,APPLY(Lc3,IDEN(Lc4,"{}"),Defs)])],
+                                Lc,foldupType(nQ,sconType([],rT)),sEnv,Opts);
+
+      valis node(onew(node(class(Id,anonymous,Arity,Cls),rT,Lc)),rT,Lc);
+    }
+
+  | APPLY(Lc,IDEN(Lc0,".."),[S,APPLY(Lc1,IDEN(Lc2,"{}"),Defs)]) => valof{
+      Id = genNew("anon");
+      Spr = typeOfLabel(S,Env,Opts);		  -- pick up the super label
+
+      nCons = APPLY(Lc,IDEN(Lc,Id),[]);
+
+      sEnv = [(Id,varBind,sconType([],ndType(Spr))),..Env];
+
+      (Cls,Arity) = typeOfClass([APPLY(Lc,IDEN(Lc,"<="),[nCons,S]),
+                                 APPLY(Lc,IDEN(Lc,".."),
+                                       [nCons,APPLY(Lc1,IDEN(Lc2,"{}"),Defs)])],
+                                Lc,sconType([],ndType(Spr)),sEnv,Opts);
+
+      rT = ndType(Spr);
+      valis node(onew(node(class(Id,anonymous,Arity,Cls),rT,Lc)),rT,Lc);
+    }
+
+  | APPLY(Lc,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) => valof{
+      a = typeOf(A,Env,Opts);
+      b = typeOf(B,Env,Opts);
+      g = checkGoal(G,Env,Opts);
+
+      try{
+        valis node(iff(node(cnj(g),topType,Lc),a,b),typeLub(ndType(a),ndType(b),Env),Lc)
+      }
+      onerror{
+        error(M,_)->{
+          reportError("type mismatch between arms of conditional: "<>M,Lc);
+          valis node(vde,newVar(),Lc);
+        }
+      }
+    }
+ 
+  | APPLY(Lc,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+      Ex = typeOf(Exp,Env,Opts);
+      (rT,Cs) = caseExp(Cases,ndType(Ex),Env,Opts);
+
+      valis node(cse(Ex,Cs),rT,Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"{}"),[APPLY(_,IDEN(_,".."),[E,B])]) => valof {
+      Q = findVarsInBound(E,B,Env);
+
+      if dbgType in Opts then
+	"vars in bound set abstr "<>display(Ex)<>" are: "<>showEnv(Q)<>"\n">>stdout;
+
+      sEnv = Q<>Env;
+      body = collect{
+        for I in listIfy(B,",") do{
+          case I in {
+            APPLY(Lci,IDEN(_,"in"),[P,S]) -> {
+              base = typeOf(S,sEnv,Opts); 
+              try{
+		tV = newVar();
+
+                sameType(ndType(base),uType("go.stdlib","list",[tV]),Env);
+		Ptn = typeOfPtn(P,(T->sameType(uType("go.stdlib","list",[T]),ndType(base),sEnv)),sEnv,Opts); 
+		
+		elemis (Ptn,base)
+              }
+              onerror{
+                error(Bec,'fail) ->
+                  reportError("pattern: "<>display(P)<>" not consistent with "
+                              "base list: "<>showTerm(base)<>"\nbecause "<>Bec,Lci)
+              };
+            }
+          | _ -> 
+              reportError("invalid bound set condition: "<>display(I),Context(I))
+          }
+        }
+      };
+
+      lhs = typeOf(E,sEnv,Opts);
+
+      valis node(bnd(projectQ(Q),lhs,body),uType("go.stdlib","list",[ndType(lhs)]),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"{}"),[APPLY(_,IDEN(_,"||"),[E,G])]) => valof{
+      Q = findVarsInBag(E,G,Env);
+
+      sEnv = Q<>Env;
+
+      goal = node(cnj(checkGoal(G,sEnv,Opts)),uType("go.stdlib","logical",[]),Lc);
+
+      lhs = typeOf(E,sEnv,Opts);
+
+      valis node(bag(projectQ(Q),lhs,goal),uType("go.stdlib","list",[ndType(lhs)]),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"-"),[INT(_,Nm)]) => node(int(-Nm),uType("go.stdlib","integer",[]),Lc)
+
+  | APPLY(Lc,IDEN(_,"-"),[FLT(_,Nm)]) => node(flt(-Nm),uType("go.stdlib","float",[]),Lc)
+
+  | APPLY(Lc,IDEN(_,"-"),[N]) => valof{             -- special to handle unary minus
+      nN = typeOf(N,Env,Opts);
+      nTp = ndType(nN);
+
+      try{
+        subType(nTp,uType("go.stdlib","number",[]),Env);
+        valis node(app(node(iden("-"),funType([(nTp,inpMode),(nTp,inpMode)],nTp),Lc),
+                       [node(int(0),uType("go.stdlib","integer",[]),Lc),nN]),nTp,Lc)
+      }
+      onerror{
+        error(Bec,'fail) -> {
+          reportError("argument of unary minus invalid\nbecause "<>Bec,Lc);
+          valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,":"),[I,T]) => valof{
+      iD = typeOf(I,Env,Opts);
+      Pkg = valof{
+	if inPkg(P) in Opts then
+	  valis P
+	else
+	  exception error("No package info",'internal)
+      };
+      (rT,nQ) = realType(T,Pkg,Env);
+
+      if nQ!=[] then
+        reportError("additional type variables: "<>showEnv(nQ)<>" not declared",Lc);
+
+      try{
+        sameType(ndType(iD),rT,Env);
+        valis node(ndEl(iD),rT,Lc)
+      }
+      onerror{
+        error(Bec,_) -> {
+          reportError("type of "<>showTerm(iD)<>" not consistent with asserted type "<>
+                      showType(rT)<>"\nbecause "<>Bec,Lc);
+          valis iD
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"::"),[L,R]) => valof {
+      l = typeOf(L,Env,Opts);
+
+      valis node(grd(l,checkGoal(R,Env,Opts)),ndType(l),Lc)
+    }
+
+  | APPLY(Lc,IDEN(Lc0,"@"),[A,APPLY(Lca,IDEN(Lcb,B),bA)]) => 
+      typeOf(APPLY(Lc,IDEN(Lc0,"::"),[A,APPLY(Lca,APPLY(Lca,IDEN(Lc0,"."),
+                                                [A,IDEN(Lcb,B)]),bA)]),
+	     Env,Opts)
+
+  | APPLY(Lc,IDEN(_,"@@"),[L,G]) => valof{
+      l = typeOf(L,Env,Opts);
+
+      valis node(lzy(l,checkGoal(G,Env,Opts)),ndType(l),Lc)
+    }
+
+    -- Parse string expression
+
+  | APPLY(Lc,IDEN(_,"%%"),[G,APPLY(_,IDEN(_,"~"),[L,R])]) => valof{ -- with remainder ...
+      g = typeOf(G,Env,Opts);
+      lft = typeOf(L,Env,Opts);
+      rgt = typeOf(R,Env,Opts);		  -- rhs should be a stream
+      aType = newVar();
+
+      case deRef(ndType(g)) in {
+	grType([(cA,cMode)],fT) -> {
+	  if dbgType in Opts then{
+	    "Applying grammar: "<>showTerm(g)<>"\nto "<>display(L)<>"\n">>stdout;
+	  };
+
+	  case cMode in {
+	    inpMode ->
+	      subType(aType,cA,Env)
+	  | superMode ->
+	      subType(aType,cA,Env)
+	  | outMode ->
+	      sameType(aType,cA,Env)
+	  | biMode ->
+	      sameType(aType,cA,Env)
+	  };
+
+	  try{
+	    sameType(ndType(lft),fT,Env)
+	  }
+	  onerror{
+	    error(Bec,'fail) ->
+	      reportError("Stream "<>showTerm(lft)<>" not consistent with "<>showTerm(g)<>
+			  "\nbecause "<>Bec,Lc)
+	  };
+              
+	  try{
+	    sameType(ndType(lft),ndType(rgt),Env)
+	  }
+	  onerror{
+	    error(Bec,'fail) ->
+	      reportError("Stream: "<>showTerm(lft)<>" not consistent with remainder "<>
+			  showTerm(rgt)<>"\nbecause "<>Bec,Lc)
+	  };
+	  
+	  valis node(nt(g,[lft,rgt]),aType,Lc);
+	}
+      | _ -> {
+	  reportError(showTerm(g)<>" does not appear to be a single argument grammar",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"%%"),[G,L]) => valof{ -- no remainder ...
+      g = typeOf(G,Env,Opts);
+      lft = typeOf(L,Env,Opts);
+      aType = newVar();
+
+      case deRef(ndType(g)) in {
+	grType([(cA,cMode)],fT) -> {
+	  if dbgType in Opts then{
+	    "Applying grammar: "<>showTerm(g)<>"\nto "<>display(L)<>"\n">>stdout;
+	  };
+
+	  case cMode in {
+	    inpMode ->
+	      subType(aType,cA,Env)
+	  | superMode ->
+	      subType(aType,cA,Env)
+	  | outMode ->
+	      sameType(aType,cA,Env)
+	  | biMode ->
+	      sameType(aType,cA,Env)
+	  };
+
+	  try{
+	    sameType(ndType(lft),fT,Env)
+	  }
+	  onerror{
+	    error(Bec,'fail) ->
+	      reportError("Stream "<>showTerm(lft)<>" not consistent with "<>showTerm(g)<>
+			  "\nbecause "<>Bec,Lc)
+	  };
+              
+	  valis node(nt(g,[lft]),aType,Lc);
+	}
+      | _ -> {
+	  reportError(showTerm(g)<>" does not appear to be a single argument grammar",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | BRACE(Lc0,IDEN(Lc1,"spawn"),[G]) => valof{
+      Q = findVarsInProcessRule(APPLY(Lc0,IDEN(Lc1,"->"),
+				      [TPL(noLoc,[]),G]),Env);
+      
+      sEnv = Q<>Env;
+
+      body = checkAction(G,false,voidType,sEnv,Opts);
+
+      valis node(frk(projectQ(Q),body),uType("go.stdlib","thread",[]),Lc0)
+    }
+    	
+  | BRACE(Lc0,IDEN(Lc1,"valof"),[P]) => valof{
+      Q = findVarsInProcessRule(APPLY(Lc0,IDEN(Lc1,"->"),
+				      [TPL(noLoc,[]),P]),Env);
+      
+      sEnv = Q<>Env;
+      vTp = newVar();
+
+      body = checkAction(P,true,vTp,sEnv,Opts);
+
+      if dbgType in Opts then
+        "Type of valof is "<>showType(vTp)<>"\n">>stdout;
+
+      valis node(vlof(projectQ(Q),body),vTp,Lc0);
+    }
+      
+  | APPLY(Lc,IDEN(_,"onerror"),[A,B]) => valof{
+      lft = typeOf(A,Env,Opts);
+      oT : ndType(lft);
+
+      errProg = collect{
+        for Rl in listIfy(B,"|") do{
+          if APPLY(eLc,IDEN(_,"=>"),[L,R]).=Rl then{
+            Q = findVarsInRule(L,R,VOID,Env);
+            sEnv = Q<>Env;
+	    try{
+	      eVal = typeOf(R,sEnv,Opts);
+	      ePtn = typeOfPtn(L,(T->sameType(T,uType("*","exception",[]),sEnv)),sEnv,Opts);
+	      elemis node(eqn("",projectQ(Q),[ePtn],eVal,[]),ndType(eVal),eLc);
+
+	      try{
+		oT := typeLub(oT,ndType(eVal),Env)
+	      }
+	      onerror{
+		error(Bec,'fail) ->
+		  reportError("type returned by error handler: "<>showTerm(eVal)<>
+			      " not consistent\nbecause "<>Bec,eLc)
+	      }
+	    }
+            onerror{
+              error(Bec,'fail) -> 
+                reportError("Exception pattern: "<>display(L)<>" not consistent "
+                            "with exception\nbecause "<>Bec,eLc)
+            }
+          }
+          else
+            reportError("invalid error handler clause: "<>display(Rl),Context(Rl))
+        }
+      };
+
+      valis node(err(lft,errProg),oT,Lc);
+    }
+      
+  | APPLY(Lc,IDEN(_,"raise"),[A]) => valof{
+      lft = typeOf(A,Env,Opts);
+
+      try{
+        subType(ndType(lft),uType("*","exception",[]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("exception expression: "<>showTerm(lft)<>" not consistent with"
+                      " exception type\nbecause "<>Bec,Lc)
+      };
+
+      valis node(exc(lft),newVar(),Lc);      -- the actual type is unconstrained
+    }
+
+  | APPLY(Lc,IDEN(_,"$meta"),[A]) => typeOfMeta(A,Env,Opts)
+
+  | APPLY(Lc,F,A) => valof {
+      f = typeOf(F,Env,Opts);
+
+      case deRef(ndType(f)) in {
+	funType(cA,fT) -> {
+	  if dbgType in Opts then{
+	    "Applying function: "<>showTerm(f)<>"\nto "<>display(TPL(Lc,A))<>"\n">>stdout;
+	  };
+
+	  if listlen(cA)==listlen(A) then{
+	    ags = typeOfFunArgs(A,cA,showTerm(f),Env,Opts);
+              
+	    valis node(app(f,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Number of arguments: "<>listlen(A)^0<>" supplied "
+			" of call to "<>showTerm(f)<>
+			" different to that expected: "<>listlen(cA)^0,Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+      | conType(cA,fT) -> {
+	  if listlen(cA)==listlen(A) then{
+	    ags = collect{
+	      cAtps : cA;
+	      
+	      for Arg in A do{
+		a = typeOf(Arg,Env,Opts);
+                        
+		if isProgramType(ndType(a)) then
+		  reportError("argument: "<>showTerm(a)<>
+			      " not allowed to be a program",Lc);
+		[aT,..X].=cAtps;
+		cAtps := X;
+                        
+		try{
+		  sameType(ndType(a),aT,Env)
+		}
+		onerror{
+		  error(Bec,'fail) ->
+		    reportError("argument: "<>showTerm(a)<>" not consistent with "
+				"constructor "<>showTerm(f)<>"\nbecause "<>Bec,Context(Arg))
+		};
+		elemis a;
+	      }
+	    };
+
+	    valis node(con(f,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Arity of "<>showTerm(f)<>" inconsistent with "<>listlen(A)^0<>
+			" supplied arguments",Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+      | sconType(cA,fT) -> {
+	  if listlen(cA)==listlen(A) then{
+	    ags = typeOfFunArgs(A,cA,showTerm(f),Env,Opts);
+	    valis node(onew(node(con(f,ags),fT,Lc)),fT,Lc);
+	  }
+	  else{
+	    reportError("Arity of "<>showTerm(f)<>" inconsistent with "<>listlen(A)^0<>
+			" supplied arguments",Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+      | _ -> {
+	  reportError(showTerm(f)<>" is neither a function, nor a constructor",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | X => valof{
+      Lc = Context(X);
+      reportError("Invalid expression: "<>display(X),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+  };
+
+  typeOfMeta(El,Env,Opts) => case El in {
+    IDEN(Lc,Nm) => valof{
+      try{
+        case lookupType(Nm,((M)=>M==varBind),Env) in {
+          (_,varBind,Tp) -> {
+	    (_,fTp).=freshen(Tp);
+            case fTp in {
+	      enuType(rTp) ->{
+		iF = node(iden("metaCons"),
+			  conType([uType("go.stdlib","symbol",[]),
+				   uType("go.stdlib","list",
+					 [uType("go.stdlib","meta",[])])],
+				  uType("go.stdlib","meta",[])),Lc);
+		iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc);
+		iE = node(enu("[]"),voidType,Lc);
+		valis node(con(iF,[iA,iE]),uType("go.stdlib","meta",[]),Lc)
+	      }
+            | _ ->{
+		iF = node(iden("metaVar"),
+			  conType([uType("go.stdlib","symbol",[])],
+				  uType("go.stdlib","meta",[])),Lc);
+		iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc);
+		valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+            }
+          }
+	  }
+	}
+      } onerror{
+	error(_,'notdef) ->{
+	  iF = node(iden("metaVar"),
+		    conType([uType("go.stdlib","symbol",[])],
+			    uType("go.stdlib","meta",[])),Lc);
+	  iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc);
+	  valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+	}
+      }
+    }
+  | INT(Lc,Nm) => valof{
+      iF = node(iden("metaInteger"),conType([uType("go.stdlib","integer",[])],
+					    uType("go.stdlib","meta",[])),Lc);
+      iA = node(int(Nm),uType("go.stdlib","integer",[]),Lc);
+      valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+    }
+  | FLT(Lc,Nm) => valof{
+      iF = node(iden("metaFloat"),conType([uType("go.stdlib","float",[])],
+					  uType("go.stdlib","meta",[])),Lc);
+      iA = node(flt(Nm),uType("go.stdlib","float",[]),Lc);
+      valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+    }
+  | SYM(Lc,Nm) => valof{
+      iF = node(iden("metaSymbol"),conType([uType("go.stdlib","symbol",[])],
+					  uType("go.stdlib","meta",[])),Lc);
+      iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc);
+      valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+    }
+  | CHR(Lc,Nm) => valof{
+      iF = node(iden("metaChar"),conType([uType("go.stdlib","char",[])],
+					  uType("go.stdlib","meta",[])),Lc);
+      iA = node(chr(Nm),uType("go.stdlib","char",[]),Lc);
+      valis node(con(iF,[iA]),uType("go.stdlib","meta",[]),Lc)
+    }
+  | ST(Lc,St) => metaString(Lc,St)
+  | APPLY(Lc,IDEN(Lc1,Nm),Args) => valof{
+      mArgs = metaArgs(Args,Env,Opts);
+      iF = node(iden("metaCons"),
+		conType([uType("go.stdlib","symbol",[]),
+			 uType("go.stdlib","list",
+			       [uType("go.stdlib","meta",[])])],
+			uType("go.stdlib","meta",[])),Lc);
+      iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc1);
+      valis node(con(iF,[iA,mArgs]),uType("go.stdlib","symbol",[]),Lc)
+    }
+  | SQUARE(Lc,IDEN(Lc1,Nm),Args) => valof{
+      mArgs = metaArgs(Args,Env,Opts);
+      iF = node(iden("metaSquare"),
+		conType([uType("go.stdlib","symbol",[]),
+			 uType("go.stdlib","list",
+			       [uType("go.stdlib","meta",[])])],
+			uType("go.stdlib","meta",[])),Lc);
+      iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc1);
+      valis node(con(iF,[iA,mArgs]),uType("go.stdlib","symbol",[]),Lc)
+    }
+  | BRACE(Lc,IDEN(Lc1,Nm),Args) => valof{
+      mArgs = metaArgs(Args,Env,Opts);
+      iF = node(iden("metaBrace"),
+		conType([uType("go.stdlib","symbol",[]),
+			 uType("go.stdlib","list",
+			       [uType("go.stdlib","meta",[])])],
+			uType("go.stdlib","meta",[])),Lc);
+      iA = node(sym(Nm),uType("go.stdlib","symbol",[]),Lc1);
+      valis node(con(iF,[iA,mArgs]),uType("go.stdlib","symbol",[]),Lc)
+    }
+  };
+
+  metaArgs(L,Env,Opts) => case L in {
+    [] => node(enu("[]"),
+	       uType("go.stdlib","list",[uType("go.stdlib","meta",[])]),noLoc)
+  | [E,..M] => valof{
+      mE = typeOfMeta(E,Env,Opts);
+      mM = metaArgs(L,Env,Opts);
+      Lc = Context(E);
+      mT = uType("go.stdlib","meta",[]);
+
+      mC = node(iden(",.."),conType([mT,uType("go.stdlib","list",[mT])],mT),Lc);
+
+      valis node(con(mC,[mE,mM]),mT,Lc)
+    }
+  };
+
+  metaString(Lc,St) => case St in {
+    "" => valof{
+      iF = node(iden("metaCons"),
+		conType([uType("go.stdlib","symbol",[]),
+			 uType("go.stdlib","list",
+			       [uType("go.stdlib","meta",[])])],
+			uType("go.stdlib","meta",[])),Lc);
+      iA = node(sym("go.stdlib#[]"),uType("go.stdlib","symbol",[]),Lc);
+      iE = node(enu("[]"),voidType,Lc);
+      valis node(con(iF,[iA,iE]),uType("go.stdlib","meta",[]),Lc)
+    }
+  | [C,..S] => valof{
+      iA = node(sym("go.stdlib#,.."),uType("go.stdlib","symbol",[]),Lc);
+
+      iF = node(iden("metaCons"),
+		conType([uType("go.stdlib","symbol",[]),
+			 uType("go.stdlib","list",
+			       [uType("go.stdlib","meta",[])])],
+			uType("go.stdlib","meta",[])),Lc);
+
+      cF = node(iden("metaChar"),conType([uType("go.stdlib","char",[])],
+					 uType("go.stdlib","meta",[])),Lc);
+      cH = node(con(cF,[node(chr(C),uType("go.stdlib","char",[]),Lc)]),
+		uType("go.stdlib","meta",[]),Lc);
+
+      cT = metaString(Lc,S);
+
+      iE = node(iden(",.."),voidType,Lc);
+
+      args = node(con(iE,[cH,
+			  node(con(iE,[cT,
+				       node(enu("[]"),uType("go.stdlib","meta",[]),Lc)]),voidType,Lc)]),
+			       uType("go.stdlib","meta",[]),Lc);
+      valis node(con(iF,[iA,args]),uType("go.stdlib","meta",[]),Lc)
+    }
+  };
+
+  -- pattern types make different assumptions for new types
+
+  typeOfPtn(Ex,Chk,Env,Opts) => case Ex in {
+    IDEN(Lc,"[]") => valof{
+      eTp = uType("go.stdlib","list",[newVar()]);
+
+      Chk(eTp);
+
+      valis node(enu("[]"),eTp,Lc)
+    }
+  | IDEN(Lc,Nm) => valof{
+      try{
+        case lookupType(Nm,((M)=>M==varBind),Env) in {    -- pick up the type assocation of Nm in environment
+          (_,varBind,Tp) -> {
+	    (_,fTp).=freshen(Tp);
+
+            case fTp in {
+              enuType(rTp) -> {
+		Chk(rTp);
+
+		valis node(enu(Nm),rTp,Lc);
+	      }
+            | _ -> {
+		Chk(fTp);
+                valis node(iden(Nm),fTp,Lc)
+	      }
+            }
+          }
+        }
+      } onerror {
+        error(Bec,'notdef) -> {
+          reportError(Bec,(Lc));
+          valis node(iden(Nm),newVar(),Lc);
+        }
+      }
+    }
+
+  | INT(Lc,Nm) => valof{
+      pTp = uType("go.stdlib","integer",[]);
+      Chk(pTp);
+      valis node(int(Nm),pTp,Lc)
+    }
+
+  | FLT(Lc,Nm) => valof{
+      pTp = uType("go.stdlib","float",[]);
+      Chk(pTp);
+      valis node(flt(Nm),pTp,Lc)
+    }
+
+  | SYM(Lc,Sm) => valof{
+      pTp = uType("go.stdlib","symbol",[]);
+      Chk(pTp);
+      valis node(sym(Sm),pTp,Lc)
+    }
+
+  | CHR(Lc,Sm) => valof{
+      pTp = uType("go.stdlib","char",[]);
+      Chk(pTp);
+      valis node(chr(Sm),pTp,Lc)
+    }
+
+  | ST(Lc,St) => valof{
+      pTp = uType("go.stdlib","list",[uType("go.stdlib","char",[])]);
+      Chk(pTp);
+      valis node(str(St),pTp,Lc)
+    }
+
+  | APPLY(Lc,APPLY(_,IDEN(_,"."),[Rc,IDEN(_,Fld)]),Args) => valof{
+      reportError("dot expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"$"),[X]) => valof{
+      reportError("$ expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"#"),[Pkg,IDEN(_,Fn)]) => valof{	  -- package symbol
+      pkgName = packageReference(Pkg);
+
+      try{
+        (_,_,pTp) .= lookupType(pkgName,(M=>M==pkgBind),Env);
+        (_,iTp) .= freshen(pTp);
+	Imps = fieldsOf(iTp);
+	
+	if (Fn,varBind,Tp) in Imps then{	  -- only the wrapper is from the package
+	  (_,fTp).=freshen(Tp);
+
+	  case fTp in {
+	    enuType(rTp) -> {
+	      Chk(rTp);
+	      valis node(pkrf(pkgName,node(enu(Fn),rTp,Lc)),rTp,Lc)
+	    }
+	  | _ -> {
+	      Chk(fTp);
+	      valis node(pkrf(pkgName,node(iden(Fn),fTp,Lc)),fTp,Lc)
+	    }
+	  }
+	}
+	else{
+	  reportError(Fn<>" not defined in package "<>pkgName,Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+      onerror{
+        error(Bec,'notdef) -> {
+          reportError("package: "<>display(Pkg)<>" not imported",Lc);
+	  valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,".."),[APPLY(_,IDEN(_,":"),[S,T]),APPLY(_,IDEN(_,"{}"),Defs)]) => valof{
+      reportError("anonymous class expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[G,A]),B]) => valof{
+      reportError("conditional expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+ 
+  | APPLY(Lc,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+      reportError("case expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"{}"),[APPLY(_,IDEN(_,".."),[E,B])]) => valof {
+      reportError("bag expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"{}"),[APPLY(_,IDEN(_,"||"),[E,G])]) => valof{
+      reportError("bag expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"-"),[N]) => valof{		-- special to handle unary minus
+      reportError("arithmetic expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,":"),[I,T]) => valof{
+      Pkg = valof{
+	if inPkg(P) in Opts then
+	  valis P
+	else
+	  exception error("No package info",'internal)
+      };
+      (rT,nQ) = realType(T,Pkg,Env);
+
+      if nQ!=[] then
+        reportError("additional type variables: "<>showEnv(nQ)<>" not declared",Lc);
+
+      try{
+	iD = typeOfPtn(I,(T->sameType(T,rT,nQ<>Env)),Env,Opts);
+        valis node(ndEl(iD),rT,Lc)
+      }
+      onerror{
+        error(Bec,_) -> {
+          reportError("type of "<>display(I)<>" not consistent with asserted type "<>
+                      showType(rT)<>"\nbecause "<>Bec,Lc);
+          valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"::"),[L,R]) => valof {
+      l = typeOfPtn(L,Chk,Env,Opts);
+
+      valis node(grd(l,checkGoal(R,Env,Opts)),ndType(l),Lc)
+    }
+
+  | APPLY(Lc,IDEN(L0,"@"),[A,APPLY(Lca,IDEN(Lcb,B),bA)]) => 
+      typeOfPtn(APPLY(Lc,IDEN(L0,"::"),[A,APPLY(Lca,APPLY(Lcb,IDEN(L0,"."),
+							  [A,IDEN(Lcb,B)]),bA)]),
+		Chk,Env,Opts)
+
+    -- Parse string expression
+  | APPLY(Lc,IDEN(_,"%%"),_) => valof{ -- with remainder ...
+      reportError("parse expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+    
+  | BRACE(Lc,IDEN(_,"spawn"),[G]) => valof{
+      reportError("spawn expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+    	
+  | BRACE(Lc,IDEN(_,"valof"),[P]) => valof{
+      reportError("valof expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+      
+  | APPLY(Lc,IDEN(_,"onerror"),[A,B]) => valof{
+      reportError("onerror expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+      
+  | APPLY(Lc,IDEN(_,"raise"),[A]) => valof{
+      reportError("exception expressions not allowed in patterns: "<>display(Ex),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,F,A) => valof {
+      f = typeOf(F,Env,Opts);
+
+      case deRef(ndType(f)) in {
+	funType(cA,fT) -> {
+	  reportError("Evaluable functions, such as: "<>showTerm(f)<>
+		      " not permitted as patterns",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      | conType(cA,fT) -> {
+	  if listlen(cA)==listlen(A) then{
+	    Chk(fT);
+
+	    ags = collect{
+	      cAtps : cA;
+	      
+	      for Arg in A do{
+		[aT,..X].=cAtps;
+		cAtps := X;
+                        
+		try{
+		  a = typeOfPtn(Arg,(T->sameType(T,aT,Env)),Env,Opts);
+		  
+		  elemis a;
+
+		  if isProgramType(ndType(a)) then
+		    reportError("argument: "<>showTerm(a)<>
+				" not allowed to be a program",Lc);
+		}
+		onerror{
+		  error(Bec,'fail) ->
+		    reportError("argument: "<>display(Arg)<>" not consistent with "
+				"expected constructor argument type "<>showType(aT)<>"\nbecause "<>Bec,Context(Arg))
+		};
+	      }
+	    };
+
+	    valis node(con(f,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Arity of "<>showTerm(f)<>" inconsistent with "<>listlen(A)^0<>
+			" supplied arguments",Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+      | sconType(_,_) -> {
+	  reportError("stateful constructor: "<>display(F)<>
+		      " not permitted in patterns",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      | _ -> {
+	  reportError(showTerm(f)<>" is neither a function, nor a constructor",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | X => valof{
+      Lc = Context(X);
+      reportError("Invalid pattern: "<>display(X),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+  };
+
+
+  typeOfLabelPtn(Ex,Chk,Env,Opts) => case Ex in {
+    IDEN(Lc,Nm) => valof{
+      try{
+        case lookupType(Nm,((M)=>M==varBind),Env) in {    -- pick up the type assocation of Nm in environment
+          (_,varBind,Tp) -> {
+	    (_,fTp).=freshen(Tp);
+
+            case fTp in {
+              enuType(rTp) -> {
+		Chk(rTp);
+                valis node(enu(Nm),fTp,Lc)	  -- we dont check statefullness here
+	      }
+	    | sconType(Ar,_) -> {
+		reportError(listlen(Ar)^0<>" arguments missing from "<>Nm<>
+			    "\nof type "<>showType(fTp),Lc);
+                valis node(iden(Nm),fTp,Lc)
+	      }
+            | _ -> {
+		Chk(fTp);
+                valis node(iden(Nm),fTp,Lc)
+	      }
+            }
+          }
+        }
+      } onerror {
+        error(Bec,'notdef) -> {
+          reportError(Bec,Lc);
+          valis node(iden(Nm),newVar(),Lc);
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,":"),[I,T]) => valof{
+      Pkg = valof{
+	if inPkg(P) in Opts then
+	  valis P
+	else
+	  exception error("No package info",'internal)
+      };
+      (rT,nQ) = realType(T,Pkg,Env);
+
+      if nQ!=[] then
+        reportError("additional type variables: "<>showEnv(nQ)<>" not declared",Lc);
+
+      try{
+	iD = typeOfLabelPtn(I,(T->sameType(T,rT,nQ<>Env)),Env,Opts);
+	Chk(rT);
+        valis node(ndEl(iD),rT,Lc)
+      }
+      onerror{
+        error(Bec,_) -> {
+          reportError("type of "<>display(I)<>" not consistent with asserted type "<>
+                      showType(rT)<>"\nbecause "<>Bec,Lc);
+          valis node(vde,newVar(),Lc)
+        }
+      }
+    }
+
+  | APPLY(Lc,F,A) => valof {
+      f = typeOf(F,Env,Opts);
+
+      case deRef(ndType(f)) in {
+	funType(cA,fT) -> {
+	  reportError("Evaluable functions, such as: "<>showTerm(f)<>
+		      " not permitted as patterns",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      | conType(cA,fT) -> {
+	  if listlen(cA)==listlen(A) then{
+	    Chk(fT);
+
+	    ags = collect{
+	      cAtps : cA;
+	      
+	      for Arg in A do{
+		[aT,..X].=cAtps;
+		cAtps := X;
+                        
+		try{
+		  a = typeOfPtn(Arg,(T->sameType(T,aT,Env)),Env,Opts);
+
+		  elemis a;
+
+		  if isProgramType(ndType(a)) then
+		    reportError("argument: "<>showTerm(a)<>
+				" not allowed to be a program",Lc);
+		}
+		onerror{
+		  error(Bec,'fail) ->
+		    reportError("argument: "<>display(Arg)<>" not consistent with "
+				"constructor "<>showTerm(f)<>"\nbecause "<>Bec,Context(Arg))
+		};
+	      }
+	    };
+
+	    valis node(con(f,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Arity of "<>showTerm(f)<>" inconsistent with "<>listlen(A)^0<>
+			" supplied arguments",Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+
+      | sconType(cA,fT) -> {
+	  if listlen(cA)==listlen(A) then{
+	    Chk(fT);
+
+	    ags = typeOfModedParams(Lc,A,cA,Env,Opts);
+
+	    valis node(con(f,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Arity of "<>showTerm(f)<>" inconsistent with "<>listlen(A)^0<>
+			" supplied arguments",Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+
+      | _ -> {
+	  reportError(showTerm(f)<>" is neither a function, nor a constructor",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | X => valof{
+      Lc = Context(X);
+      reportError("Invalid label: "<>display(X),Lc);
+      valis node(vde,newVar(),Lc)
+    }
+  };
+
+  caseExp(Cases,cTp,Env,Opts) => case Cases in {
+    APPLY(Lc,IDEN(_,"=>"),[APPLY(Lc0,IDEN(_,"::"),[H,G]),B]) => valof{
+      Q = findVarsInEqn(Cases,Env);
+
+      if dbgType in Opts then
+        "Variable of case rule "<>display(Cases)<>" are "<>showEnv(Q)<>"\n">>stdout;
+
+      try{
+	sEnv = Q<>Env;
+	ptnX = typeOfPtn(H,(T->sameType(T,cTp,sEnv)),sEnv,Opts);
+	rB = typeOf(B,sEnv,Opts);
+
+	valis (ndType(rB),[node(eqn("",projectQ(Q),[ptnX],rB,checkGoal(G,sEnv,Opts)),
+				funType([(ndType(ptnX),inpMode)],ndType(rB)),Lc)])
+      }
+      onerror{
+        error(Bec,'fail) -> {
+          reportError("case pattern: "<>display(H)<>" not consistent with "
+                      "case expression type: "<>showType(cTp)<>"\nbecause "<>Bec,Lc);
+	  valis (newVar(),[])
+	}
+      }
+    }
+  | APPLY(Lc,IDEN(_,"=>"),[H,B]) => valof {
+      Q = findVarsInEqn(Cases,Env);
+
+      if dbgType in Opts then
+        "Variable of case rule "<>display(Cases)<>" are "<>showEnv(Q)<>"\n">>stdout;
+
+      try{
+	sEnv = Q<>Env;
+	ptnX = typeOfPtn(H,(T->sameType(T,cTp,sEnv)),sEnv,Opts);
+	rB = typeOf(B,sEnv,Opts);
+
+	valis (ndType(rB),
+	       [node(eqn("",projectQ(Q),[ptnX],rB,[]),
+		     funType([(ndType(ptnX),inpMode)],ndType(rB)),Lc)])
+      }
+      onerror{
+        error(Bec,'fail) -> {
+          reportError("case pattern not consistent with "
+                      "case expression type: "<>showType(cTp)<>"\nbecause "<>Bec,Lc);
+	  valis (newVar(),[])
+	}
+      }
+    }
+  | APPLY(Lc,IDEN(_,"|"),[A,B]) => valof{
+      (aR,aBody) = caseExp(A,cTp,Env,Opts);
+      (bR,bBody) = caseExp(B,cTp,Env,Opts);
+
+      try{
+        nR = typeLub(aR,bR,Env);           -- the result type is the broadest
+        valis (nR,aBody<>bBody)
+      }
+      onerror{
+        error(M,'fail) -> {
+          reportError("case rule return types: "<>showType(aR)<>"/"<>showType(bR)<>
+                      " not consistent\nbecause "<>M,Lc)
+        }
+      };
+
+      valis (aR,aBody)
+    }
+  };
+
+  typeOfObject(Obj,Env,Opts) => case Obj in {
+    IDEN(Lc,Nm) => valof{
+      try{
+        case lookupType("."<>Nm,(M=>M==varBind),Env) in {         -- Is this a super.XX name?
+          (_,varBind,Tp) -> {
+	    (_,fTp).=freshen(Tp);
+            case fTp in {
+              enuType(rTp) ->
+		valis node(enu(Nm),rTp,Lc)
+            | _ ->
+                valis node(iden(Nm),fTp,Lc)
+            }
+          }
+        }
+      } onerror{
+        _ -> {
+          try{
+            case lookupType(Nm,((M)=>M==varBind),Env) in {
+              (_,varBind,Tp) -> {
+		(_,fTp).=freshen(Tp);
+                case fTp in {
+                  enuType(rTp) ->
+		    valis node(enu(Nm),rTp,Lc)
+                | _ ->
+                    valis node(iden(Nm),fTp,Lc)
+                }
+              }
+            }
+          } onerror {
+            error(Bec,'notdef) -> {
+              reportError(Bec,(Lc));
+              valis node(iden(Nm),newVar(),Lc);
+            }
+          }
+        }
+      }
+    }
+  | _ => typeOf(Obj,Env,Opts)
+  };
+
+  packageReference(Obj) => case Obj in {
+    IDEN(_,Nm) => Nm
+  | APPLY(_,IDEN(_,"."),[L,IDEN(_,Fld)]) =>
+      packageReference(L)<>"."<>Fld               -- 
+  | _ => exception error("",'fail)
+  };
+  
+  typeOfArgs(Lc,Args,Env,Opts) => valof{
+    nArgs = collect{
+      for A in Args do{
+        a = typeOf(A,Env,Opts);
+	
+        if conType(cA,_).=ndType(a) then
+          reportError(showTerm(a)<>" is a "<>listlen(cA)^0<>" constructor"
+		      "\nsymbol is not allowed as an argument",Lc)
+	else if sconType(cA,_).=ndType(a) then
+          reportError(showTerm(a)<>" is a "<>listlen(cA)^0<>" constructor"
+		      "\nsymbol is not allowed as an argument",Lc)
+	else if isProgramType(ndType(a)) then
+          reportError("argument: "<>showTerm(a)<>
+		      " not allowed here as an argument",Lc);
+        elemis a;
+      }
+    };
+
+    valis nArgs
+  };
+
+  typeOfFunArg(El,Tp,Nm,Md,Env,Opts) => valof{
+    a = typeOf(El,Env,Opts);			  -- pick up the argument
+
+    Lc = ndContext(a);
+    aTp = ndType(a);
+
+    case aTp in {
+      conType(cA,_)->
+	reportError(showTerm(a)<>" is a "<>listlen(cA)^0<>" constructor"
+		    "\nsymbol is not allowed as an argument of\n"<>Nm,Lc)
+    | sconType(cA,_)->
+	reportError(showTerm(a)<>" is a "<>listlen(cA)^0<>" constructor"
+		    "\nsymbol is not allowed as an argument of\n"<>Nm,Lc)
+    | _ -> if isProgramType(aTp) then
+	reportError("argument: "<>showTerm(a)<>
+		    " not allowed here as an argument of\n"<>Nm,Lc)
+    };
+    
+    try{
+      case Md in {
+	inpMode ->
+	  subType(aTp,Tp,Env)
+      | superMode ->
+	  subType(aTp,Tp,Env)
+      | outMode ->
+	  sameType(aTp,Tp,Env)
+      | biMode ->
+	  sameType(aTp,Tp,Env)
+      }
+    }
+    onerror{
+      error(Bec,'fail) ->
+	reportError("Argument: "<>showTerm(a)<>" of \n"<>Nm<>
+		    "\nnot consistent with required type: "<>showType(Tp)<>
+		    "\nbecause "<>Bec,Lc)
+    };
+    valis a
+  };
+
+  typeOfFunArgs(Args,Tps,Nm,Env,Opts) => collect{
+    At : Tps;
+    AA : Args;
+
+    while [(tA,tM),..tR].=At && [aA,..aR].=AA do{
+      elemis typeOfFunArg(aA,tA,Nm,tM,Env,Opts);
+      At := tR; AA := aR;
+    }
+  };
+
+  typeOfModedParams(Lc,Args,eTps,Env,Opts) => valof{
+    eTypes : eTps;
+    if listlen(Args)==listlen(eTps) then{
+      nArgs = collect{
+        for A in Args do{
+          [(eTp,md),..eT].=eTypes;
+          eTypes := eT;
+
+          P = valof {
+	    if md==outMode then{
+	      aTm = typeOf(A,Env,Opts);
+	      try{
+		subType(ndType(aTm),eTp,Env)
+	      } onerror {
+		error(Bec,'fail) ->
+		  reportError("Argument: "<>showTerm(aTm)<>" not consistent with required "
+			      "type "<>showType(eTp)<>"\nbecause "<>Bec,Lc)
+	      };
+	      valis aTm
+	    }
+	    else{
+	      try{
+		valis typeOfPtn(A,(T->sameType(T,eTp,Env)),Env,Opts)
+	      } onerror {
+		error(Bec,'fail) ->
+		  reportError("Argument: "<>display(A)<>" not consistent with required "
+			      "type "<>showType(eTp)<>"\nbecause "<>Bec,Lc)
+	      };
+	      valis node(vde,newVar(),Lc)
+	    }
+	  };
+
+	  if isProgramType(ndType(P)) then
+	    reportError("argument: "<>showTerm(P)<>" not allowed to be a program",Lc)
+	  else if conType(_,_).=ndType(P) then
+	    reportError("argument: "<>showTerm(P)<>" not allowed to be a constructor name",Lc)
+	  else if sconType(_,_).=ndType(P) then
+	    reportError("argument: "<>showTerm(P)<>" not allowed to be a constructor name",Lc);
+          
+          elemis node(flow(P,md),ndType(P),ndContext(P))
+        }
+      };
+
+      valis nArgs
+    }
+    else{
+      reportError("Number of arguments: "<>listlen(Args)^0<>" does not match expected"
+                  " arity "<>listlen(eTps)^0,Lc);
+      valis []
+    }
+  };
+
+  typeOfFunction(Eqns,fTp,Env,Opts) => valof{
+    AritySet : false;
+    Arity: 0;
+
+    List = collect{
+      for Eqn in Eqns do{
+        (Eq,Ar) = typeOfEquation(Eqn,fTp,Env,Opts);
+
+        if dbgType in Opts then
+          "Eqn types to: "<>showTerm(Eq)<>"\n">>stdout;
+
+        elemis Eq;
+
+        if !AritySet then{
+          Arity := Ar;
+          AritySet := true
+        }
+        else if Arity!=Ar then
+          reportError("different arity than expected: "<>Arity^0,ndContext(Eq))
+      }
+    };
+    valis (List,Arity)
+  };
+  
+  typeOfEquation(Eq,fTp,Env,Opts) => case Eq in {
+    APPLY(Lc,IDEN(_,"=>"),[APPLY(_,IDEN(_,"::"),
+				 [APPLY(LcH,IDEN(_,Nm),H),G]),R]) => valof {
+      try{
+        (tQ,funType(tA,tR)).=freshen(fTp);
+
+        Q = findVarsInEqn(Eq,Env);
+        if dbgType in Opts then{
+          "Vars of equation "<>display(Eq)<>" = "<>showEnv(Q)<>"\n">>stdout;
+	};
+        
+        sEnv = Q<>Env;
+        
+        Args = typeOfModedParams(Lc,H,tA,sEnv,Opts);
+
+	Guard = checkGoal(G,sEnv,Opts);
+        
+        rhs = typeOf(R,sEnv,Opts);
+        
+        try{
+          subType(ndType(rhs),tR,sEnv)
+        }
+        onerror{
+          error(Bec,'fail) -> 
+            reportError("type of returned value: "<>showType(ndType(rhs))<>" not consistent"
+                        " with expected type: "<>showType(tR)<>"\nbecause "<>Bec,Lc)
+        };
+
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(funType(tA,tR))<>" not consistent with"
+			" with expected type: "<>showType(fTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(eqn(Nm,projectQ(Q),Args,rhs,Guard),fTp,Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("equation does not match expected type: "<>showType(fTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | APPLY(Lc,IDEN(_,"=>"),[APPLY(LcH,IDEN(_,Nm),H),R]) => valof {
+      try{
+        (tQ,funType(tA,tR)).=freshen(fTp);
+
+        Q = findVarsInEqn(Eq,Env);
+        if dbgType in Opts then{
+          "Vars of eqn "<>display(Eq)<>" = "<>showEnv(Q)<>"\n">>stdout;
+        };
+
+        sEnv = Q<>Env;
+        
+        Args = typeOfModedParams(Lc,H,tA,sEnv,Opts);
+        
+        rhs = typeOf(R,sEnv,Opts);
+        
+        if dbgType in Opts then{
+          "Rhs of eqn  = "<>showTerm(rhs)<>"\n">>stdout;
+          "Expected type is "<>showType(tR)<>"\n">>stdout;
+        };
+        
+        try{
+          subType(ndType(rhs),tR,sEnv)
+        }
+        onerror{
+          error(Bec,'fail) -> 
+            reportError("type of returned value: "<>showType(ndType(rhs))<>" not consistent"
+                        " with expected type: "<>showType(tR)<>"\nbecause "<>Bec,Lc)
+        };
+        
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(funType(tA,tR))<>" not consistent with"
+			" with expected type: "<>showType(fTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(eqn(Nm,projectQ(Q),Args,rhs,[]),fTp,Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("equation does not match expected type: "<>showType(fTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | _ => exception error("invalid equation",'compiler)
+  };
+
+  typeOfPredicate(Clses,pTp,Env,Opts) => valof{
+    AritySet : false;
+    Arity: 0;
+    List = collect{
+      for Cls in Clses do{
+        (Cl,Ar) = typeOfClause(Cls,pTp,Env,Opts);
+        elemis Cl;
+
+        if !AritySet then{
+          Arity := Ar;
+          AritySet := true
+        }
+        else if Arity!=Ar then
+          reportError("inconsistent arity, "<>Arity^0<>" expected",ndContext(Cl));
+      }
+    };
+    
+    valis (List,Arity)
+  };
+
+  typeOfClause(Cl,pTp,Env,Opts) => case Cl in {
+    APPLY(Lc,IDEN(_,":-"),[APPLY(LcH,IDEN(_,Nm),H),B]) => valof{
+      try{
+        Q = findVarsInClause(Cl,Env);
+            
+        if dbgType in Opts then{
+          "Environment of clause "<>display(Cl)<>" is "++showEnvD(Env,20)++"\n">>stdout;
+          "Vars are: "++showEnv(Q)++"\n">>stdout;
+        };
+        
+        (tQ,predType(tA)).=freshen(pTp);
+        
+        sEnv = Q<>Env;
+
+        Args = typeOfModedParams(Lc,H,tA,sEnv,Opts);
+
+	Body = checkGoal(B,sEnv,Opts);
+
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(predType(tA))<>" not consistent with"
+			" with expected type: "<>showType(pTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(cls(Nm,projectQ(Q),Args,Body),predType(tA),Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("rule does not match expected type: "<>showType(pTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | _ => exception error("invalid clause in typeOfClause: "<>display(Cl),'fail)
+  };
+
+  typeOfStrongPredicate(Clses,pTp,Env,Opts) => valof{
+    AritySet : false;
+    Arity: 0;
+
+    List = collect{
+      for Cls in Clses do{
+        (Cl,Ar) = typeOfStrongClause(Cls,pTp,Env,Opts);
+
+        elemis Cl;
+        
+        if !AritySet then{
+          Arity := Ar;
+          AritySet := true
+        }
+        else if Arity!=Ar then
+          reportError("inconsistent arity, "<>Arity^0<>" expected",ndContext(Cl));
+      }
+    };
+    
+    valis (List,Arity)
+  };
+
+  typeOfStrongClause(Cl,pTp,Env,Opts) => case Cl in {
+    APPLY(Lc,IDEN(_,":--"),
+	  [APPLY(_,IDEN(_,"::"),[APPLY(LcH,IDEN(_,Nm),H),G]),B]) => valof{
+      try{
+	Q = findVarsInStrongClause(Cl,Env);
+            
+	if dbgType in Opts then{
+	  "Environment of strong clause "<>display(Cl)<>
+	  " is "++showEnvD(Env,20)++"\n">>stdout;
+	  "Vars are: "++showEnv(Q)++"\n">>stdout;
+	};
+      
+        (tQ,predType(tA)).=freshen(pTp);
+        
+        sEnv = Q<>Env;
+        
+        Args = typeOfModedParams(Lc,H,tA,sEnv,Opts);
+        
+	Guard = checkGoal(G,sEnv,Opts);
+
+	Body = checkGoal(B,sEnv,Opts);
+
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(predType(tA))<>" not consistent with"
+			" with expected type: "<>showType(pTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(scls(Nm,projectQ(Q),Args,Guard,Body),predType(tA),Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("rule does not match expected type: "<>showType(pTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | APPLY(Lc,IDEN(_,":--"),[APPLY(LcH,IDEN(_,Nm),H),B]) => valof{
+      try{
+        Q = findVarsInStrongClause(Cl,Env);
+            
+        if dbgType in Opts then{
+          "Environment of strong clause "<>display(Cl)<>
+          " is "++showEnvD(Env,20)++"\n">>stdout;
+          "Vars are: "++showEnv(Q)++"\n">>stdout;
+        };
+        
+        (tQ,predType(tA)).=freshen(pTp);
+
+        sEnv = Q<>Env;
+        
+        Args = typeOfModedParams(Lc,H,tA,sEnv,Opts);
+
+	Body = checkGoal(B,sEnv,Opts);
+
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(predType(tA))<>" not consistent with"
+			" with expected type: "<>showType(pTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(scls(Nm,projectQ(Q),Args,[],Body),predType(tA),Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("rule does not match expected type: "<>showType(pTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | _ => exception error("invalid clause in typeOfStrongClause: "<>display(Cl),'fail)
+  };
+
+  checkGoal(G,Env,Opts)=> case G in {
+    APPLY(_,IDEN(_,","),[L,R]) =>
+      checkGoal(L,Env,Opts)<>checkGoal(R,Env,Opts)
+  | IDEN(Lc,"true") =>[]
+  | IDEN(Lc,"false") => [node(enu("false"),uType("go.stdlib","logical",[]),Lc)]
+  | IDEN(Lc,Id) => checkGoal(APPLY(Lc,IDEN(Lc,"="),[IDEN(Lc,Id),IDEN(Lc,"true")]),Env,Opts)
+  | APPLY(Lc,IDEN(_,"="),[L,R]) => valof{
+      tV = newVar();
+
+      lhs = typeOfFunArg(L,tV,"=",biMode,Env,Opts);
+      rhs = typeOfFunArg(R,tV,"=",biMode,Env,Opts);
+
+      valis [node(prd(node(iden("="),predType([]),Lc),[lhs,rhs]),uType("go.stdlib","logical",[]),Lc)];
+    }
+
+  | APPLY(Lc,IDEN(_,".="),[L,R]) => valof{
+      rhs = typeOf(R,Env,Opts);
+      rT = ndType(rhs);
+
+      try{
+	lhs = typeOfPtn(L,(T->subType(T,ndType(rhs),Env)),Env,Opts);
+	valis [node(mtc(lhs,rhs),uType("go.stdlib","logical",[]),Lc)]
+      }
+      onerror{
+        error(eMsg,'fail) -> {
+          reportError("lhs of =\n"++display(L)++
+                      "\nnot consistent with \nrhs: "++
+                      display(R)++"\nbecause "++eMsg,Lc);
+          valis []
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"<="),[I,T]) => valof{
+      if dbgType in Opts then
+        "Checking class membership "<>display(G)<>"\n">>stdout;
+      iD = typeOfLabel(I,Env,Opts);                    -- the element to check
+      rT = typeOfLabel(T,Env,Opts);		       -- The class the check
+
+      if dbgType in Opts then{
+        "Class type is "<>showType(ndType(rT))<>"\n">>stdout;
+        "Element type is "<>showType(ndType(iD))<>"\n">>stdout;
+      };
+
+      try{
+        subType(ndType(iD),ndType(rT),Env); -- The lhs should be a sub-type of the rhs
+
+        valis [node(prd(node(iden("<="),predType([]),Lc),[iD,rT]),uType("go.stdlib","logical",[]),Lc)]
+      }
+      onerror{
+        error(Bec,_) -> {
+          reportError("type of "<>showTerm(iD)<>" not consistent with "
+                      "class "<>showTerm(rT)<>"\nbecause "<>Bec,Lc);
+          valis []
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"in"),[L,R]) => valof{
+      rhs = typeOf(R,Env,Opts);
+      rT = ndType(rhs);
+
+      try{
+	lhs = typeOfPtn(L,(T->sameType(uType("go.stdlib","list",[T]),rT,Env)),Env,Opts);
+	valis [node(prd(node(iden("in"),predType([(ndType(lhs),biMode),(rT,biMode)]),Lc),[lhs,rhs]),
+		    uType("go.stdlib","logical",[]),Lc)]
+      }
+      onerror{
+        error(eMsg,'fail) -> {
+          reportError("lhs of in\n"++display(L)++
+                      "\nnot consistent with \nrhs: "++
+                      display(R)++"\nbecause "++eMsg,Lc);
+          valis []
+        }
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"@@"),[L,G]) => valof{
+      l = typeOf(L,Env,Opts);
+
+      valis [node(lzy(l,checkGoal(G,Env,Opts)),ndType(l),Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"|"),[APPLY(Lc2,IDEN(_,"?"),[T,A]),B]) => valof{
+      tst = checkGoal(T,Env,Opts);
+      lft = checkGoal(A,Env,Opts);
+      rgt = checkGoal(B,Env,Opts);
+      valis [node(iff(node(cnj(tst),uType("go.stdlib","logical",[]),Lc2),
+                      node(cnj(lft),uType("go.stdlib","logical",[]),Lc),
+                      node(cnj(rgt),uType("go.stdlib","logical",[]),Lc)),
+                  uType("go.stdlib","logical",[]),Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"|"),[A,B]) => valof{
+      lft = checkGoal(A,Env,Opts);
+      rgt = checkGoal(B,Env,Opts);
+      valis [node(dsj(node(cnj(lft),
+			   uType("go.stdlib","logical",[]),Lc),
+		      node(cnj(rgt),uType("go.stdlib","logical",[]),Lc)),
+                  uType("go.stdlib","logical",[]),Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"*>"),[A,B]) => valof{
+      Q = findVarsInForAll(A,APPLY(Lc,IDEN(Lc,"{}"),[B]),Env);
+
+      sEnv = Q<>Env;
+    
+      valis [node(frll(projectQ(Q),
+                       checkGoal(A,sEnv,Opts),
+		       checkGoal(B,sEnv,Opts)),uType("go.stdlib","logical",[]),Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"!"),[One]) => 
+      [node(one(checkGoal(One,Env,Opts)),uType("go.stdlib","logical",[]),Lc)]
+    
+  | APPLY(Lc,IDEN(_,"\\+"),[Neg]) => 
+      [node(neg(checkGoal(Neg,Env,Opts)),uType("go.stdlib","logical",[]),Lc)]
+
+  | APPLY(Lc,IDEN(_,"!="),[L,R]) =>
+      checkGoal(APPLY(Lc,IDEN(Lc,"\\+"),[APPLY(Lc,IDEN(Lc,"="),[L,R])]),Env,Opts)
+
+  | APPLY(Lc,IDEN(_,"onerror"),[A,B]) => valof{
+      lft = checkGoal(A,Env,Opts);
+
+      errProg = collect{
+        for Rl in listIfy(B,"|") do{
+          if APPLY(eLc,IDEN(_,":-"),[L,R]).=Rl then{
+            Q = findVarsInRule(L,VOID,R,Env);
+	    sEnv = Q<>Env;
+	    try{
+	      ePtn = typeOfPtn(L,(T->sameType(T,uType("*","exception",[]),sEnv)),sEnv,Opts);
+	      elemis node(cls("",projectQ(Q),[ePtn],checkGoal(R,sEnv,Opts)),voidType,eLc);
+            }
+            onerror{
+              error(Bec,'fail) ->
+                reportError("Exception pattern not consistent "
+                            "with exception\nbecause "<>Bec,eLc)
+            }
+          }
+          else
+            reportError("invalid error handler clause: "<>display(Rl),Context(Rl))
+        }
+      };
+
+      valis [node(err(node(cnj(lft),uType("go.stdlib","logical",[]),Lc),errProg),uType("go.stdlib","logical",[]),Lc)]
+    }
+      
+  | APPLY(Lc,IDEN(_,"raise"),[A]) => valof{
+      lft = typeOf(A,Env,Opts);
+
+      try{
+        subType(ndType(lft),uType("*","exception",[]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("exception expression: "<>showTerm(lft)<>" not consistent with"
+                      " exception type\nbecause "<>Bec,Lc)
+      };
+
+      if dbgType in Opts then{
+        "Exception is "<>showTerm(lft)<>"\n">>stdout;
+      };
+      
+      valis [node(exc(lft),uType("go.stdlib","logical",[]),Lc)];
+    }
+
+  | APPLY(Lc,IDEN(_,"-->"),[L,APPLY(_,IDEN(_,"~"),[S,R])]) => valof{
+      stm = typeOf(S,Env,Opts);		  -- rhs should be a stream
+      rgt = typeOf(R,Env,Opts);		  -- rhs should also be a stream
+
+      try{
+        subType(ndType(stm),uType("go.stdlib","list",[topType]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("parsed stream: "<>showTerm(stm)<>" not consistent with list"
+                      "\nbecause "<>Bec,Lc)
+      };
+
+      try{
+        sameType(ndType(stm),ndType(rgt),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("stream: "<>showTerm(stm)<>" not consistent with: "<>
+                      showTerm(rgt)<>"\nbecause "<>Bec,Lc)
+      };
+
+      lft = grammarBody(L,ndType(stm),Env,Opts);  -- lhs must be a DCG rule body
+
+      valis [node(nt(lft,[stm,rgt]),uType("go.stdlib","logical",[]),Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"-->"),[L,S]) => valof{
+      stm = typeOf(S,Env,Opts);		  -- rhs should be a stream
+
+      try{
+        subType(ndType(stm),uType("go.stdlib","list",[topType]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("parsed stream: "<>showTerm(stm)<>" not consistent with list"
+                      "\nbecause "<>Bec,Lc)
+      };
+
+      lft = grammarBody(L,ndType(stm),Env,Opts);  -- lhs must be a DCG rule body
+
+      valis [node(nt(lft,[stm]),uType("go.stdlib","logical",[]),Lc)]
+    }
+
+  | BRACE(Lc0,IDEN(Lc1,"action"),[P]) => valof{
+      Q = findVarsInProcessRule(APPLY(Lc0,IDEN(Lc1,"->"),
+				      [TPL(noLoc,[]),P]),Env);
+      
+      sEnv = Q<>Env;
+
+      p = checkAction(P,true,uType("go.stdlib","logical",[]),sEnv,Opts);
+      
+      valis [node(vlof(projectQ(Q),p),uType("go.stdlib","logical",[]),Lc0)];
+    }
+      
+  | APPLY(Lc,IDEN(_,"{}"),[Gl]) => checkGoal(Gl,Env,Opts)
+
+  | APPLY(Lc,P,A) => valof {
+      p = typeOf(P,Env,Opts);
+
+      case deRef(ndType(p)) in {
+	predType(cA) -> {
+	  if dbgType in Opts then{
+	    "Applying predicate: "<>showTerm(p)<>"\nto "<>display(TPL(Lc,A))<>"\n">>stdout;
+	  };
+
+	  if listlen(cA)==listlen(A) then{
+	    ags = typeOfFunArgs(A,cA,showTerm(p),Env,Opts);
+              
+	    valis [node(prd(p,ags),uType("go.stdlib","logical",[]),Lc)];
+	  }
+	  else{
+	    reportError("Number of arguments: "<>listlen(A)^0<>" supplied "
+			" of call to "<>showTerm(p)<>
+			" different to that expected: "<>listlen(cA)^0,Lc);
+	    valis []
+	  }
+	}
+      | _ -> {
+	  reportError(showTerm(p)<>" is not a predicate",Lc);
+	  valis []
+	}
+      }
+    }
+
+  | _ => valof {
+      reportError("Invalid condition: "++display(G),Context(G));
+      valis []
+    }
+  };
+
+  typeOfGrammar(Rules,gTp,Env,Opts) => valof{
+    AritySet : false;
+    Arity: 0;
+
+    List = collect{
+      for Cls in Rules do{
+        (Cl,Ar) = typeOfGrammarRule(Cls,gTp,Env,Opts);
+
+        elemis Cl;
+
+        if !AritySet then{
+          Arity := Ar;
+          AritySet := true
+        }
+        else if Arity!=Ar then
+          reportError("Arity different to that expected: "<>Arity^0,ndContext(Cl));
+
+      }
+    };
+    valis (List,Arity)
+  };
+  
+  typeOfGrammarRule(Rl,gTp,Env,Opts) => case Rl in {
+    APPLY(Lc,IDEN(_,"-->"),[APPLY(_,IDEN(_,","),[APPLY(LcA,IDEN(_,Nm),H),P]),B]) => valof{
+      Q = findVarsInGrammar(APPLY(LcA,IDEN(LcA,Nm),H),P,B,Env);
+
+      try{
+        (tQ,grType(tA,sT)).=freshen(gTp);
+        sEnv = Q<>Env;
+        
+        Args = typeOfModedParams(LcA,H,tA,sEnv,Opts);
+        
+        pback = grammarBody(P,sT,sEnv,Opts);
+        body = grammarBody(B,sT,sEnv,Opts);
+        
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(grType(tA,sT))<>" not consistent with"
+			" with expected type: "<>showType(gTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(grl(projectQ(Q),Args,pback,body),gTp,Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("rule does not match expected type: "<>showType(gTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  | APPLY(Lc,IDEN(_,"-->"),[APPLY(LcA,IDEN(LcB,Nm),H),B]) => valof{
+      Q = findVarsInGrammar(APPLY(noLoc,IDEN(noLoc,Nm),H),IDEN(noLoc,"[]"),B,Env);
+
+      if dbgType in Opts then
+        "Vars of grammar rule "<>display(Rl)<>" = "<>showEnv(Q)<>"\n">>stdout;
+
+      try{
+        (tQ,grType(tA,sT)).=freshen(gTp);
+        sEnv = Q<>Env;
+
+        Args = typeOfModedParams(LcA,H,tA,sEnv,Opts);
+
+        body = grammarBody(B,sT,sEnv,Opts);
+
+	for (_,_,tV) in tQ do{
+	  if !isUnbound(tV) then{
+	    reportError("program type: "<>showType(grType(tA,sT))<>" not consistent with"
+			" with expected type: "<>showType(gTp)<>"\nbecause "<>
+			showType(tV)<>" should be unbound",Lc);
+	  }
+	};
+        
+        valis (node(grl(projectQ(Q),Args,node(enu("[]"),sT,Lc),body),gTp,Lc),listlen(Args))
+      }
+      onerror{
+        error(Bec,_) ->{
+          reportError("rule does not match expected type: "<>showType(gTp)<>
+                      "\nbecause "<>Bec,Lc);
+          valis (node(vde,newVar(),Lc),-1)
+        }
+      }
+    }
+  };
+
+  grammarBody(G,sTp,Env,Opts)=> case G in {
+    APPLY(Lc,IDEN(_,","),[L,R]) => valof{
+      gL = grammarBody(L,sTp,Env,Opts);
+      gR = grammarBody(R,sTp,Env,Opts);
+
+      valis node(seq([gL,gR]),sTp,Lc)
+    }
+
+  | IDEN(Lc,"[]") => node(enu("[]"),sTp,Lc)
+
+  | ST(Lc,St) => valof{
+      try{
+        subType(sTp,uType("go.stdlib","list",[uType("go.stdlib","char",[])]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("string "<>St^0<>" not consistent with expected type: "<>
+                      showType(sTp)<>"\nbecause "<>Bec,Lc)
+      };
+
+      valis node(str(St),uType("go.stdlib","list",[uType("go.stdlib","char",[])]),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,",.."),[_,_]) => valof {
+      try{
+	valis typeOfPtn(G,(T->subType(T,sTp,Env)),Env,Opts);
+        -- subType(sTp,ndType(l),Env);
+      }
+      onerror{
+        error(Bec,'fail) ->
+          { reportError(Bec,Lc);
+	  valis node(vde,sTp,Lc) }
+      }
+    }
+    
+  | IDEN(Lc,"eof") => node(enu("eof"),sTp,Lc)
+    
+  | APPLY(Lc,IDEN(_,"{}"),[Gl]) => node(cnj(checkGoal(Gl,Env,Opts)),sTp,Lc)
+
+  | APPLY(Lc,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[T,A]),B]) => valof{
+      tst = grammarBody(T,sTp,Env,Opts);
+      lft = grammarBody(A,sTp,Env,Opts);
+      rgt = grammarBody(B,sTp,Env,Opts);
+        
+      valis node(iff(tst,lft,rgt),sTp,Lc)
+    }
+    
+  | APPLY(Lc,IDEN(_,"|"),[L,R]) => valof{
+      lft = grammarBody(L,sTp,Env,Opts);
+      rgt = grammarBody(R,sTp,Env,Opts);
+      
+      valis node(dsj(lft,rgt),sTp,Lc)
+    }
+    
+  | APPLY(Lc,IDEN(_,"!"),[One]) => valof{		  -- one-of
+      rgt = grammarBody(One,sTp,Env,Opts);
+      valis node(one([rgt]),ndType(rgt),Lc)
+    }
+    
+  | APPLY(Lc,IDEN(_,"\\+"),[Neg]) => valof{
+      rgt = grammarBody(Neg,sTp,Env,Opts);
+      valis node(neg([rgt]),ndType(rgt),Lc)
+    }
+    
+  | APPLY(Lc,IDEN(_,"::"),[L,R]) => valof {
+      lft = grammarBody(L,sTp,Env,Opts);
+      
+      valis node(grd(lft,checkGoal(R,Env,Opts)),ndType(lft),Lc)
+    }
+
+  | APPLY(Lc,IDEN(_,"onerror"),[A,B]) => valof{
+      lft = grammarBody(A,sTp,Env,Opts);
+
+      errProg = collect{
+        for Rl in listIfy(B,"|") do{
+          if APPLY(eLc,IDEN(_,"-->"),[L,R]).=Rl then{
+            Q = findVarsInGrammar(L,IDEN(noLoc,"[]"),R,Env);
+	    sEnv = Q<>Env;
+	    try{
+	      ePtn = typeOfPtn(L,(T->sameType(T,uType("*","exception",[]),sEnv)),sEnv,Opts);
+
+	      eBody = grammarBody(R,sTp,sEnv,Opts);
+	      elemis node(grl(projectQ(Q),[ePtn],
+			      node(seq([]),ndType(eBody),eLc),eBody),ndType(eBody),eLc)
+	    }
+	    onerror{
+	      error(Bec,'fail) ->
+                reportError("Exception pattern not consistent "
+                            "with exception\nbecause "<>Bec,eLc)
+	    }
+          }
+          else
+            reportError("invalid error handler clause: "<>display(Rl),Context(Rl))
+        }
+      };
+
+      valis node(err(lft,errProg),ndType(lft),Lc)
+    }
+      
+  | APPLY(Lc,IDEN(_,"raise"),[A]) => valof{
+      lft = typeOf(A,Env,Opts);
+      
+      try{
+        subType(ndType(lft),uType("*","exception",[]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("exception expression: "<>showTerm(lft)<>" not consistent with"
+                      " exception type\nbecause "<>Bec,Lc)
+      };
+
+      valis node(exc(lft),topType,Lc);
+    }
+    
+  | BRACE(Lc0,IDEN(Lc1,"action"),[P]) => valof{
+      Q = findVarsInProcessRule(APPLY(Lc0,IDEN(Lc1,"->"),
+				      [TPL(noLoc,[]),P]),Env);
+      
+      sEnv = Q<>Env;
+
+      p = checkAction(P,true,uType("go.stdlib","logical",[]),sEnv,Opts);
+
+      valis node(vlof(projectQ(Q),p),topType,Lc0);
+    }
+      
+  | APPLY(Lc,IDEN(_,"*"),[NT,APPLY(_,IDEN(_,"^"),[Ptn,Lst])]) => valof{
+      Q = findVarsInIterator(NT,Ptn,Lst,Env);
+      sEnv = Q<>Env;
+
+      body = grammarBody(NT,sTp,sEnv,Opts);
+      ptrm = typeOf(Ptn,sEnv,Opts);
+      nlst = typeOf(Lst,sEnv,Opts);
+
+      try{
+        subType(uType("go.stdlib","list",[ndType(ptrm)]),ndType(nlst),sEnv)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("Expression: "<>showTerm(ptrm)<>" not consistent with: "<>
+                      showTerm(nlst)<>"\nbecause "<>Bec,Lc)
+      };
+
+      valis node(itr(projectQ(Q),body,ptrm,nlst),ndType(body),Lc);
+    }
+
+  | APPLY(Lc,IDEN(_,"*"),[NT]) => valof{
+      Q = findVarsInIterator(NT,VOID,VOID,Env);
+      sEnv = Q<>Env;
+
+      body = grammarBody(NT,sTp,Env,Opts);
+
+      valis node(itr(projectQ(Q),body,node(vde,newVar(),Lc),node(vde,newVar(),Lc)),
+		 ndType(body),Lc);
+    }
+
+  | APPLY(Lc,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+      Ex = typeOf(Exp,Env,Opts);
+      sTp = newVar();
+      Cs = caseGrammar(Cases,ndType(Ex),sTp,Env,Opts);
+
+      valis node(cse(Ex,Cs),sTp,Lc)
+    }
+
+  | APPLY(_,IDEN(Lc,K::isKeyword(K)),_) => valof{
+      reportError("Unexpected keyword: "++K++" in grammar body",Lc);
+      valis node(vde,newVar(),Lc)
+    }
+
+  | APPLY(Lc,G,A) => valof {
+      g = typeOf(G,Env,Opts);
+
+      case deRef(ndType(g)) in {
+	grType(cA,fT) -> {
+	  if dbgType in Opts then{
+	    "Applying grammar: "<>showTerm(g)<>"\nto "<>display(TPL(Lc,A))<>"\n">>stdout;
+	  };
+
+	  if listlen(cA)==listlen(A) then{
+	    ags = typeOfFunArgs(A,cA,showTerm(g),Env,Opts);
+              
+	    valis node(nt(g,ags),fT,Lc);
+	  }
+	  else{
+	    reportError("Number of arguments: "<>listlen(A)^0<>" supplied "
+			" of call to "<>showTerm(g)<>
+			" different to that expected: "<>listlen(cA)^0,Lc);
+	    valis node(vde,newVar(),Lc)
+	  }
+	}
+      | _ -> {
+	  reportError(showTerm(g)<>" does not appear to be a grammar",Lc);
+	  valis node(vde,newVar(),Lc)
+	}
+      }
+    }
+
+  | _ => valof {
+      Lc = Context(G);
+      reportError("Invalid rule body: "++display(G),Lc);
+      valis node(vde,newVar(),Lc)                  -- dummy goal returned
+    }
+  };
+
+  caseGrammar(Cases,Tp,sTp,Env,Opts) => case Cases in {
+    APPLY(eLc,IDEN(_,"-->"),[L,R]) => valof{
+      Q = findVarsInGrammar(L,IDEN(noLoc,"[]"),R,Env);
+      sEnv = Q<>Env;
+      try{
+	ePtn = typeOfPtn(L,(T->subType(T,Tp,sEnv)),sEnv,Opts);
+
+	eBody = grammarBody(R,sTp,sEnv,Opts);
+	valis [node(grl(projectQ(Q),[ePtn],
+			node(seq([]),ndType(eBody),eLc),eBody),ndType(eBody),eLc)]
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("case pattern "<>display(L)<>" not consistent "
+		      "with expected type "<>showType(Tp)<>"\nbecause "<>Bec,eLc);
+	  valis []
+	}
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"|"),[A,B]) => 
+      caseGrammar(A,Tp,sTp,Env,Opts)<>caseGrammar(B,Tp,sTp,Env,Opts)
+  };
+
+  typeOfProcedure(Rules,pTp,Env,Opts) => valof{
+    Arity : -1;
+    List = collect{
+      for Rule in Rules do{
+        case Rule in {
+          APPLY(Lc,IDEN(_,"->"),[APPLY(_,IDEN(_,"::"),[APPLY(LcA,IDEN(_,Nm),H),G]),B]) -> {
+            Q = findVarsInProcessRule(Rule,Env);
+
+            if dbgType in Opts then
+              "Variable of action rule "<>display(Rule)<>" are "<>showEnv(Q)<>"\n">>stdout;
+            try{
+              (tQ,actType(tA)).=freshen(pTp);
+              sEnv = Q<>Env;
+
+              Args = typeOfModedParams(LcA,H,tA,sEnv,Opts);
+              
+              Guard = checkGoal(G,sEnv,Opts);
+              
+              body = checkAction(B,false,voidType,sEnv,Opts);
+              
+              if Arity<0 then
+                Arity := listlen(Args)
+              else if listlen(Args)!=Arity then
+                reportError("arity different to that expected: "<>Arity^0,Lc);
+              
+	      for (_,_,tV) in tQ do{
+		if !isUnbound(tV) then{
+		  reportError("program type: "<>showType(actType(tA))<>
+			      " not consistent with"
+			      " with expected type: "<>showType(pTp)<>"\nbecause "<>
+			      showType(tV)<>" should be unbound",Lc);
+		}
+	      };
+        
+              elemis node(prl(projectQ(Q),Args,Guard,body),actType(tA),Lc)
+            }
+            onerror{
+	      error(_,'matcherr) ->
+                reportError("rule does not match expected type: "<>
+			    showType(pTp),Lc)
+	    | error(Bec,C) ->{
+                reportError("rule does not match expected type: "<>showType(pTp)<>
+                            "\nbecause "<>Bec<>"\n"<>C^0,Lc)
+              }
+            }
+          }
+        | APPLY(Lc,IDEN(_,"->"),[APPLY(LcA,IDEN(_,Nm),H),B]) -> {
+            Q = findVarsInProcessRule(Rule,Env);
+
+            try{
+              (tQ,actType(tA)).=freshen(pTp);
+              sEnv = Q<>Env;
+
+              Args = typeOfModedParams(LcA,H,tA,sEnv,Opts);
+              
+              body = checkAction(B,false,voidType,sEnv,Opts);
+              
+              if Arity<0 then
+                Arity := listlen(Args)
+              else if listlen(Args)!=Arity then
+                reportError("arity different to that expected: "<>Arity^0,Lc);
+              
+	      for (_,_,tV) in tQ do{
+		if !isUnbound(tV) then{
+		  reportError("program type: "<>showType(actType(tA))<>
+			      " not consistent with"
+			      " with expected type: "<>showType(pTp)<>"\nbecause "<>
+			      showType(tV)<>" should be unbound",Lc);
+		}
+	      };
+        
+              elemis node(prl(projectQ(Q),Args,[],body),actType(tA),Lc)
+            }
+            onerror{
+              error(Bec,_) ->{
+                reportError("rule does not match expected type: "<>showType(pTp)<>
+                            "\nbecause "<>Bec,Lc)
+              }
+            }
+          }
+        }
+      }
+    };
+    valis (List,Arity)
+  };
+
+  caseAction(Cases,Tp,allowed,aTp,Env,Opts) => case Cases in {
+    APPLY(Lc,IDEN(_,"->"),[APPLY(_,IDEN(_,"::"),[H,G]),B]) => valof{
+      Q = findVarsInCaseRule(H,G,B,Env);
+      sEnv = Q<>Env;
+      try{
+	ptnX = typeOfPtn(H,(T->sameType(T,Tp,sEnv)),sEnv,Opts);
+	Guard = checkGoal(G,sEnv,Opts);
+
+	body = checkAction(B,allowed,aTp,sEnv,Opts);
+
+	valis [node(prl(projectQ(Q),[ptnX],Guard,body),voidType,Lc)]
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("case pattern not consistent "
+		      "with: "<>showType(Tp)<>"\nbecause "<>Bec,Lc);
+	  valis []
+	}
+      }
+    }
+  | APPLY(Lc,IDEN(_,"->"),[H,B]) => valof{
+      Q = findVarsInCaseRule(H,IDEN(noLoc,"true"),B,Env);
+      sEnv = Q<>Env;
+
+      if dbgType in Opts then
+        "Variable of case rule "<>display(Cases)<>" are "<>showEnv(Q)<>"\n">>stdout;
+      try{
+	ptnX = typeOfPtn(H,(T->sameType(T,Tp,sEnv)),sEnv,Opts);
+	body = checkAction(B,allowed,aTp,sEnv,Opts);
+	
+	valis [node(prl(projectQ(Q),[ptnX],[],body),voidType,Lc)]
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("case pattern: "<>display(H)<>" not consistent "
+		      "with: "<>showType(Tp)<>"\nbecause "<>Bec,Lc);
+	  valis []
+	}
+      }
+    }
+  | APPLY(_,IDEN(_,"|"),[A,B]) => 
+      caseAction(A,Tp,allowed,aTp,Env,Opts)<>caseAction(B,Tp,allowed,aTp,Env,Opts)
+  };
+
+  checkAction(Act,allowed,aTp,Env,Opts) => case Act in {
+    IDEN(Lc,"{}") => []
+  | APPLY(_,IDEN(_,";"),[L,R]) => 
+      checkAction(L,allowed,aTp,Env,Opts)<>checkAction(R,allowed,aTp,Env,Opts)
+           
+  | APPLY(_,IDEN(_,";"),[S]) => checkAction(S,allowed,aTp,Env,Opts)
+
+  | APPLY(Lc,IDEN(_,"!"),[Goal]) => 
+      [node(one(checkGoal(Goal,Env,Opts)),voidType,Lc)]
+  | APPLY(Lc,IDEN(_,"\+"),[Goal]) => 
+      [node(neg(checkGoal(Goal,Env,Opts)),voidType,Lc)]
+  | APPLY(Lc,IDEN(_,"*>"),[A,B]) => valof{
+      Q = findVarsInForAll(A,B,Env);
+
+      sEnv = Q<>Env;
+    
+      lft = checkGoal(A,sEnv,Opts);
+      rgt = checkAction(B,allowed,aTp,sEnv,Opts);
+      valis [node(frll(projectQ(Q),lft,rgt),voidType,Lc)]
+    }
+  | APPLY(Lc,IDEN(_,"::"),[A,B]) => valof{
+      nA = checkAction(A,allowed,aTp,Env,Opts);
+      valis [node(grd(node(seq(nA),voidType,Lc),checkGoal(B,Env,Opts)),voidType,Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"="),[_,_]) => [node(one(checkGoal(Act,Env,Opts)),voidType,Lc)]
+
+  | APPLY(Lc,IDEN(_,".="),[_,_]) => [node(one(checkGoal(Act,Env,Opts)),voidType,Lc)]
+
+  | APPLY(Lc,IDEN(_,":="),[IDEN(L0,V),E]) => valof{
+      Vr = typeOf(IDEN(L0,V),Env,Opts);
+      val = typeOf(E,Env,Opts);
+
+      try{
+        subType(ndType(val),ndType(Vr),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("expression: "<>showTerm(val)<>" not consistent with: "<>
+                      showTerm(Vr)<>"\nbecause "<>Bec,Lc)
+      };
+      
+      if dbgType in Opts then
+        "assignable var: "<>showTerm(Vr)<>"\n">>stdout;
+
+      valis [node(asg(V,public,val),voidType,Lc)]
+    }
+
+  | APPLY(Lc,IDEN(_,"valis"),[E]) => valof{
+      if allowed then{
+        val = typeOf(E,Env,Opts);
+
+        try{
+          subType(ndType(val),aTp,Env)
+        }
+        onerror{
+          error(Bec,'fail) ->
+            reportError("valis expression: "<>showTerm(val)<>" not consistent with "
+                        "expected type: "<>showType(aTp)<>"\nbecause "<>Bec,Lc)
+        };
+
+        valis [node(vlis(val),voidType,Lc)]
+      }
+      else{
+        reportError("valis action not allowed",Lc);
+        valis []
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"istrue"),[G]) => valof{
+      if allowed then{
+        val = checkGoal(G,Env,Opts);
+
+        try{
+          subType(uType("go.stdlib","logical",[]),aTp,Env)
+        }
+        onerror{
+          error(Bec,'fail) ->
+            reportError("istrue goal: "<>show(node(cnj(val),voidType,noLoc))<>
+                        " not permitted here \nbecause "<>Bec,Lc)
+        };
+
+        valis [node(vlis(node(cnj(val),uType("go.stdlib","logical",[]),Lc)),voidType,Lc)]
+      }
+      else{
+        reportError("valis action not allowed",Lc);
+        valis []
+      }
+    }
+
+  | APPLY(Lc,IDEN(_,"case"),[APPLY(_,IDEN(_,"in"),[Exp,Cases])]) => valof{
+      Ex = typeOf(Exp,Env,Opts);
+      Cs = caseAction(Cases,ndType(Ex),allowed,aTp,Env,Opts);
+
+      valis [node(cse(Ex,Cs),voidType,Lc)]
+    }
+    
+  | APPLY(Lc,IDEN(_,"onerror"),[A,B]) => valof{
+      lft : checkAction(A,allowed,aTp,Env,Opts);
+      
+      errProg = collect{
+        for Rl in listIfy(B,"|") do{
+          if APPLY(eLc,IDEN(_,"->"),[L,R]).=Rl then{
+            Q = findVarsInProcessRule(Rl,Env);
+	    sEnv = Q<>Env;
+	    try{
+	      ePtn = typeOfPtn(L,(T->sameType(T,uType("*","exception",[]),sEnv)),sEnv,Opts);
+	      eBody = checkAction(R,allowed,aTp,sEnv,Opts);
+	      elemis node(prl(projectQ(Q),[ePtn],[],eBody),voidType,eLc)
+	    }
+	    onerror{
+	      error(Bec,'fail) ->
+                reportError("Exception pattern not consistent "
+                            "with exception\nbecause "<>Bec,eLc)
+	    }
+	  }
+          else
+            reportError("invalid error handler clause: "<>display(Rl),Context(Rl))
+        }
+      };
+      
+      valis [node(err(node(seq(lft),voidType,Lc),errProg),voidType,Lc)]
+    }
+    
+  | APPLY(Lc,IDEN(_,"raise"),[A]) => valof {
+      lft = typeOf(A,Env,Opts);
+      
+      try{
+        subType(ndType(lft),uType("*","exception",[]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("exception expression: "<>showTerm(lft)<>" not consistent with"
+                      " exception type\nbecause "<>Bec,Lc)
+      };
+
+      valis [node(exc(lft),topType,Lc)];
+    }
+    
+  | APPLY(Lc,IDEN(_,"|"),[APPLY(_,IDEN(_,"?"),[T,A]),B]) => valof{
+      tst = checkGoal(T,Env,Opts);
+      lft = checkAction(A,allowed,aTp,Env,Opts);
+      rgt = checkAction(B,allowed,aTp,Env,Opts);
+      
+      valis [node(iff(node(cnj(tst),uType("go.stdlib","logical",[]),Lc),
+                      node(seq(lft),voidType,Lc),
+                      node(seq(rgt),voidType,Lc)),voidType,Lc)]
+    }
+    
+  | BRACE(Lc0,IDEN(Lc1,"spawn"),[G]) => valof{
+      Q = findVarsInProcessRule(APPLY(Lc0,IDEN(noLoc,"->"),
+				      [TPL(noLoc,[]),G]),Env);
+      body = checkAction(G,false,voidType,Q<>Env,Opts);
+
+      valis [node(frk(projectQ(Q),body),voidType,Lc0)]
+    }
+    
+  | BRACE(Lc0,APPLY(Lc1,IDEN(_,"sync"),[O]),
+          [A::(APPLY(_,IDEN(_,"|"),
+                     [LL::(!APPLY(_,IDEN(_,"?"),[_,_]).=LL), RR]).=A ||
+               APPLY(_,IDEN(_,"->"),_).=A)]) => valof{
+      rNd = typeOf(O,Env,Opts);
+
+      bL = checkSync(A,allowed,aTp,Env,Opts);
+
+      if dbgType in Opts then{
+        "Object "<>display(O)<>" has type "<>showType(ndType(rNd))<>"\n">>stdout;
+      };
+
+      valis [node(sync(rNd,bL,node(vde,voidType,noLoc)),voidType,Lc0)] -- no timeout
+    }
+    
+  | APPLY(_,IDEN(_,"timeout"),[L,APPLY(Lc,IDEN(_,"->"),[T,A])]) => valof{
+      oAct : checkAction(L,allowed,aTp,Env,Opts);         -- look at the timed out action
+      tme = typeOf(T,Env,Opts);
+
+      try{
+        subType(ndType(tme),uType("go.stdlib","number",[]),Env)
+      }
+      onerror{
+        error(Bec,'fail) ->
+          reportError("timeout value: "<>showTerm(tme)<>" inconsistent"
+                      "\nbecause "<>Bec,Lc)
+      };
+
+      Q = findVarsInProcessRule(APPLY(noLoc,IDEN(noLoc,"->"),[TPL(noLoc,[]),A]),Env);
+              
+      sEnv = Q<>Env;
+
+      aAct = checkAction(A,allowed,aTp,sEnv,Opts);
+
+      -- check the valises from the timeout and regular action
+      if [node(sync(O,syncL,Tout),rTp,rLc)].=oAct then{
+        if node(vde,_,_).=Tout then
+          valis [node(sync(O,syncL,node(tmout(projectQ(Q),tme,aAct),rTp,rLc)),rTp,rLc)]
+        else{
+          reportError("too many timeout clauses attached to sync action",rLc);
+          valis []
+        }
+      }
+      else{
+        reportError("Only synchronized actions may be governed by a timeout",Lc);
+        valis []
+      }
+    }
+    
+  | APPLY(Lc,IDEN(_,"{}"),[Goal]) => 
+      [node(one(checkGoal(Goal,Env,Opts)),newVar(),Lc)]
+
+  | APPLY(Lc,P,A) => valof{
+      try{
+	xP = typeOf(P,Env,Opts);
+
+	if actType(cA).=deRef(ndType(xP)) then{
+	  try{
+	    if listlen(cA)==listlen(A) then{
+	      ags = typeOfFunArgs(A,cA,showTerm(xP),Env,Opts);
+	      valis [node(act(xP,ags),voidType,Lc)]
+	    }
+	    else{
+	      reportError("Number of arguments: "<>listlen(A)^0<>" supplied "
+			  " of call to "<>showTerm(xP)<>
+			  " different to that expected: "<>listlen(cA)^0,Lc);
+	      valis []
+	    }
+	  }
+	  onerror{
+	    error(Bec,'fail) -> {
+	      reportError("arguments to action in "<>display(Act)<>
+			  " not consistent with type of "<>showTerm(xP)<>
+			  "\nbecause "<>Bec,Lc);
+	      valis []
+	    }
+	  }
+	}
+	else{
+	  reportError("applied program: "<>showTerm(xP)<>
+		      " does not appear to be an action procedure",Lc);
+	  valis []
+	}
+      }
+      onerror{
+	error(Bec,'fail) -> {
+	  reportError("cannot type check "<>display(Act)<>"\nbecause "<>Bec,Context(Act));
+	  valis []
+	}
+      }
+    }
+
+  | X => valof{
+      Lc = Context(X);
+      reportError("invalid action "++display(X),Lc);
+      valis []
+    }
+  };
+  
+  checkSync(Act,allowed,aTp,Env,Opts) => {
+    case Act in {
+      APPLY(Lc,IDEN(_,"->"),[G,A]) => valof {
+        Q = findVarsInSyncRule(G,A,Env);
+              
+        sEnv = Q<>Env;
+        
+        body = checkAction(A,allowed,aTp,sEnv,Opts);
+  
+        valis [node(prl(projectQ(Q),[],checkGoal(G,sEnv,Opts),body),voidType,Lc)]
+      }
+    | APPLY(_,IDEN(_,"|"),[A,B]) => 
+        checkSync(A,allowed,aTp,Env,Opts)<>checkSync(B,allowed,aTp,Env,Opts)
+    | _ => valof{
+        Lc = Context(Act);
+        reportError("invalid sync rule: "++display(Act),Lc);
+        valis []
+      }
+    }
+  };
+  
+  /* Compute the types of the elements in a cell/theta environment */
+
+  calculateType(Pk,Nm,Lc,tRules,tEnv,tmpEnv,Opts) => valof{
+    iFace : [];			  -- build up a collection of interface elements
+    supers : [];		    -- build up a collection of subtype elements
+    tpArgs : [];			       -- We need to verify polymorphism
+    polyQ : [];
+    Inv: [];				  -- The list of invariants
+    (_,_,tTp) = lookupType(Nm,((M)=>M==tvarBind),tmpEnv);
+    tId = genNew(Nm);
+    tThis = node(iden(tId),tTp,Lc);
+    vQ : [];
+    PreCond : [];			  -- The list of preconditions
+    PostConds : [];			  -- The list of post conditions
+
+    -- Compute the head template
+    if APPLY(tLc,IDEN(_,"<~"),[SQUARE(_,_,tA),_]) in tRules then{
+      tpArgs := tA;
+
+      for A in tpArgs do{
+	if IDEN(iLc,tV).=A then{
+	  if (tV,_,_) in polyQ then
+	    reportError("repeated occ of a type variable "
+			"in type template: "<>tV,iLc)
+	  else
+	    polyQ := [(tV,tvarBind,newVr(topType,tV,true)),..polyQ]
+	}
+	else if APPLY(_,IDEN(_,"<~"),[IDEN(iLc,tV),bTp]).=A then{
+	  if (tV,_,_) in polyQ then
+	    reportError("repeated occ of a type variable "
+			"in type template: "<>tV,iLc)
+	  else
+	    polyQ := [(tV,tvarBind,newVr(topType,tV,true)),..polyQ]
+	}
+	else
+	  reportError("illegal type parameter: "<>display(A),tLc)
+      };
+      
+      polyQ := rev(polyQ);      -- Get the order right
+    };
+    
+    for Rl in tRules do{	      -- Now we deal with each type rule
+      case Rl in {
+	APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,_,tA),APPLY(_,IDEN(Lc1,"{}"),mT)]) -> {
+	  M : mT;
+	  
+	  if listlen(tpArgs)!=listlen(tA) then
+	    reportError("inconsistent number of type arguments in type: "<>
+			display(Rl)<>
+			" "<>listlen(tpArgs)^0<>" expected",Lc)
+	  else                          -- rewrite type variables to be consistent
+	    M := macroList(M,macroEnv(tA,(polyQ//((.(tV,_,_).)=>IDEN(noLoc,tV))),[]));
+	  
+	  if dbgType in Opts then{
+	    "Environment for parsing fields: "<>
+	    display(APPLY(noLoc,IDEN(noLoc,"{}"),mT))<>
+	    " is "<>showEnvD(tmpEnv,30)<>"\n">>stdout;
+	  };
+	  
+	  for APPLY(_,IDEN(_,":"),[IDEN(_,Fld),Tp]) in M do{
+	    xTp = parseType(Tp,Pk,tmpEnv,polyQ);
+	    
+	    if (Fld,_,oTp) in iFace then{
+	      try{
+		sameType(oTp,xTp,tmpEnv); -- must be the same type
+	      }
+	      onerror{
+		error(Bec,'fail) ->
+		  reportError("type of field: "<>Fld<>":"<>showType(oTp)<>
+			      " not consistent with other declarations "
+			      "of same field\nbecause "<>Bec,Lc)
+	      }
+	    }
+	    else if !isProgramType(xTp) then
+	      reportError("invalid type: "<>showType(xTp)<>
+			  ", only program types allowed in type interfaces",Lc)
+	    else
+	      iFace := [(Fld,varBind,xTp),..iFace]
+	  };
+	  
+/*		  for APPLY(IDEN(_,"$"),[I]) in M do{
+	    dQ = findVarsInBag(VOID,I,tmpEnv);
+	    Vq = dQ//((.(X,_,_).)=>(IDEN(noLoc,X),IDEN(noLoc,genNew(X))));
+	    Vs = Vq//((.(_,IDEN(_,VV)).)=>(VV,varBind,newVar()));
+	    vEnv = [("$",varBind,tTp),..Vs<>tmpEnv];
+	    
+	    Inv := [checkGoal(replace(I,Vq),Env,Opts),..Inv];
+	    vQ := (Vs//((.(Nm,_,vT).)=>(Nm,vT)))<>vQ;
+	    
+	    if !("$",_,_) in iFace then
+	      iFace := [("$",varBind,predType([])),..iFace];
+	  };
+	  */
+	}
+      | APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,_,tA),sT]) -> { -- user type
+	  sTp : sT;
+	  
+	  if listlen(tpArgs)!=listlen(tA) then
+	    reportError("inconsistent number of type arguments in type: "<>
+			display(Rl)<>
+			" "<>listlen(tpArgs)^0<>" expected",Lc)
+	  else              -- rewrite type variables to be consistent
+	    sTp := replace(sT,macroEnv(tA,(polyQ//((.(tV,_,_).)=>IDEN(noLoc,tV))),[]));
+	  
+	  spTp = parseType(sTp,Pk,tmpEnv,polyQ);
+	  try{
+	    
+	    iTp = typeInterface(spTp,tEnv);
+	    
+	    for (Fld,Mode,xTp) in fieldsOf(iTp) do{
+	      if (Fld,_,oTp) in iFace then{
+		try{
+		  sameType(oTp,xTp,tmpEnv); -- must be the same type
+		}
+		onerror{
+		  error(Bec,'fail) ->
+		    reportError("type of field: "<>Fld<>":"<>showType(oTp)<>
+				" not consistent with other declarations of same field"
+				"\nbecause "<>Bec,Lc)
+		}
+	      }
+	      else
+		iFace := [(Fld,varBind,xTp),..iFace]
+	    };
+	    
+	    if ("$",varBind,predType([])) in fieldsOf(iTp) &&
+	    uType(vPk,sNm,_).=spTp then{
+	      sDNm = vPk<>"#"<>sNm<>"$";
+	      if (sDNm,_,_) in tEnv then
+		Inv := [node(prd(node(iden(sDNm),voidType,Lc),[]),voidType,Lc),..Inv]
+	    };
+	    
+	    supers := [spTp,..supers];
+	    
+	    for uType(sPk,sNm,sA) in typeSupers(spTp,tEnv) do{
+	      if uType(!sPk,!sNm,ssA) in supers then{
+		try{
+		  sameType(uType(sPk,sNm,sA),uType(sPk,sNm,ssA),tEnv)
+		}
+		onerror{
+		  error(Bec,'fail) ->
+		    reportError("multiply inherited type: "<>
+				showType(uType(sPk,sNm,sA))<>" not consistent with "
+				"other inherited version: "<>showType(uType(sPk,sNm,ssA))<>
+				"\nbecause "<>Bec,Lc)
+		}
+	      }
+	      else
+		supers := [uType(sPk,sNm,sA),..supers]
+	    }
+	  }
+	  onerror{
+	    error(Bec,_) ->
+	      reportError(Bec,Lc)
+	  };
+	}
+      }
+    };
+
+    valis ([(Nm,typeBind,
+	    foldupType(polyQ,
+		       typeDef(uType(Pk,Nm,polyQ//((.(_,_,tV).)=>tV)),
+			       [faceType(iFace),..supers]))),..tEnv],
+	   { if Inv!=[] then valof{
+	       vId = Pk<>"#"<>Nm<>"$";
+	       valis [(Nm,varBind,node(rel(vId,public,0,
+					   [node(cls(vId,vQ,[],Inv),
+						 predType([]),Lc)]),
+				       predType([]),Lc))]
+	     }
+	     else []
+	   })
+  };
+
+  thetaEnv(Pk,Th,thLc,Env,Methods,topLevel,statefull,Opts) => valof{
+    Groups = thetaDepend(Th,Env,Opts);
+    thLen = listlen(Th)+5;
+
+    tEnv : Env;
+    thePrograms : [];
+    imports : [];
+    declared : [];                     -- which names have been declared locally
+    privateTypes : [];
+    privateVals : [];
+    privateCons : [];
+    
+    if topLevel then{                        -- add main to the top-level types.
+      tEnv := [("main",varBind,actType([(uType("go.stdlib","list",[uType("go.stdlib","list",[uType("go.stdlib","char",[])])]),
+                                         inpMode)])),..tEnv];
+      declared := [("main",noLoc),..declared];          -- ensure its not over-ridden
+    };
+
+    if dbgType in Opts then
+      "Theta environment: "<>showEnvD(tEnv,thLen)<>"\n">>stdout;
+
+    for gp in Groups do{
+      if dbgType in Opts then{
+        showGroup("next group",gp);
+      };
+
+      -- extract the type definitions first
+
+/*
+      We go through the group several times.
+      The first time is to extract type names 
+      The second time is to define types of entities
+      The third time is to type check the value entries themselves
+*/
+
+      tmpEnv : tEnv;                             -- Collect new types
+      mutualRecTypes : [];		 -- We may need to deal with these later
+
+      for (_,_,El) in gp do{
+        case El in {
+          APPLY(_,IDEN(_,"<~"),[IDEN(_,Nm),TPL(_,tRules)]) -> {
+            for Rl in tRules do{
+              case Rl in {
+                APPLY(_,IDEN(_,"<~"),[SQUARE(_,_,tA),_]) -> {
+                  polyQ = collect{
+                    for _ in tA do
+                      elemis newVar()
+                  };
+                  -- this is a temporary entry,
+                  tmpEnv := [(Nm,tvarBind,uType(Pk,Nm,polyQ)),..tmpEnv];
+                  break;
+                }
+              }
+            };
+          }
+        | _ -> {}
+        }
+      };
+
+      for (_,Vis,El) in gp do{
+        case El in {
+          APPLY(_,IDEN(_,":"),[IDEN(iLc,Nm),Tp]) -> {
+            try{
+              (rTp,nQ) = realType(Tp,Pk,tmpEnv);
+
+	      tEnv := [(Nm,varBind,foldupType(nQ,rTp)),..tEnv];
+
+              declared := [(Nm,iLc),..declared];
+            } onerror{
+              error(Bec,'fail) ->
+                reportError("could not generalize type of: "<>Nm<>":"<>display(Tp)<>
+                            "\nbecause "<>Bec,iLc)
+            };
+	    if Vis==private then
+	      privateVals := privateVals\/[Nm]; -- add this to the private list
+          }
+
+          -- We now parse type descriptions properly
+        | APPLY(Lc,IDEN(_,"<~"),[IDEN(_,Nm),TPL(_,tRules)]) -> {
+            iFace : [];           -- build up a collection of interface elements
+            supers : [];            -- build up a collection of subtype elements
+            tpArgs : [];                       -- We need to verify polymorphism
+            polyQ : [];
+	    Inv: [];				  -- The list of invariants
+	    (_,_,tTp) = lookupType(Nm,((M)=>M==tvarBind),tmpEnv);
+	    tId = genNew(Nm);
+	    tThis = node(iden(tId),tTp,Lc);
+	    vQ : [];
+	    PreCond : [];			  -- The list of preconditions
+	    PostConds : [];			  -- The list of post conditions
+
+	    if Vis==private then
+	      privateTypes := privateTypes\/[Nm]; -- add this to private list
+
+	    -- Compute the head template
+	    if APPLY(tLc,IDEN(_,"<~"),[SQUARE(_,_,tA),_]) in tRules then{
+	      tpArgs := tA;
+
+	      for A in tpArgs do{
+		if IDEN(iLc,tV).=A then{
+		  if (tV,_,_) in polyQ then
+		    reportError("repeated occ of a type variable "
+				"in type template: "<>tV,iLc)
+		  else
+		    polyQ := [(tV,tvarBind,newVr(topType,tV,true)),..polyQ]
+		}
+		else if APPLY(_,IDEN(_,"<~"),[IDEN(iLc,tV),bTp]).=A then{
+		  if (tV,_,_) in polyQ then
+		    reportError("repeated occ of a type variable "
+				"in type template: "<>tV,iLc)
+		  else
+		    polyQ := [(tV,tvarBind,newVr(topType,tV,true)),..polyQ]
+		}
+		else
+		  reportError("illegal type parameter: "<>display(A),tLc)
+	      };
+
+	      polyQ := rev(polyQ);      -- Get the order right
+	    };
+
+            for Rl in tRules do{	      -- Now we deal with each type rule
+              case Rl in {
+                APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,_,tA),APPLY(_,IDEN(Lc1,"{}"),mT)]) -> {
+                  M : mT;
+
+		  if listlen(tpArgs)!=listlen(tA) then
+		    reportError("inconsistent number of type arguments in type: "<>
+				display(Rl)<>
+				" "<>listlen(tpArgs)^0<>" expected",Lc)
+		  else                          -- rewrite type variables to be consistent
+		    M := macroList(M,macroEnv(tA,(polyQ//((.(tV,_,_).)=>IDEN(noLoc,tV))),[]));
+
+                  if dbgType in Opts then{
+                    "Environment for parsing fields: "<>
+                    display(APPLY(noLoc,IDEN(noLoc,"{}"),mT))<>
+                    " is "<>showEnvD(tmpEnv,30)<>"\n">>stdout;
+                  };
+
+                  for APPLY(_,IDEN(_,":"),[IDEN(_,Fld),Tp]) in M do{
+                    xTp = parseType(Tp,Pk,tmpEnv,polyQ);
+                    
+                    if (Fld,_,oTp) in iFace then{
+                      try{
+                        sameType(oTp,xTp,tmpEnv); -- must be the same type
+                      }
+                      onerror{
+                        error(Bec,'fail) ->
+                          reportError("type of field: "<>Fld<>":"<>showType(oTp)<>
+                                      " not consistent with other declarations "
+                                      "of same field\nbecause "<>Bec,Lc)
+                      }
+                    }
+		    else if !isProgramType(xTp) then
+		      reportError("invalid type: "<>showType(xTp)<>
+				   ", only program types allowed in type interfaces",Lc)
+                    else
+                      iFace := [(Fld,varBind,xTp),..iFace]
+                  };
+
+/*		  for APPLY(IDEN(_,"$"),[I]) in M do{
+		    dQ = findVarsInBag(VOID,I,tmpEnv);
+		    Vq = dQ//((.(X,_,_).)=>(IDEN(noLoc,X),IDEN(noLoc,genNew(X))));
+		    Vs = Vq//((.(_,IDEN(_,VV)).)=>(VV,varBind,newVar()));
+		    vEnv = [("$",varBind,tTp),..Vs<>tmpEnv];
+
+		    Inv := [checkGoal(replace(I,Vq),Env,Opts),..Inv];
+		    vQ := (Vs//((.(Nm,_,vT).)=>(Nm,vT)))<>vQ;
+		    
+		    if !("$",_,_) in iFace then
+		      iFace := [("$",varBind,predType([])),..iFace];
+		  };
+*/
+                }
+              | APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,_,tA),sT]) -> { -- user type
+                  sTp : sT;
+
+		  if listlen(tpArgs)!=listlen(tA) then
+		    reportError("inconsistent number of type arguments in type: "<>
+				display(Rl)<>
+				" "<>listlen(tpArgs)^0<>" expected",Lc)
+		  else              -- rewrite type variables to be consistent
+		    sTp := replace(sT,macroEnv(tA,(polyQ//((.(tV,_,_).)=>IDEN(noLoc,tV))),[]));
+
+                  spTp = parseType(sTp,Pk,tmpEnv,polyQ);
+                  try{
+		    
+		    iTp = typeInterface(spTp,tmpEnv);
+		    
+		    for (Fld,Mode,xTp) in fieldsOf(iTp) do{
+		      if (Fld,_,oTp) in iFace then{
+			try{
+			  sameType(oTp,xTp,tmpEnv); -- must be the same type
+			}
+			onerror{
+			  error(Bec,'fail) ->
+			    reportError("type of field: "<>Fld<>":"<>showType(oTp)<>
+					" not consistent with other declarations of same field"
+					"\nbecause "<>Bec,Lc)
+			}
+		      }
+		      else
+			iFace := [(Fld,varBind,xTp),..iFace]
+		    };
+
+		    if ("$",varBind,predType([])) in fieldsOf(iTp) &&
+		    uType(vPk,sNm,_).=spTp then{
+		      sDNm = vPk<>"#"<>sNm<>"$";
+		      if (sDNm,_,_) in tEnv then
+			Inv := [node(prd(node(iden(sDNm),voidType,Lc),[]),voidType,Lc),..Inv]
+		    };
+
+                    supers := [spTp,..supers];
+                    
+                    for uType(sPk,sNm,sA) in typeSupers(spTp,tEnv) do{
+                      if uType(!sPk,!sNm,ssA) in supers then{
+                        try{
+                          sameType(uType(sPk,sNm,sA),uType(sPk,sNm,ssA),tEnv)
+                        }
+                        onerror{
+                          error(Bec,'fail) ->
+                            reportError("multiply inherited type: "<>
+                                        showType(uType(sPk,sNm,sA))<>" not consistent with "
+                                        "other inherited version: "<>showType(uType(sPk,sNm,ssA))<>
+                                        "\nbecause "<>Bec,Lc)
+                        }
+                      }
+                      else
+                        supers := [uType(sPk,sNm,sA),..supers]
+                    }
+                  }
+                  onerror{
+		    error(_,'notdef) ->{
+		      mutualRecTypes := [(Nm,Vis,El),..mutualRecTypes]
+		    }
+		  | error(Bec,_) ->
+                      reportError(Bec,Lc)
+                  };
+                }
+              }
+            };
+
+	    if !((Nm,_,_) in mutualRecTypes) then{
+	      tEnv := [(Nm,typeBind,
+			foldupType(polyQ,
+				   typeDef(uType(Pk,Nm,polyQ//((.(_,_,tV).)=>tV)),
+					   [faceType(iFace),..supers]))),..tEnv];
+	      if Inv!=[] then{
+		vId = Pk<>"#"<>Nm<>"$";
+		thePrograms := [(Nm,varBind,node(rel(vId,public,0,
+						     [node(cls(vId,vQ,[],Inv),
+							   predType([]),Lc)]),
+						 predType([]),Lc)),..thePrograms];
+	      }
+	    }
+          }
+
+        | APPLY(_,IDEN(_,"<$"),[IDEN(LcC,Nm),TPL(_,ClRules)]) -> {
+            declared := [(Nm,LcC),..declared];
+	    if Vis==private then
+	      privateVals := privateVals\/[Nm]; -- add this to the private list
+          }
+
+        | APPLY(Lc,IDEN(_,"import"),[Pkg]) -> {
+            (iDefs,impType) = importModule(packageName(Pkg),Opts,Lc);
+	    if dbgType in Opts then{
+	      "Importing "<>display(Pkg)<>"\n">>stdout;
+	    };
+	      
+            imports := iDefs<>imports;
+            tEnv := impType<>tEnv;
+            for (pkName,Tps,_) in iDefs do{
+              tEnv := [(slashify(pkName,"."),pkgBind,faceType(Tps)),..tEnv];
+              if dbgType in Opts then{
+                "imported definitions in package "<>slashify(pkName,".")<>" are "<>
+                showType(faceType(Tps))<>"\n">>stdout;
+              }
+            };
+	    if dbgType in Opts then{
+	      "Env after import is "<>tEnv^0<>"\n">>stdout;
+	    }
+          }
+        | APPLY(_,_,[IDEN(_,Nm),.._]) -> {
+	    if Vis==private then
+	      privateVals := privateVals\/[Nm]; -- add this to the private list
+	  }
+	| APPLY(_,IDEN(_,"$"),_) -> {}
+        }
+      };
+
+      if mutualRecTypes!=[] then{
+	for (_,Vis,APPLY(Lc,IDEN(_,"<~"),[IDEN(_,Nm),TPL(_,tRules)])) in mutualRecTypes do{
+	  (mTEnv,mTProgs) = calculateType(Pk,Nm,Lc,tRules,tEnv,tmpEnv,Opts);
+
+	  tEnv := mTEnv;
+	  if mTProgs!=[] then
+	    thePrograms := mTProgs<>thePrograms;
+	  if Vis==private then
+	    privateVals := privateVals\/[Nm]; -- add this to the private list
+	}
+      };
+
+      if topLevel && !(noStdLib in Opts) && ! (["go","stdlib"],_,_) in imports then{ -- automatically import stdlib
+        if dbgType in Opts then{
+          "Importing stdlib\n">>stdout;
+        };
+        (iDefs,impType) = importModule(["go","stdlib"],Opts,thLc);
+        imports := iDefs<>imports;
+        tEnv := impType<>tEnv;
+        for (pkName,Tps,_) in iDefs do{
+          tEnv := Tps<>[(slashify(pkName,"."),varBind,faceType(Tps)),..tEnv];
+          if dbgType in Opts then{
+            "imported definitions in stdlib "<>showType(faceType(Tps))<>"\n">>stdout;
+          }
+        };
+      };
+
+      if topLevel && dbg(_) in Opts && !(["go","debug"],_,_) in imports then{
+        if dbgType in Opts then{
+          "Importing debug package\n">>stdout;
+        };
+        (iDefs,impType) = importModule(["go","debug"],Opts,thLc);
+        imports := iDefs<>imports;
+        tEnv := impType<>tEnv;
+        for (pkName,Tps,_) in iDefs do{
+          tEnv := Tps<>[(slashify(pkName,"."),varBind,faceType(Tps)),..tEnv];
+          if dbgType in Opts then{
+            "imported definitions in debug "<>showType(faceType(Tps))<>"\n">>stdout;
+          }
+        };
+      };
+
+      if topLevel && genProfile in Opts && !(["go","profile"],_,_) in imports then{
+        if dbgType in Opts then{
+          "Importing profile package\n">>stdout;
+        };
+        (iDefs,impType) = importModule(["go","profile"],Opts,thLc);
+        imports := iDefs<>imports;
+        tEnv := impType<>tEnv;
+        for (pkName,Tps,_) in iDefs do{
+          tEnv := Tps<>[(slashify(pkName,"."),varBind,faceType(Tps)),..tEnv];
+          if dbgType in Opts then{
+            "imported definitions in profile "<>showType(faceType(Tps))<>"\n">>stdout;
+          }
+        };
+      };
+
+      sE : Methods<>tEnv;                    -- Set up the environment
+
+      if dbgType in Opts then{
+        "Pre-defined elements "<>showEnv(Methods)<>"\n">>stdout;
+        "Private types are: "<>privateTypes^0<>"\n">>stdout;
+        "Private values are: "<>privateVals^0<>"\n">>stdout;
+      };
+
+      thetaVars : [];	   -- We collect vars to check for circular dependencies
+      
+      st = collect {
+        for (IDEN(_,Nm),_,El) in gp do{
+          case El in {
+            APPLY(Lc,IDEN(_,"<~"),[IDEN(_,Id),_]) -> {
+	      (_,_,iTp) = lookupType(Id,((M)=>M==typeBind),sE);
+	      Vis = { if Id in privateTypes then private else public };
+              elemis (IDEN(Lc,Id),typeBind,node(tpe(Id,Vis,iTp),typeType,Lc))
+            }
+          | APPLY(Lc,IDEN(_,"<~"),[SQUARE(_,IDEN(_,Id),_),_]) -> {
+              (_,_,iTp) = lookupType(Id,((M)=>M==typeBind),sE);
+	      Vis = { if Id in privateTypes then private else public };
+              elemis (IDEN(Lc,Id),typeBind,node(tpe(Id,Vis,iTp),typeType,Lc))
+            }
+          | APPLY(_,IDEN(_,":"),_) -> {}    -- type definition already processed
+          | APPLY(Lc,IDEN(_,"="),[IDEN(_,Id),R]) -> {
+	      if !statefull then
+		reportError("variable "<>Id<>" not permitted in a stateless class",Lc)
+	      else if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("constant "<>Id<>" not declared",Lc)
+              else{
+		thetaVars := [(Id,Lc)]\/thetaVars; -- we use this to check for circles
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of constant "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                  };
+
+                  Const = valof{
+                    if findVarsInTerm(R,sE)==[] then
+                      valis typeOf(R,sE,Opts)
+                    else
+                      valis typeOf(BRACE(Lc,IDEN(Lc,"valof"),[
+                                           APPLY(Lc,IDEN(Lc,"valis"),[R])]),
+				   sE,Opts);
+                  };
+
+                  try{
+                    subType(ndType(Const),VType,sE)
+                  }
+                  onerror{
+                    error(Bec,'fail) ->
+                      reportError("expression: "<>showTerm(Const)<>
+				  " not consistent with"
+                                  " declared type: "<>showType(VType)<>
+				  "\nbecause "<>Bec,Lc)
+                  };
+              
+                  if dbgType in Opts then
+                    "expression "<>Id<>" is "<>showType(ndType(Const))<>"\n">>stdout;
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(def(Id,Vis,Const),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+          | APPLY(Lc,IDEN(_,":="),[IDEN(_,Id),R]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("variable "<>Id<>" not declared",Lc)
+	      else if !statefull then
+		reportError("stateful variable "<>Id<>" not permitted here",Lc)
+              else{
+		thetaVars := [(Id,Lc)]\/thetaVars; -- we use this to check for circles
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                  };
+
+                  Defn = valof{
+                    SQ = findVarsInTerm(R,sE);
+
+                    if SQ==[] then
+                      valis typeOf(R,sE,Opts)
+                    else
+                      valis typeOf(BRACE(Lc,IDEN(Lc,"valof"),[
+                                           APPLY(Lc,IDEN(Lc,"valis"),[R])]),
+				   sE,Opts);
+                  };
+
+                  try{
+                    subType(ndType(Defn),VType,sE)
+                  }
+                  onerror{
+                    error(Bec,'fail) ->
+                      reportError("expression: "<>showTerm(Defn)<>" not consistent with"
+                                  " declared type: "<>showType(VType)<>"\nbecause "<>Bec,Lc)
+                  };
+
+                  if dbgType in Opts then{
+                    "expression is "<>showTerm(Defn)<>"\n">>stdout;
+                  };
+
+                  elemis (IDEN(Lc,Id),varBind,node(asg(Id,private,Defn),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+          | APPLY(Lc,IDEN(_,"=>"),[IDEN(_,Id),TPL(_,Eqns)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("function "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of function "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+--                    "Current env is "<>sE^0<>"\n">>stdout;
+--                    "Current env is "<>showEnvD(sE,thLen)<>"\n">>stdout;
+                  };
+                  (Eqs,Arity) = typeOfFunction(Eqns,VType,sE,Opts);
+                    
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(fun(Id,Vis,Arity,Eqs),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+
+          | APPLY(Lc,IDEN(_,":-"),[IDEN(_,Id),TPL(_,Clses)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("relation "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of relation "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                    "Current env is "<>showEnvD(sE,thLen)<>"\n">>stdout;
+                  };
+
+                  (Cls,Arity) = typeOfPredicate(Clses,VType,sE,Opts);
+                    
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(rel(Id,Vis,Arity,Cls),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+            
+          | APPLY(Lc,IDEN(_,":--"),[IDEN(_,Id),TPL(_,Clses)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("relation "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of strong relation "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                    "Current env is "<>showEnvD(sE,thLen)<>"\n">>stdout;
+                  };
+                  (Cls,Arity) = typeOfStrongPredicate(Clses,VType,sE,Opts);
+                    
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(srel(Id,Vis,Arity,Cls),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+            
+          | APPLY(Lc,IDEN(_,"->"),[IDEN(_,Id),TPL(_,Rules)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("procedure "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of procedure "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                    "Current env is "<>showEnvD(sE,thLen)<>"\n">>stdout;
+                  };
+                  (Rls,Arity) = typeOfProcedure(Rules,VType,sE,Opts);
+                  
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(prc(Id,Vis,Arity,Rls),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+
+          | APPLY(Lc,IDEN(_,"-->"),[IDEN(_,Id),TPL(_,Rules)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("grammar "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,varBind,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of grammar "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                    "Current env is "<>showEnvD(sE,thLen)<>"\n">>stdout;
+                  };
+                  (Rls,Arity) = typeOfGrammar(Rules,VType,sE,Opts);
+                    
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(grm(Id,Vis,Arity,Rls),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared",Lc)
+                }
+              }
+            }
+
+          | APPLY(Lc,IDEN(_,"<$"),[IDEN(_,Id),TPL(_,Rules)]) -> {
+              if !((Id,_) in declared) && !(Id,_,T) in Methods then  -- is it already declared?
+                reportError("class "<>Id<>" not declared",Lc)
+              else{
+                try{
+                  (_,Mode,VType).=lookupType(Id,((M)=>M==varBind),sE);
+
+                  if dbgType in Opts then{
+                    "defined type of class "<>Id<>" is "<>showType(VType)<>"\n">>stdout;
+                  };
+
+                  (Rls,Arity) = typeOfClass(Rules,Lc,VType,sE,Opts);
+
+		  Vis = { if Id in privateVals then private else public };
+                  elemis (IDEN(Lc,Id),varBind,node(class(Id,Vis,Arity,Rls),VType,Lc));
+                }
+                onerror{
+                  error(_,'notdef) ->
+                    reportError(Id<>" is not declared as a class",Lc)
+                }
+              }
+            }
+
+          | APPLY(Lc,IDEN(_,"$"),[A]) -> {
+	      if !statefull then
+		reportError("static initializer not permitted in a stateless class",Lc)
+	      else{
+		Q = findVarsInProcessRule(APPLY(noLoc,IDEN(noLoc,"->"),[TPL(noLoc,[]),A]),sE);
+        
+		sEnv = Q<>sE;
+                
+		Init = checkAction(A,false,voidType,sEnv,Opts);
+		
+		elemis (IDEN(Lc,"$"),varBind,node(vlof(projectQ(Q),Init),voidType,Lc));
+	      }
+	    }
+
+          | APPLY(_,IDEN(_,"import"),_) -> {}       -- imports already processed
+            
+          | X -> {
+              reportError("Cant handle definition "++display(X),Context(X));
+            }
+          }
+        }
+      };
+
+      if listlen(thetaVars)>1 then{
+	[(V1,L1),..tV].=thetaVars;
+	O : "";
+	Sep:"";
+	for (Vx,_) in tV do{
+	  O := O<>Sep<>Vx;
+	  Sep := ", ";
+	};
+	
+	reportWarn("Potential circular dependencies between "<>V1<>" and "<>O,L1);
+      };
+       
+      -- requantify the programs in the theta
+      for (IDEN(_,Nm),Kind,PrgNode) in st do{
+        thePrograms := [(Nm,Kind,reQuantify(PrgNode,sE)),..thePrograms];
+        if exported(PrgNode) then{
+          for P in privateTypes do{
+            if isReferenced(Pk,P,[],ndType(PrgNode)) then
+              reportWarn(Nm<>" references private type: "<>P,ndContext(PrgNode))
+          }
+        }
+      }
+    };
+
+    for (Nm,Lc) in declared do{
+      if !(!Nm,_,_) in thePrograms && (Nm!="main"|| !topLevel)then
+        reportWarn(Nm<>" was declared, but not defined",Lc)
+    };
+
+    valis (rev(thePrograms),imports); -- We reverse to support proper evaluation order
+  };
+
+  /* Handle class notation */
+
+  typeOfClass(Prog,clLc,ClassType,Env,Opts) => valof{
+    Rls : [];                     -- Pick out the class rules and the class body
+    supers : [];                                  -- The set of super variables
+    Methods : [];                                 -- collect the methods of this
+    classRules : [];                          -- We collect the class rules here
+    duplicates : [];           -- we accumulate potential duplicate inheritances
+    Arity : -1;
+    statefull : false;
+
+    (nQ,thisType) : freshen(ClassType);
+
+    if conType(L,rT).=thisType then{		  -- statefree constructor
+      Arity:=listlen(L);
+      thisType :=rT;
+    }
+    else if sconType(L,rT).=thisType then{	  -- statefull constructor
+      Arity:=listlen(L);
+      thisType :=rT;
+      statefull := true;
+    }
+    else if enuType(rT).=thisType then{		  -- statefree also
+      Arity:= 0;
+      thisType := rT;
+    }
+    else{
+      reportError("Type of class should be a constructor, not: "<>showType(thisType),clLc);
+    };
+
+    qEnv = nQ<>Env;                       -- environment enhanced with type vars
+
+    if dbgType in Opts then{
+      showEnvD(qEnv,listlen(nQ)+3)<>"\n">>stdout;
+    };
+
+    if dbgType in Opts then{
+      showType(thisType)<>" is "<>(if statefull then "" else "not ")<>
+      "statefull\n">>stdout
+    };
+
+    -- We need to precompute the available methods, which we do by looking at the supers and the class body ...
+
+    for El in Prog do {
+      case El in {
+        APPLY(Lc,IDEN(_,"<="),[Lbl,Supr]) -> {
+          Q = findVarsInClassRule(El,qEnv);
+          sEnv = [("this",varBind,thisType),..Q<>qEnv];
+
+          SpNme = "."<>{
+            if IDEN(_,S).=Supr then S 
+            else if APPLY(_,IDEN(_,S),_).=Supr then S
+            else exception error("we have a problem houston",'internal)
+          };
+	  
+          if (SpNme,_,_) in supers then
+            reportError("can only inherit once from a given class: "<>display(Supr),Lc);
+
+          super = valof{			  -- super label
+	    S = typeOf(Supr,sEnv,Opts);
+
+	    if node(onew(SS),_,_).=S then{
+	      if !statefull then
+		reportError("A statefree class may not inherit from a "
+			    "stateful super class: "<>show(SS),Lc);
+	      valis SS
+	    }
+	    else
+	      valis S
+	  };
+
+          supers := [(SpNme,varBind,ndType(super)),..supers];
+
+          Label = valof{			  -- make sure that our Label is Ok
+	    try{
+	      valis typeOfLabelPtn(Lbl,(T->sameType(T,thisType,sEnv)),sEnv,Opts)
+	    }
+	    onerror{
+	      error(Bec,'fail) -> {
+		reportError("Type of label: "<>display(Lbl)<>" not consistent with type "
+			    "declared for class: "<>showType(thisType)<>
+			    "\nbecause "<>Bec,Lc);
+		valis node(vde,newVar(),Lc)
+	      }
+	    };
+	  };
+
+          try{
+            subType(thisType,ndType(super),sEnv)
+          }
+          onerror{
+            error(Bec,_) -> 
+              reportError("class: "<>showTerm(Label)<>" inconsistent with "<>
+                          showTerm(super)<>"\nbecause "<>Bec,Lc)
+          };
+
+          try{
+            spFlds = fieldsOf(typeInterface(ndType(super),sEnv));
+
+            for (Fld,Mode,fTp) in spFlds do{       -- pick up the methods from the class definition
+              if (Fld,_,mTp) in Methods then{
+                duplicates:=[(Fld,Lc),..duplicates];
+              }
+              else{
+                Methods := [(Fld,Mode,fTp),..Methods];
+              }
+            };
+
+            rl = node(crle(projectQ(Q),Label,super),faceType(spFlds),Lc);
+
+            classRules := [rl,..classRules];
+          }
+          onerror{
+            error(Bec,_) -> 
+              reportError("problem in type associated with super\nbecause: "<>Bec,Lc)
+          }
+        }
+          
+      | APPLY(Lc,IDEN(_,".."),[Lbl,APPLY(_,IDEN(_,"{}"),Defs)]) -> {
+          Q = findVarsInClassBody(El,Methods<>qEnv);
+
+          if dbgType in Opts then{
+            "Methods at body "<>showEnv(Methods)<>"\n">>stdout;
+            "Class Variables are "<>showEnv(Q)<>"\n">>stdout;
+            "this: "<>showType(thisType)<>"\n">>stdout;
+          };
+            
+          sEnv : [("this",varBind,thisType),..Q<>qEnv];
+
+          Label = valof{			  -- make sure that our Label is Ok
+	    try{
+	      valis typeOfLabelPtn(Lbl,(T->sameType(T,thisType,sEnv)),sEnv,Opts)
+	    }
+	    onerror{
+	      error(Bec,'fail) -> {
+		reportError("Type of label: "<>display(Lbl)<>" not consistent with type "
+			    "declared for class: "<>showType(thisType)<>
+			    "\nbecause "<>Bec,Lc);
+		valis node(vde,newVar(),Lc)
+	      }
+	    };
+	  };
+
+	  case Lbl in {
+	    IDEN(_,_) -> {
+	      if Arity!=0 then
+		reportError("arity of "<>display(Lbl)<>" different to that expected: "<>Arity^0,Lc);
+	    }
+	  | APPLY(_,IDEN(_,":"),[IDEN(_,_),_]) -> {
+	      if Arity!=0 then
+		reportError("arity of "<>display(Lbl)<>" different to that expected: "<>Arity^0,Lc);
+	    }
+	  | APPLY(_,IDEN(_,":"),[APPLY(_,_,A),_]) -> {
+	      if Arity!=listlen(A) then
+		reportError("arity of "<>display(Lbl)<>":"<>listlen(A)^0<>" different to that expected: "<>
+			    Arity^0,Lc);
+	    }
+	  | APPLY(_,_,A) -> {
+	      if Arity!=listlen(A) then
+		reportError("arity of "<>display(Lbl)<>":"<>listlen(A)^0<>" different to that expected: "<>
+			    Arity^0,Lc);
+	    }
+	  };
+
+          if dbgType in Opts then{
+            "Label: "<>showTerm(Label)<>"\n">>stdout;
+            "this: "<>showType(thisType)<>"\n">>stdout;
+--            "Current env now: "<>showEnvD(sEnv,30)<>"\n">>stdout;
+          };
+
+          try{
+            -- We verify that the methods in the interface are implemented correctly
+            spFlds = fieldsOf(typeInterface(thisType,sEnv));
+
+            for (Fld,Mode,fTp) in spFlds do{
+              if (!Fld,Mode,mTp) in Methods then{
+                try{
+                  subType(mTp,fTp,sEnv);
+                } onerror {
+                  error(Bec,_) -> reportError("inconsistency between assumed type for method: "<>Fld<>
+                                              "\nbecause: "<>Bec,Lc)
+                }
+              }
+              else{
+                Methods := [(Fld,Mode,fTp),..Methods];
+              }
+            };
+          }
+          onerror{
+            error(Bec,'fail) -> reportError(Bec,Lc)
+          | _ ->
+              reportError("no interface associated with class type "<>
+                          showType(thisType),Lc)
+          };
+
+          -- examine the body as a theta environment
+	  Pkg = valof{
+	    if inPkg(P) in Opts then
+	      valis P
+	    else
+	      exception error("No package information",'internal)
+	  };
+
+          (theta,Imprts) = thetaEnv(Pkg,Defs,clLc,supers<>sEnv,Methods,false,
+				    statefull,Opts);
+
+          if Imprts!=[] then
+            reportError("imports not permitted inside class bodies",Lc);
+
+          nMethods = collect{
+            try{
+              spFlds = fieldsOf(typeInterface(thisType,sEnv)); -- this is the interface contract
+
+              for (Nm,Mode,mTp) in spFlds do{
+                if (_,_,node(el,gTp,eLc)::defines(el,Nm)) in theta then{
+                  elemis (Nm,Mode,mTp)
+                }
+                else{                  -- try to collect definition from a super
+                  checkSuper::{
+                    for (_,_,spTp) in supers do{
+                      try{
+                        if (Nm,Mode,gTp) in fieldsOf(typeInterface(spTp,sEnv)) then{
+                          elemis (Nm,Mode,gTp);
+                          leave checkSuper;
+                        }
+                      }
+                      onerror{
+                        error(Bec,_)->
+                          reportError("Could not locate the interface spec of "<>showType(spTp),Lc)
+                      }
+                    };
+                    reportError("no implementation given for "<>Nm<>":"<>showType(mTp),Lc)
+                  }
+                }
+              }
+            }
+            onerror{
+              _ -> {}
+            }
+          };
+
+          for (Fld,fLc) in duplicates do{
+            if !(Fld,_,_) in theta then
+              reportWarn("Multiply inherited method: "<>Fld<>
+                         "\nOnly one will be used",Lc);
+          };
+
+	  classRules := [node(clss(projectQ(Q),thisType,Label,
+				   (theta//((.(_,_,Pr).)=>Pr))),
+			      faceType(Methods),Lc),..classRules]
+        }
+      | _ -> exception error("something wrong with class element "<>display(El),'fail)
+      }
+    };
+
+    valis (classRules,Arity);
+  };
+
+  typeOfLabel(El,Env,Opts) => valof{
+    S = typeOf(El,Env,Opts);
+
+    if node(onew(SS),_,_).=S then
+      valis SS
+    else
+      valis S
+  };
+
+  defines(El,Nm) => case El in {
+    rel(!Nm,_,_,_) => true
+  | srel(!Nm,_,_,_) => true
+  | fun(!Nm,_,_,_) => true
+  | prc(!Nm,_,_,_) => true
+  | grm(!Nm,_,_,_) => true
+  | class(!Nm,_,_,_) => true
+  | tpe(!Nm,_,_) => true
+  | def(!Nm,_,_) => true
+  | asg(!Nm,_,_) => true
+  | _=> false
+  };
+
+  exported(El) => case ndEl(El) in {
+    rel(_,Vis,_,_) => Vis==public
+  | srel(_,Vis,_,_) => Vis==public
+  | fun(_,Vis,_,_) => Vis==public
+  | prc(_,Vis,_,_) => Vis==public
+  | grm(_,Vis,_,_) => Vis==public
+  | class(_,Vis,_,_) => Vis==public
+  | tpe(_,Vis,_) => Vis==public
+  | def(_,Vis,_) => Vis==public
+  | asg(_,Vis,_) => false
+  | _=> false
+  };
+
+  projectQ(Q) => collect{
+    for (Nm,varBind,Tp) in Q do
+      elemis (Nm,Tp)
+  };
+
+  __debug_display__(X) =>  { try { case X in {
+        any(T) => showType(T)
+      | any(LT) => showType(tplType(LT))
+      | any(E) => showEnvD(E,5)
+      | any(T) => showTerm(T)
+      | any(L) => sequence(L,"{",", ","}",showTerm)
+      | any(E) => display(E)
+      | any(L) => display(TPL(noLoc,L))
+      | any(Z) => Z^0
+      }
+    }
+    onerror{
+      error(_,_) => X^0
+    }
+  };
+
+  packageOf(Opts) => valof{
+    if inPkg(P) in Opts then
+      valis P
+    else
+      exception error("No package info",'internal)
+  };
+
+} export (typeOfProgram);

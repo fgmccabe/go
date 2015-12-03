@@ -1,0 +1,36 @@
+/*
+ * A dynamic set-like entity that can record a named set of values
+ */
+
+#include "go.ah";
+
+module
+  import interface <stdio.af> in
+{
+  dynQ(Init) => let {
+    I : Init;
+
+    query(N) => {
+      if (N,X) in I then
+        X
+      else
+        exception error(N^0<>" not defined",'fail)
+    };
+
+    define(N,V){
+      if (N,_) in I then
+        exception error(N^0<>"defined twice",'fail)
+      else{
+        I := [(N,V),..I]
+      }
+    };
+
+    clear(N){
+      if (N,_) in I then
+        I := I^\(N,_)
+  };
+
+    defined() => I;
+
+  } in dyn(query,define,clear,defined);
+} export dynQ

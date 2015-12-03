@@ -1,0 +1,134 @@
+/*
+ * Generate the meta information for a class
+ */
+
+#include "go.ah";
+
+module
+import {
+  interface "canon.af" and
+  interface "display.af" and
+  interface "canonlabel.af" and
+  interface "misc.af" and
+  interface <stdio.af> 
+} in {
+
+  -- Each class has a series of methods constructed automatically to handle reflection
+
+  -- The following methods are defined:
+  
+  -- meta:[]=>meta.
+  -- __meta:[list[thing,integer]+,list[thing,integer]-]=>meta
+
+  -- the latter is an internal program that is used to handle variables
+
+  -- __reflect:[meta+,thing-,list[(thing,integer)]+]{}.
+  -- This succeeds if the meta term represents a valid representation of this class
+
+  -- The definition of __meta, for a class constructor such as foo(A1,A2) is
+  
+  -- __meta(Vi,Vo) => cons('foo',[A1.__meta(Vi,Vx),A2.__meta(Vx,Vo)]).
+
+  -- The standard classes also have a definition for __meta, with the one for thing being a
+  -- little special:
+  -- __meta(Vi,Vo)::var(this) => vrb(__pickVar(Vi,Vo)).
+  -- __meta(Vi,Vi) => cons('thing',[]).
+
+  -- The definition of meta is left to thing:
+  -- meta() => __quantify(this.__meta([],Vr),Vr).
+
+  -- The definition of __reflect for a particular class of arity k is 
+  -- __reflect(cons(className,[M1,..,Mk]),className(A1,..,Ak),Vr) :-
+  --   stdlib#__reflect(M1,A1,V2), ..., stdlib#__reflect(Mk,Ak,Vr).
+
+  genMeta(Nd::(node(class(clName,_,clArity,Progs),_,Lc).=Nd),Opts,Map) => valof{
+    if !noMeta in Opts && !metaDefined(Progs) then {
+      strct(lName,_) .= unpackName(lookupClassName(Map,clName));
+
+      thisVar = idnt(genNew("$this"));
+      clVar = idnt(genNew("$cl"));
+
+      Vr : idnt(genNew("Vr"));
+      Q: [Vr];
+      A : [];
+      M : [];
+
+      mBody = collect{
+	for i in 1..clArity do{
+	  Mx = idnt(genNew("Mx"));
+	  Ax = idnt(genNew("Ax"));
+	  elemis ocall(cons(trCons("__meta",2),[Vr,Mx]),Ax,Ax,Lc);
+	  Q := [Mx,Ax,..Q];
+	  A := [Ax,..A];
+	  M := [Mx,..M];
+	}
+      };
+      
+      As = rev(A);
+      Ms = valof{
+	MM : cons(strct("go.stdlib#[]",0),[]);
+	for a in M do{
+	  MM := cons(strct("go.stdlib#,..",2),[a,MM]);
+	};
+	valis MM;
+      };
+      
+      mtName = prg(lName<>"@__meta",listlen(As)+2);
+      
+      mProg = clse(Q,As<>[cons(strct("go.stdlib#metaCons",2),[symb(lName),Ms]),Vr],
+		   mBody,Lc);
+      defineProg(Map,mtName,seqn([mProg]));
+      
+      rfName = prg(lName<>"@___reflect",3);
+      
+      AA : As;
+      reflectBody = collect{
+	for a in M do{
+	  [V,..Va].=AA; AA := Va;
+	  elemis ocall(cons(trCons("__reflect",2),[Vr,V]),a,a,Lc);
+	}
+      };
+      rfProg = valof{				  -- We need a very special hack here
+	if lName=="go.stdlib#metaCons" then{
+	  xC = idnt(genNew("xC"));
+	  xA = idnt(genNew("xA"));
+	  xR = idnt(genNew("xR"));
+	  xT = idnt(genNew("xT"));
+	  valis clse([xC,xA,Vr,xR,xT],[xT,Vr,xR],
+		     [defn(xT,cons(strct("go.stdlib#metaCons",2),[xC,xA]),Lc),
+		      ocall(cons(trCons("__reflect",2),[Vr,xR]),xC,xT,Lc)],Lc)
+	}
+	else
+	  valis clse(Q,[cons(strct("go.stdlib#metaCons",2),[symb(lName),Ms]),
+			Vr,cons(strct(lName,listlen(As)),As)],
+		     reflectBody,Lc)
+      };
+      defineProg(Map,rfName,seqn([rfProg]));
+      
+      -- sort out the additional entry for the class entry code
+      
+      mV = idnt(genNew("$Mt"));
+      mX = idnt(genNew("$Mx"));
+      
+      valis [clse([thisVar,mV,Vr,..As],[cons(trCons("__meta",2),[Vr,mV]),
+					cons(strct(lName,listlen(As)),As),
+					thisVar],
+		  [neck(Lc),call(mtName,As<>[mV,Vr],Lc)],Lc),
+	     clse([thisVar,clVar,mV,Vr],[cons(trCons("__reflect",2),[Vr,mV]),clVar,thisVar],
+		  [neck(Lc),call(rfName,[thisVar,Vr,mV],Lc)],Lc)]
+    }
+    else
+      valis []
+  };
+    
+  metaDefined(Progs) => valof{
+    if node(clss(_,_,_,Body),_,_) in Progs && node(fun("__meta",_,_,_),_,_) in Body then
+      valis true
+    else
+      valis false
+  };
+
+  trCons(Name,Arity) => strct(Name<>"%"<>Arity^0,Arity);
+} export (genMeta)
+
+

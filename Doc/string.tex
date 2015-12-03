@@ -1,0 +1,200 @@
+\chapter{String and symbol primitives}
+\label{strings}
+
+This chapter describes the various symbol and string processing primitives in the \go standard library. Recall that \go strings are lists of \q{char}; so many of the primitives described in Chapter~\vref{stdlib} and Chapter~\vref{chars} may also be relevant to processing strings.
+
+\section{Symbol and string processing}
+\label{stirng:symbol}
+
+These functions manipulate symbols and strings.
+
+\subsection{\function{explode} -- convert a symbol to a string}
+\label{string:explode}
+
+\synopsis{explode}{[symbol]\funarrow{}string}
+
+The \q{explode} function takes a \q{symbol} argument and returns a string -- i.e., a list of \q{char} -- consisting of the characters in the symbol's print name.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+If the argument is an unbound variable.
+\end{description}
+
+\subsection{\function{implode} -- convert a string to a symbol}
+\label{string:implode}
+
+\synopsis{implode}{[string]\funarrow{}symbol}
+
+The \q{implode} function takes a string and returns a  \q{symbol} whose print name is formed from the string argument.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+If the argument is an unbound variable; or not a fully ground list of character.
+\end{description}
+
+\subsection{\function{gensym} -- generate a symbol}
+\label{string:gensym}
+
+\synopsis{gensym}{string\funarrow{}symbol}
+
+The \q{gensym} function returns a \emph{unique} \q{symbol} whose print name is formed from the string argument and a unique sequence of digits. The \go engine attempts to ensure the uniqueness of the symbol by using a random number as the basis of the generated symbol.
+
+The print name of the resulting \type{symbol} is patterned on:
+\begin{alltt}
+C\emph{NNN}
+\end{alltt}
+where \q{C} is the input prefix, and \emph{NNN} is a random number.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+If the argument is an unbound variable.
+\end{description}
+
+\subsection{\function{int2str} -- format an integer}
+\label{string:int2str}
+
+\synopsis{int2str}{[integer,integer,integer,char]\funarrow{}string}
+
+The \q{int2str} function formats an integer into a string. Given a call of the form:
+\begin{alltt}
+int2str(N,B,W,P)
+\end{alltt}
+The number to be formatted is \param{N}, the \emph{base} of the representation is \param{B}, the number of characters to format the number into is \param{W}, the `pad' character to use in the event that the number requires fewer characters is \param{P}.
+
+If the width parameter \param{W} is zero, then the output of the string will be exactly the number required to format the number; otherwise exactly \param{abs(W)} characters will be returned. If \param{W} is less than zero then the number will be left formatted, otherwise it will be right formatted.
+
+If the base parameter \param{B} is less than zero then the number will be \emph{signed}: i.e., either a \q{+} or a \q{-} character will be prefixed to the output string.
+
+For example, the expression:
+\begin{alltt}
+int2str(345,-16,5,` )
+\end{alltt}
+results in the string:
+\begin{alltt}
+"  +159"
+\end{alltt}
+whereas, 
+\begin{alltt}
+int2str(345,10,0,` )
+\end{alltt}
+results in:
+\begin{alltt}
+"345"
+\end{alltt}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINTNEEDD'}]
+If at least one of the arguments \param{N}, \param{W}, \param{B} is not an integer.
+\end{description}
+
+
+\section{Parsing Strings}
+\label{string:stdparse}
+The \q{go.stdparse} standard library package includes a number of standard functions and grammars that are effective for interpreting strings.
+
+
+\subsection{\texorpdfstring{\function{expand} -- }{}Simple tokenizer}
+\label{stdlib:expand}
+\synopsis{expand}{[list[t],list[t]]\funarrow{}list[list[t]]}
+
+The \q{expand} function partitions a list into a list of sub-lists. Each element of the result is a fragment found between token 'markers' (the second argument is the token marker).
+
+For example, to split a string into words, with spaces between words, use \q{expand} :
+\begin{alltt}
+expand("this is a list of words"," ")
+\end{alltt}
+which will return the result
+\begin{alltt}
+["this", "is", "a", "list", "of", "words"]
+\end{alltt}
+
+
+\subsection{\texorpdfstring{\function{collapse} -- }{}List collapse}
+\label{stdlib:collapse}
+\synopsis{collapse}{[list[list[t]],list[t]]\funarrow{}list[t]}
+
+The \q{collapse} function is the converse of \q{expand} -- it takes a list of lists of elements and strings them together into a single list. Between each element of the original list of `words', it inserts a glue sub-sequence -- which is the second argument.
+
+For example, to construct a string from a list of words -- putting a space between each word -- use:
+\begin{alltt}
+collapse(["this", "is", "a", "list", "of", "words"]," ")
+\end{alltt}
+The glue subsequence is insert \emph{between} the elements:
+\begin{alltt}
+"this is a list of words"
+\end{alltt}
+The \q{collapse} function can also be used as a kind of list flattener -- converting a list of lists of things into simple list:
+\begin{alltt}
+collapse([[1],[2,3],[4,5]],[])
+\end{alltt}
+to give:
+\begin{alltt}
+[1,2,3,4,5]
+\end{alltt}
+
+\subsection{\function{integerOf} -- parse a string for an \q{integer}}
+\label{stdparse:integerOf}
+\synopsis{integerOf}{[integer-]\grarrow{}string}
+
+The \q{integerOf} standard grammar will parse a string looking for an \q{integer} value.
+
+If \q{integerOf} successfully parses a string as an \q{integer}, then the value represented in the string is unified with \param{N}.
+
+Note that a classical way of using \q{integerOf} is in conjunction with the \q{\%\%} operator, as in:
+\begin{alltt}
+X = integerOf\%\%"23"
+\end{alltt}
+which would result in \q{X} being unified with the number \q{23}.
+
+Apart from the regular decimal notation, the \q{integerOf} grammar also recognizes \go's alternate integer notations -- hexadecimal number (prefixed with a \q{0xfff}) -- and character code (\q{0c\emph{Char}}).
+
+\subsection{\function{naturalOf} -- parse a string for a positive \q{integer}}
+\label{stdparse:naturalOf}
+\synopsis{naturalOf}{[integer-]\grarrow{}string}
+
+The \q{naturalOf} standard grammar will parse a string looking for a positive (i.e., unsigned) \q{integer} value.
+
+If \q{naturalOf} successfully parses a string as an \q{integer}, then the value represented in the string is unified with \param{N}.
+
+\subsection{\function{hexNum} -- parse a string for a hexadecimal \q{integer}}
+\label{stdparse: hexNum}
+
+\synopsis{naturalOf}{[integer-]\grarrow{}string}
+
+The \q{hexNum} standard grammar will parse a string looking for a positive hexadecimal value.
+
+If \q{naturalOf} successfully parses a string as an \q{integer}, then the value represented in the string is unified with \param{N}.
+
+\subsection{\function{floatOf} -- parse a string for a \q{float}}
+\label{stdparse:floatOf}
+
+\synopsis{floatOf}{[float-]\grarrow{}string}
+
+The \q{floatOf} standard grammar will parse a string looking for a \q{float} ing point value.
+
+If \q{floatOf} successfully parses a string as a \q{float}, then the value represented in the string is unified with \param{N}.
+
+The \q{floatOf} grammar accepts the same notation for floating point numbers as \go itself; i.e., the normal floating point notation (see Section~\vref{token:number}).
+
+\subsection{\function{skipWhiteSpace} -- skip white space in a string }
+\label{stdparse:skipWhiteSpace}
+
+\synopsis{skipWhiteSpace}{[]\grarrow{}string}
+
+The \q{skipWhiteSpace} standard grammar is true of a string if the input contains only white space characters. Use it to skip white space in text. The definition of white space is based on the Unicode standard -- in particular it includes space characters, line characters, paragraph marks, and control characters.
+
+\subsection{\function{str2integer} -- parse a string to get integer}
+\label{stdparse:str2integer}
+\synopsis{str2integer}{[string]\funarrow{}integer}
+
+The \q{str2integer} function parses a string and decodes and returns an integer.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eFAIL'}]
+Not a numeric string
+\end{description}

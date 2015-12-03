@@ -1,0 +1,715 @@
+/* Automatically generated, do not edit */
+#include "instr.ah";
+
+module
+import {
+  interface "ecode.af" 
+  and interface <stdio.af> 
+}in{
+  mnem(L,Lits) => collect{
+    pc : 0;		-- compute label offsets
+    Lbls = collect{
+      for I in L do{
+        case I in {
+          lbl(Lb) ->  elemis(Lb,pc)
+        | cmt(_) ->  {}
+        | _ -> pc+:=1
+        };
+      };
+    };
+
+    pc:=0;
+
+    for X in L do {
+      case X in {
+        lbl(_) -> {}		-- label
+      | cmt(_) -> {}		-- comment
+      | halt -> {		-- stop execution
+          Code:0;
+          pc := pc+1;
+          elemis Code;
+        }
+      | die -> {		-- stop current process
+          Code:1;
+          pc := pc+1;
+          elemis Code;
+        }
+      | succ -> {		-- Succeed a clause
+          Code:2;
+          pc := pc+1;
+          elemis Code;
+        }
+      | kawl(V0,V1) -> {		-- call to program
+          Code:3;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | lkawl(V0,V1) -> {		-- last call to program
+          Code:4;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | dlkawl(V0,V1) -> {		-- deallocating last call
+          Code:5;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | kawlO(V0,V1) -> {		-- call object method
+          Code:6;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | lkawlO(V0,V1) -> {		-- last method call
+          Code:7;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | dlkawlO(V0,V1) -> {		-- deallocating last variable call
+          Code:8;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | go_to(V0) -> {		-- jump
+          Code:12;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | escape(V0,V1) -> {		-- service function
+          Code:13;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          (EC,_) = escCode(V1);
+          Code := bor(Code,bleft(EC,8));
+          elemis Code;
+        }
+      | alloc(V0,V1) -> {		-- allocate locals
+          Code:16;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | dealloc -> {		-- deallocate locals
+          Code:17;
+          pc := pc+1;
+          elemis Code;
+        }
+      | tryme(V0) -> {		-- try inline clause
+          Code:18;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | retryme(V0) -> {		-- retry inline clause
+          Code:19;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | trustme -> {		-- last inline clause
+          Code:20;
+          pc := pc+1;
+          elemis Code;
+        }
+      | trycl(V0) -> {		-- try clause
+          Code:21;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | retry(V0) -> {		-- retry clause
+          Code:22;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | trust(V0) -> {		-- last clause
+          Code:23;
+          pc := pc+1;
+          gap = pcGap(pc,V0,Lbls,0xffffff);
+          Code := bor(Code,bleft(gap,8));
+          elemis Code;
+        }
+      | fayl -> {		-- fail current execution
+          Code:24;
+          pc := pc+1;
+          elemis Code;
+        }
+      | cut -> {		-- cut choice point
+          Code:25;
+          pc := pc+1;
+          elemis Code;
+        }
+      | indexc(V0,V1) -> {		-- character index jump
+          Code:26;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | indexl(V0) -> {		-- list index
+          Code:27;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | indexs(V0,V1) -> {		-- symbol index jump
+          Code:28;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | indexn(V0,V1) -> {		-- numerical index jump
+          Code:29;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | indexx(V0,V1) -> {		-- constructor index jump
+          Code:30;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | trpblk -> {		-- start error block
+          Code:31;
+          pc := pc+1;
+          elemis Code;
+        }
+      | trpend -> {		-- end error block
+          Code:32;
+          pc := pc+1;
+          elemis Code;
+        }
+      | except(V0) -> {		-- raise run-time exception
+          Code:33;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | gcmap(V0,V1) -> {		-- Set active arguments & local depth
+          Code:34;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | gc(V0,V1) -> {		-- Invoke GC if not enough space
+          Code:35;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | susp(V0,V1) -> {		-- suspend/execute call
+          Code:37;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),16));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | resume(V0) -> {		-- continue from suspended call
+          Code:38;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | trgr(V0) -> {		-- trigger suspended calls
+          Code:39;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | uAA(V0,V1) -> {		-- Unify argument registers
+          Code:42;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | uAY(V0,V1) -> {		-- Unify
+          Code:43;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | uAS(V0) -> {		-- Unify
+          Code:45;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | ucAS(V0) -> {		-- Unify with occurs check
+          Code:46;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | uAlit(V0,V1) -> {		-- Unify with literal
+          Code:47;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns(V0,V1) -> {		-- Unify with constructor
+          Code:50;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uYY(V0,V1) -> {		-- Unify Y[h],Y[m]
+          Code:51;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | uYS(V0) -> {		-- Unify
+          Code:52;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | ucYS(V0) -> {		-- Unify with occurs check
+          Code:53;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | uYnil(V0) -> {		-- Unify empty list
+          Code:54;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | uSlit(V0) -> {		-- Unify literal
+          Code:60;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uScns(V0) -> {		-- Unify constructor
+          Code:63;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns0(V0) -> {		-- Unify A[0] with constructor
+          Code:55;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns1(V0) -> {		-- Unify A[1] with constructor
+          Code:56;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns2(V0) -> {		-- Unify A[2] with constructor
+          Code:57;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns3(V0) -> {		-- Unify A[3] with constructor
+          Code:58;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | uAcns4(V0) -> {		-- Unify A[4] with constructor
+          Code:59;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | mAA(V0,V1) -> {		-- Move
+          Code:70;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | mAY(V0,V1) -> {		-- Move
+          Code:71;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | muAY(V0,V1) -> {		-- Move unsafe
+          Code:72;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | mAS(V0) -> {		-- Move
+          Code:74;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | mAlit(V0,V1) -> {		-- Move literal
+          Code:75;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | mAcns(V0,V1) -> {		-- Build constructor 
+          Code:76;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | mYA(V0,V1) -> {		-- Move
+          Code:77;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          Code := bor(Code,bleft(band(V1,0xff),24));
+          elemis Code;
+        }
+      | mYY(V0,V1) -> {		-- Move
+          Code:78;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | mYS(V0) -> {		-- Move
+          Code:80;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | mSA(V0) -> {		-- Move
+          Code:83;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | mSY(V0) -> {		-- Move
+          Code:84;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | mSlit(V0) -> {		-- Move literal
+          Code:85;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | mScns(V0) -> {		-- Build constructor
+          Code:88;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | oAU(V0) -> {		-- Unbind A[h]
+          Code:90;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | oYU(V0) -> {		-- Unbind local
+          Code:91;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | oYA(V0,V1) -> {		-- Overwrite local
+          Code:92;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          Code := bor(Code,bleft(band(V1,0xff),24));
+          elemis Code;
+        }
+      | oYnil(V0) -> {		-- Overwrite with empty list
+          Code:93;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | cAA(V0,V1) -> {		-- Match
+          Code:110;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | cAY(V0,V1) -> {		-- Match
+          Code:111;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | cAS(V0) -> {		-- Match
+          Code:112;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | cAlit(V0,V1) -> {		-- Match literal
+          Code:113;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns(V0,V1) -> {		-- Match constructor
+          Code:116;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          off = ltOff(V1,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cYA(V0,V1) -> {		-- Match
+          Code:117;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          Code := bor(Code,bleft(band(V1,0xff),24));
+          elemis Code;
+        }
+      | cYS(V0) -> {		-- Match
+          Code:118;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | cSA(V0) -> {		-- Match
+          Code:121;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),16));
+          elemis Code;
+        }
+      | cSY(V0) -> {		-- Match
+          Code:122;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | cSlit(V0) -> {		-- Match literal
+          Code:123;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cScns(V0) -> {		-- Match constructor
+          Code:126;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns0(V0) -> {		-- Match constructor in A[0]
+          Code:128;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns1(V0) -> {		-- Match constructor in A[1]
+          Code:129;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns2(V0) -> {		-- Match constructor in A[2]
+          Code:130;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns3(V0) -> {		-- Match constructor in A[3]
+          Code:131;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | cAcns4(V0) -> {		-- Match constructor in A[4]
+          Code:132;
+          pc := pc+1;
+          off = ltOff(V0,Lits);
+          Code := bor(Code,bleft(band(off,0xffff),8));
+          elemis Code;
+        }
+      | clAA(V0,V1) -> {		-- First/clear
+          Code:160;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xff),16));
+          elemis Code;
+        }
+      | clAY(V0,V1) -> {		-- First/clear
+          Code:161;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | clAS(V0) -> {		-- First/clear
+          Code:163;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | clSA(V0) -> {		-- First/clear
+          Code:164;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),16));
+          elemis Code;
+        }
+      | clSY(V0) -> {		-- First/clear
+          Code:165;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | vrA(V0) -> {		-- Test for variable
+          Code:166;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | vrY(V0) -> {		-- Test for variable
+          Code:167;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | nvrA(V0) -> {		-- Test for non-variable
+          Code:168;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | nvrY(V0) -> {		-- Test for non-variable
+          Code:169;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | vdA(V0) -> {		-- Void \q{A[h]}
+          Code:180;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | vdAA(V0,V1) -> {		-- Void \q{A[h],Count}
+          Code:181;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          Code := bor(Code,bleft(band(V1,0xffff),8));
+          elemis Code;
+        }
+      | vdY(V0) -> {		-- Void \q{Y[X]}
+          Code:182;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | vdYY(V0,V1) -> {		-- Void \q{Y[X],Count}
+          Code:183;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          Code := bor(Code,bleft(band(V1,0xff),24));
+          elemis Code;
+        }
+      | clA(V0) -> {		-- Clear \q{A[h]}
+          Code:184;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xff),24));
+          elemis Code;
+        }
+      | clY(V0) -> {		-- Clear \q{Y[X]}
+          Code:185;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          elemis Code;
+        }
+      | clS -> {		-- Clear \q{S++}
+          Code:187;
+          pc := pc+1;
+          elemis Code;
+        }
+      | clYY(V0,V1) -> {		-- Clear \q{Y[X],Count}
+          Code:188;
+          pc := pc+1;
+          Code := bor(Code,bleft(band(V0,0xffff),8));
+          Code := bor(Code,bleft(band(V1,0xff),24));
+          elemis Code;
+        }
+      }
+    }
+  };
+
+pcGap(pc,V,Lbls,mx) => valof{
+    if (V,P) in Lbls then{
+      gap = P-pc;
+
+      if gap< -mx || gap>mx then
+	exception error("pc relative offset "++gap^0++" for label "++V^0,'inval);
+      valis gap;
+    }
+    else exception error("assembler -- cant find label "++V^0,'inval);
+  };
+
+  ltOff(V,Lits) => valof{
+    Lno : 0;
+    for (Lb,_) in Lits do{
+      if Lb==V then valis Lno;
+      Lno := Lno+1;    };
+    exception error("assembler -- cant find literal "++V^0,'inval)
+  };
+} export mnem               -- end of generated module

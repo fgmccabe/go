@@ -1,0 +1,161 @@
+mysql.lo mysql.o: mysql.c /usr/include/stdlib.h \
+  /usr/include/machine/ansi.h /usr/include/ppc/ansi.h \
+  /usr/include/machine/types.h /usr/include/ppc/types.h \
+  /usr/include/sys/cdefs.h /usr/include/alloca.h \
+  /Library/MySQL/include/mysql/mysql.h /usr/include/sys/types.h \
+  /usr/include/sys/appleapiopts.h /usr/include/machine/endian.h \
+  /usr/include/ppc/endian.h /Library/MySQL/include/mysql/mysql_com.h \
+  /Library/MySQL/include/mysql/mysql_version.h \
+  /Library/MySQL/include/mysql/my_alloc.h \
+  /Library/MySQL/include/mysql/errmsg.h ../../config.h \
+  ../../Engine/Headers/go.h ../../Engine/Headers/dbgflags.h \
+  ../../IoHeaders/logical.h ../../Headers/local.h ../../IoHeaders/io.h \
+  ../../IoHeaders/retcode.h ../../IoHeaders/integer.h \
+  ../../IoHeaders/number.h ../../IoHeaders/unicode.h \
+  ../../IoHeaders/formio.h ../../IoHeaders/iostr.h \
+  ../../IoHeaders/ioTcp.h ../../Engine/Headers/word.h /usr/include/math.h \
+  /usr/include/architecture/ppc/math.h \
+  /usr/include/gcc/darwin/3.3/assert.h ../../Engine/Headers/heap.h \
+  ../../Engine/Headers/vars.h ../../Engine/Headers/floats.h \
+  ../../Engine/Headers/char.h ../../Engine/Headers/symbols.h \
+  /usr/include/string.h ../../Engine/Headers/list.h \
+  ../../Engine/Headers/cons.h ../../Engine/Headers/code.h \
+  ../../Headers/opcodes.h ../../Headers/instructions.h \
+  ../../Engine/Headers/handle.h ../../Engine/Headers/msg.h \
+  ../../Engine/Headers/atts.h ../../IoHeaders/hash.h \
+  ../../Engine/Headers/opaque.h ../../Engine/Headers/str.h \
+  ../../IoHeaders/pool.h ../../IoHeaders/hosts.h \
+  ../../Engine/Headers/errors.h ../../Engine/Headers/eval.h \
+  ../../Engine/Headers/process.h ../../IoHeaders/linked.h \
+  ../../Engine/Headers/stats.h ../../Engine/Headers/dict.h \
+  ../../Engine/Headers/signals.h /usr/include/signal.h \
+  /usr/include/sys/signal.h /usr/include/machine/signal.h \
+  /usr/include/ppc/signal.h ../../Headers/dll.h
+
+/usr/include/stdlib.h:
+
+/usr/include/machine/ansi.h:
+
+/usr/include/ppc/ansi.h:
+
+/usr/include/machine/types.h:
+
+/usr/include/ppc/types.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/alloca.h:
+
+/Library/MySQL/include/mysql/mysql.h:
+
+/usr/include/sys/types.h:
+
+/usr/include/sys/appleapiopts.h:
+
+/usr/include/machine/endian.h:
+
+/usr/include/ppc/endian.h:
+
+/Library/MySQL/include/mysql/mysql_com.h:
+
+/Library/MySQL/include/mysql/mysql_version.h:
+
+/Library/MySQL/include/mysql/my_alloc.h:
+
+/Library/MySQL/include/mysql/errmsg.h:
+
+../../config.h:
+
+../../Engine/Headers/go.h:
+
+../../Engine/Headers/dbgflags.h:
+
+../../IoHeaders/logical.h:
+
+../../Headers/local.h:
+
+../../IoHeaders/io.h:
+
+../../IoHeaders/retcode.h:
+
+../../IoHeaders/integer.h:
+
+../../IoHeaders/number.h:
+
+../../IoHeaders/unicode.h:
+
+../../IoHeaders/formio.h:
+
+../../IoHeaders/iostr.h:
+
+../../IoHeaders/ioTcp.h:
+
+../../Engine/Headers/word.h:
+
+/usr/include/math.h:
+
+/usr/include/architecture/ppc/math.h:
+
+/usr/include/gcc/darwin/3.3/assert.h:
+
+../../Engine/Headers/heap.h:
+
+../../Engine/Headers/vars.h:
+
+../../Engine/Headers/floats.h:
+
+../../Engine/Headers/char.h:
+
+../../Engine/Headers/symbols.h:
+
+/usr/include/string.h:
+
+../../Engine/Headers/list.h:
+
+../../Engine/Headers/cons.h:
+
+../../Engine/Headers/code.h:
+
+../../Headers/opcodes.h:
+
+../../Headers/instructions.h:
+
+../../Engine/Headers/handle.h:
+
+../../Engine/Headers/msg.h:
+
+../../Engine/Headers/atts.h:
+
+../../IoHeaders/hash.h:
+
+../../Engine/Headers/opaque.h:
+
+../../Engine/Headers/str.h:
+
+../../IoHeaders/pool.h:
+
+../../IoHeaders/hosts.h:
+
+../../Engine/Headers/errors.h:
+
+../../Engine/Headers/eval.h:
+
+../../Engine/Headers/process.h:
+
+../../IoHeaders/linked.h:
+
+../../Engine/Headers/stats.h:
+
+../../Engine/Headers/dict.h:
+
+../../Engine/Headers/signals.h:
+
+/usr/include/signal.h:
+
+/usr/include/sys/signal.h:
+
+/usr/include/machine/signal.h:
+
+/usr/include/ppc/signal.h:
+
+../../Headers/dll.h:

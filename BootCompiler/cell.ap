@@ -1,0 +1,14 @@
+#include "go.ah";
+
+module
+  import interface <stdio.af> in
+{
+  cell(Init) => let {
+    I : Init;
+
+    get() => I;
+    set(X){
+      I := X;
+    }
+  } in (get,set);
+} export cell

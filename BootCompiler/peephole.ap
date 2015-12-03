@@ -1,0 +1,82 @@
+/*
+ * Peephole optmization
+ */
+#include "go.ah";
+#include "instr.ah";			-- pick up the instruction definition
+
+module
+import {
+  interface "misc.af" and
+  interface <stdio.af>
+} in
+{
+  same = {
+    ([],[]) => true
+  | ([E,..L],R):: E in R => same(L,R\ [E])
+  | (_,_) => false
+  };
+
+  redVoids(Code,Amap,IAmap,Ymap,IYmap) => { case Code in {
+      [] => []
+    | [Ins,..C] => { case Ins in {
+	  vdA(Reg)::Reg in Amap => redVoids(C,Amap,IAmap,Ymap,IYmap)
+	| vdA(Reg)::Reg in IAmap => redVoids(C,Amap,IAmap,Ymap,IYmap)
+	| vdA(Reg) => redVoids(C,Amap,IAmap\/[Reg],Ymap,IYmap)
+	| clY(Lc)::Lc in Ymap => redVoids(C,Amap,IAmap,Ymap,IYmap)
+	| clY(Lc)::Lc in IYmap => redVoids(C,Amap,IAmap,Ymap,IYmap)
+	| clY(Lc) => redVoids(C,Amap,IAmap,Ymap,IYmap\/[Lc])
+	| _ => compressAMap(IAmap)<>compressYMap(IYmap)<>
+	  [Ins,..redVoids(C,[],[],[],[])]
+	}
+      }
+    }
+  };
+  
+  compressAMap(Map) => collect {
+    M : [];
+
+    for Lc in sort(Map,((X,Y)=>X<Y)) do {
+      if ((L,R)::Lc==L-1||Lc==R+1) in M then{
+	if Lc==L-1 then
+	  M := (M^\ (L,R))\/[(Lc,R)]
+	else
+	  M := (M^\ (L,R))\/[(L,Lc)]
+      }
+      else
+	M := M\/[(Lc,Lc)]
+    };
+
+    for (L,R) in M do {
+      if L==R then
+	elemis vdA(L)
+      else
+	elemis vdAA(L,R-L+1)
+    }
+  };
+
+  compressYMap(Map) => collect {
+    M : [];
+
+    for Lc in sort(Map,((X,Y)=>X<Y)) do {
+      if ((L,R)::Lc==L-1||Lc==R+1) in M then{
+	if Lc==L-1 then
+	  M := (M^\ (L,R))\/[(Lc,R)]
+	else
+	  M := (M^\ (L,R))\/[(L,Lc)]
+      }
+      else
+	M := M\/[(Lc,Lc)]
+    };
+
+    for (L,R) in M do {
+      if L==R then
+	elemis clY(L)
+      else
+	elemis clYY(L,R-L+1)
+    }
+  };
+
+  peepHole(Code) => valof{
+    valis redVoids(Code,[],[],[],[])
+  }
+} export peepHole;

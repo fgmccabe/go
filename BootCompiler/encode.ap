@@ -1,0 +1,287 @@
+/*
+ * Encode a value into the standard code format
+ */
+#include "go.ah";
+
+module
+ import {
+  interface "misc.af" and
+  interface "types.af" and
+  interface "canon.af" and
+  interface <stdio.af>  
+} in {
+
+  encodeNum(N,Tg,Tail) => valof {
+    len : 0;
+    val : N;
+    bytes = collect{
+      if val>0 then{
+        lastSpecial : false;            -- true if encoding a positive no 
+        while val>0 do{                 -- that has a leading byte >= 0x80
+          elemis band(val,0xff);
+          len := len+1;
+          lastSpecial := val>=0x80;     -- is msb interpretable as a negative?
+          val := bright(val,8);
+        };
+        if lastSpecial then{            -- we may be encoding 128
+          elemis 0;                     -- put in a leading zero
+          len := len+1;
+        }
+      }
+      else{
+	while val< -1 do{
+	  elemis band(val,0xff);
+          len := len+1;
+          val := bright(val,8);
+        };
+	if val== -1 then{
+	  elemis 0xff;
+	  len := len+1;
+	}
+      }
+    };
+    if len==0 then
+      valis [bor(Tg,1),0,..Tail]
+    else
+      valis [bor(Tg,len),..rev0(bytes,Tail)]
+  };
+
+  encodeFloat(Nm,Tail) => {
+    if Nm < 0 then encodeFlt(-Nm,0x30,Tail) else encodeFlt(Nm,0x20,Tail)
+  };
+
+  encodeFlt(N,T,Tail) => valof{
+    (F,Exp) : frexp(N);
+    len : 0;
+    C = collect{
+      while F != 0.0 do{
+        (IP,FF) = modf(F*256);
+        elemis IP;
+        F := FF;
+      }
+    };
+    valis [bor(T,listlen(C)),..encodeNum(Exp,0x10,C)<>Tail]
+  };
+
+  encodeName(Nm,Tag,Tail) => valof {
+    if Nm==[] then 
+      valis encodeNum(1,Tag,[0,..Tail])
+    else{
+      len = listlen(Nm);
+      valis encodeString(Nm,Tag,Tail)
+    }
+  };
+  
+  encodeString(L,Tag,Tail) => valof{
+    Codes = collect{
+      for C in L do{
+	elemis charCode(C)
+      }
+    };
+    Uni = valof{
+      for C in Codes do{
+	if C>255 then
+	  valis true
+      };
+      valis false
+    };
+
+    if Uni then
+      valis encodeNum(2*listlen(L)+2,Tag,
+		      collect{
+			elemis 0xfe;
+			elemis 0xff;
+			for C in Codes do{
+			  elemis band(bright(C,8),255);
+			  elemis band(C,255)
+			}
+		      }<>Tail)
+    else
+      valis encodeNum(listlen(L),Tag,Codes)<>Tail
+  };
+  
+  /* Write out a program in encoded form .. */
+  encodeTerm(Term) => valof{
+    Stream = encodeTrm(Term,[]);
+    valis encodeNum(listlen(Stream),0x60,Stream);
+  };
+
+  encodeTrm(Term,Tail) => {case Term in {
+      intgr(N) => encodeNum(N,0x10,Tail)
+    | float(N) => encodeFloat(N,Tail)
+    | symb(N) => encodeName(N,0x40,Tail)
+    | ch(C) => encodeNum(charCode(C),0x50,Tail)
+    | strg(S) => encodeString(S,0x60,Tail)
+    | strct(S,N) => encodeNum(N,0x80,encodeName(S,0x40,Tail))
+    | prg(S,N) => encodeNum(N,0xa0,encodeName(S,0x40,Tail))
+    | cons(strct(N,_),A) => 
+        encodeNum(listlen(A),0x90,encodeName(N,0x40,encodeTrmList(A,Tail)))
+
+    | code(Code,Arity,Lits) => valof{
+        clen = listlen(Code);
+        CC : collect{
+          for I in Code do{
+            elemis band(bright(I,24),0xff);
+            elemis band(bright(I,16),0xff);
+            elemis band(bright(I,8),0xff);
+            elemis band(I,0xff);
+          }
+        };
+
+        CC := encodeNum(Arity,0x10,encodeNum(listlen(Lits),0x10,CC<>encodeTrmList(Lits,[])));
+
+        block = [0x1,0x3,0x5,0x7,..encodeNum(clen,0x10,CC)];
+        valis encodeNum(listlen(block),0x70,block)<>Tail;
+      }
+
+    | X => exception error("cant encodeTrm `"++X^0++"'",'inval)
+    | X => exception error("cant encodeTrm `"++showCT(X)++"'",'inval)
+    }
+  };
+
+  encodeEnum(Name,Tail) => encodeTrm(cons(strct(Name,0),[]),Tail);
+
+  encodeTrmList(L,Tail) => valof{
+    Code : Tail;
+        
+    for E in rev(L) do
+      Code := encodeTrm(E,Code);
+    valis Code;
+  };
+
+  encodeType(Type) => valof{
+    Stream = encodeT(Type,[]);
+    valis encodeNum(listlen(Stream),0x60,Stream);
+  };
+
+  encodeT(Type,Tail) => {
+    Vars : [];
+    Vno : 0;
+
+    encodeTVar(N,QL,Tl) => valof{
+      if (N,R) in Vars then
+        valis encodeNum(R,0x0,Tl)         -- encodeTrm a reference to a variable
+      else if (N,S) in QL then                -- encodeTrm a ref to a quantifier
+        valis encodeName(S,0x40,Tl)
+      else{
+        Vno := Vno+1;
+        Vars := [(N,Vno),..Vars];
+        valis encodeNum(Vno,0x0,Tl)
+      }
+    };
+
+    encodeMode(Mode,Tl) => case Mode in {
+      inpMode => encodeName("#inpMode",0x40,Tl)
+    | superMode => encodeName("#superMode",0x40,Tl)
+    | outMode => encodeName("#outMode",0x40,Tl)
+    | biMode => encodeName("#biMode",0x40,Tl)
+    };
+
+    encodeTp(Tp,QL,Tl) => case deRef(Tp) in {
+      bound(N) => encodeTVar(N,QL,Tl)
+    | allType(H,I,R) => encodeTp(uType("","-",[bound(H),I,R]),[(H,H),..QL],Tl)
+    | varType(_,_,_,_,_,_,Nm,_)::(Nm,_) in QL => encodeTVar(Nm,QL,Tl)
+    | varType(_,_,_,_,Abv,_,_,_) => encodeTp(Abv(),QL,Tl)
+    | typeType => encodeName("*#type",0x40,Tl)
+    | voidType => encodeName("*#void",0x40,Tl)
+    | topType => encodeName("*#top",0x40,Tl)
+    | tplType(L) => encodeTp(uType("","()"<>(listlen(L)^0),L),QL,Tl)
+    | faceType(M) => valof{
+        Code : Tl;
+        for (Fld,Mode,mT) in M do{
+          FldCode = encodeTp(mT,QL,Code);
+          Code := encodeNum(3,0x90,
+			    encodeName("()3",
+				       0x40,
+				       encodeName(Fld,0x40,
+						  encodeBinding(Mode,FldCode))))
+      };
+	noM = listlen(M);
+        valis encodeNum(noM,0x90,encodeName("#<~"<>(noM^0),0x40,Code))
+      }
+
+    | enuType(R) => encodeTp(conType([],R),QL,Tl)
+
+    | conType(H,R) => 
+	encodeTp(uType("","$=",[uType("","()"<>(listlen(H)^0),H),R]),QL,Tl)
+
+    | sconType(H,R) => valof{
+	Code = encodeArgTypes(H,QL,encodeTp(R,QL,Tl));
+
+	valis encodeNum(2,0x90,encodeName("#@>",0x40,Code))
+      }
+
+    | funType(H,R) => valof{
+	Code = encodeArgTypes(H,QL,encodeTp(R,QL,Tl));
+
+	valis encodeNum(2,0x90,encodeName("#=>",0x40,Code))
+      }
+
+    | predType(H) => valof{
+	Code = encodeArgTypes(H,QL,Tl);
+
+	valis encodeNum(1,0x90,encodeName("#{}",0x40,Code))
+      }
+
+    | grType(H,R) => valof{
+	Code = encodeArgTypes(H,QL,encodeTp(R,QL,Tl));
+
+	valis encodeNum(2,0x90,encodeName("#-->",0x40,Code))
+      }
+
+    | actType(H) => valof{
+	Code = encodeArgTypes(H,QL,Tl);
+
+	valis encodeNum(1,0x90,encodeName("#*",0x40,Code))
+      }
+
+    | typeDef(A,T) => 
+	encodeTp(uType("","::=",[A,tplType(T)]),QL,Tl)
+
+    | uType(Pkg,Nm,L) => valof {
+        Code : Tl;
+
+	for E in rev(L) do
+          Code := encodeTp(E,QL,Code);
+	arity = listlen(L);
+
+        valis encodeNum(arity,0x90,
+			encodeName(Pkg<>[''#,..Nm],0x40,Code))
+      }
+    | X => exception error("Cant construct type coding of "++showType(X),'fail)
+    };
+
+    encodeArgTypes(H,QL,Tl) => valof{
+      Code : Tl;
+
+      for (aTp,Mode) in rev(H) do{
+        ACode = encodeMode(Mode,encodeTp(aTp,QL,Code));
+        Code := encodeNum(2,0x90,encodeName("#()2",0x40,ACode))
+      };
+      arity = listlen(H);
+      valis encodeNum(arity,0x90,encodeName("#()"<>(arity^0),0x40,Code))
+    };
+
+    encodeFlowMode(Mode,Tl) => case Mode in {
+      inpMode => encodeName("#inpMode",0x40,Tl)
+    | superMode => encodeName("#superMode",0x40,Tl)
+    | outMode => encodeName("#outMode",0x40,Tl)
+    | biMode => encodeName("#biMode",0x40,Tl)
+    };
+
+    encodeBinding(Mode,Tl) => case Mode in {
+      varBind => encodeName("#var",0x40,Tl)
+    | tvarBind => encodeName("#tvar",0x40,Tl)
+    | typeBind => encodeName("#tpe",0x40,Tl)
+    };
+
+  }.encodeTp(Type,[],Tail);
+  
+  __debug_display__(any(X)) => X^0;
+
+  rev0(L,Tail) => case L in {
+    [] => Tail
+  | [E,..LL] => rev0(LL,[E,..Tail])
+  };
+
+} export (encodeTerm,encodeType);

@@ -1,0 +1,24 @@
+/*
+ * Module to handle some of the details of code generation 
+ */
+#include "go.ah";
+#include "instr.ah";			-- pick up the instruction definition
+
+module
+import
+{
+  interface "display.af" and
+  interface "misc.af" and
+  interface <stdio.af> 
+}
+in
+{
+  lblNo : 0;
+  newLabel() => valof{
+    XX = symbol%%([''L,..char[]%%lblNo]);
+    lblNo := lblNo+1;
+    valis XX
+  };
+
+
+} export (newLabel)

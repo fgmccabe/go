@@ -1,0 +1,143 @@
+#include "go_tok.ah";
+
+program
+import {
+  interface "url.af" and
+  interface <stdio.af>
+} in {
+
+  OptTypes ::= Debug;
+
+  operandType ::= uAr | ltl | pcl | pcr | vSz | lSz | uLt | Lt | Es | iLc | 
+  iAh | iAm | oAh | oAm | oLc | cSz | iSt ;
+
+  instruction ::= op(string,operandType[],string);
+
+
+  splitText(L) => collect{
+    Line : [];
+    for C in L do{
+      if C==''\n || C==''\r then{
+        if Line!=[] then
+          elemis rev(Line);
+        Line := [];
+      }
+      else
+        Line := [C,..Line]
+    };
+    if Line!=[] then
+      elemis rev(Line)
+  };
+
+  rev(L) => valof{
+    Out : [];
+    for X in L do
+      Out := [X,..Out];
+    valis Out
+  };
+
+  splitLine(Text) => collect{
+    Txt : Text;
+    Tok : [];
+
+    while [C,..T].=Txt do{
+      if C==''\" then{
+        Txt := T;
+        while [CC::(CC!=''\"),..TT].=Txt do{
+          Tok := [CC,..Tok];
+          Txt := TT;
+        };
+        if [''\",..TT].=Txt then
+          Txt := TT;
+        elemis rev(Tok);
+        Tok := [];
+      }
+      else if C=='', then{
+        elemis rev(Tok);
+        Tok := [];
+      }
+      else
+        Tok := [C,..Tok];
+      Txt := T;
+    };
+
+    elemis rev(Tok);
+  };
+
+  parseLine(Toks) => valof{
+    Op = head(Toks);
+    
+    Tks : tail(Toks,1);
+
+    Comment : "";
+
+    Ands = collect{
+      while [A,..nd].=Tks do{
+        case A in {
+          "uAr" -> elemis uAr
+        | "ltl" -> elemis ltl
+        | "pcl" -> elemis pcl
+        | "pcr" -> elemis pcr
+        | "vSz" -> elemis vSz
+        | "lSz" -> elemis lSz
+        | "iLt" -> elemis uLt
+        | "Lt" -> elemis Lt
+        | "Es" -> elemis Es
+        | "iLc" -> elemis iLc
+        | "iAh"-> elemis iAh 
+        | "iAm" -> elemis iAm
+        | "oAh" -> elemis oAh
+        | "oAm" -> elemis oAm
+        | "oLc" -> elemis oLc
+        | "cSz" -> elemis cSz
+        | "iSt" -> elemis iSt
+        | "" -> {}
+        | _ -> Comment := A
+        };
+        Tks := nd;
+      }
+    };
+
+    valis op(Op,Ands,Comment)
+  };
+
+  main(){
+    (files,opts) = Options();
+
+    for f in files do{
+      (ref,fn) .= mapURI(fpwd(),f);
+
+      Descriptions = splitText(grabData(fn))//splitLine//parseLine;
+      Descriptions^0>>stdout;
+    };
+  };
+
+  Options() => valof{
+    fn : [];
+    opts = collect{
+      oL : _args();
+      while oL!=[] do{
+
+        if [C,..opt].=head(oL) && (C == ''- || C==''+) then{
+          case opt in {
+            "d" -> elemis Debug
+          | _ -> {
+              "unknown option: "++opt++"\n"
+              "-d   -- enable debugging\n">>stdout;
+            }
+          }
+        }
+        else
+          fn := fn<>[head(oL)];
+
+        oL := tail(oL,1);
+      }
+    };
+
+    valis (fn,opts)
+  };
+
+
+
+
+} execute main

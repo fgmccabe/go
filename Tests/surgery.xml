@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dl::ontology dl::name="surgery">
+  <dl::concept dl::name="Doctor">
+    <dl::thing/>
+  </dl::concept>
+  <dl::concept dl::name="Specialist" dl::complete="true">
+    <dl::class dl::name="Doctor"/>
+    <dl::exists dl::property="specialty"/>
+  </dl::concept>
+  <dl::concept dl::name="AmericanSpecialist" dl::complete="true">
+    <dl::class dl::name="Specialist"/>
+    <dl::fills dl::property="country">
+      <dl::individual dl::name="america"/>
+    </dl::fills>
+  </dl::concept>
+  <dl::concept dl::name="AmericanDermatologySpecialist" dl::complete="true">
+    <dl::class dl::name="AmericanSpecialist"/>
+    <dl::fills dl::property="specialty">
+      <dl::individual dl::name="dermatology"/>
+    </dl::fills>
+  </dl::concept>
+  <dl::concept dl::name="AmericanSurgerySpecialist" dl::complete="true">
+    <dl::class dl::name="AmericanSpecialist"/>
+    <dl::fills dl::property="specialty">
+      <dl::individual dl::name="surgery"/>
+    </dl::fills>
+  </dl::concept>
+  <dl::concept dl::name="Surgeon" dl::complete="true">
+    <dl::class dl::name="Doctor"/>
+    <dl::fills dl::property="specialty">
+      <dl::individual dl::name="surgery"/>
+    </dl::fills>
+  </dl::concept>
+  <dl::concept dl::name="Dermatologist" dl::complete="true">
+    <dl::class dl::name="Doctor"/>
+    <dl::fills dl::property="specialty">
+      <dl::individual dl::name="dermatology"/>
+    </dl::fills>
+  </dl::concept>
+  <dl::import dl::url="individuals.xml"/>
+</dl::ontology>

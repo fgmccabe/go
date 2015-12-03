@@ -1,0 +1,99 @@
+/*
+ * Type definition for attributed parse tree
+ */
+
+#op('//+,infix,840);                              -- Map a list to a string
+
+type_tree ::= undef(string)
+ | voidType
+ | numType
+ | symType
+ | charType
+ | logicalType
+ | opaqueType
+ | typeType
+ | anyType
+ | thisType
+ | tplType(type_tree[])
+ | funType(type_tree[],type_tree)
+ | predType(type_tree[])
+ | grType(type_tree[],type_tree)
+ | actType(type_tree[])
+ | faceType(type_tree[],(string,type_tree)[])    -- interface type
+ | intType((string,type_tree)[])
+ | allType(string,type_tree[],type_tree) -- bound variable, interface constraints, type
+ | enumOf(type_tree)
+ | conOf(type_tree[],type_tree[],type_tree)
+ | polyType(string,type_tree[])
+ | typeFun(type_tree,type_tree)                   -- form should be typeFun(polyType(Nm,H)
+ | varType((()=>type_tree),(()=>type_tree[]),(type_tree){},(type_tree[]){},
+           (){},string) -- get, getI, set, setI, undo, name
+ ;
+
+att_tree(%tr) ::= node(%tr,type_tree,fileLoc);
+
+visibility ::= private | public | anonymous;
+
+attTree ::= iden(string)
+ | enu(string)
+ | num(number)
+ | sym(string)
+ | chr(char)
+ | str(string)
+ | lst(att_tree(attTree),att_tree(attTree))
+ | shw(att_tree(attTree),att_tree(attTree),att_tree(attTree))
+ | dot(att_tree(attTree),string)
+ | cast(att_tree(attTree),att_tree(attTree))
+ | fun(string,visibility,att_tree(attTree)[])
+ | eqn((string,type_tree)[],att_tree(attTree)[],att_tree(attTree),att_tree(attTree)[])
+ | rel(string,visibility,att_tree(attTree)[])
+ | cls((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | srel(string,visibility,att_tree(attTree)[])
+ | scls((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | grm(string,visibility,att_tree(attTree)[])
+ | grl((string,type_tree)[],att_tree(attTree)[],att_tree(attTree),att_tree(attTree))
+ | prc(string,visibility,att_tree(attTree)[])
+ | prl((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[],type_tree,att_tree(attTree)[])
+ | class(string,visibility,att_tree(attTree)[])
+ | cse(att_tree(attTree),att_tree(attTree)[])     -- case analysis
+ | bag((string,type_tree)[],att_tree(attTree),att_tree(attTree))
+ | bnd((string,type_tree)[],att_tree(attTree),(att_tree(attTree),att_tree(attTree))[]) -- bound set exp
+ | frk((string,type_tree)[],att_tree(attTree)[])  -- spawn
+ | def(string,visibility,att_tree(attTree))       -- definition
+ | asg(string,visibility,att_tree(attTree))       -- assignment
+ | ovr(string,att_tree(attTree))                  -- overwrite -- backtrackable assignment
+ | mtc(att_tree(attTree),att_tree(attTree))       -- match test
+ | app(att_tree(attTree),att_tree(attTree)[])
+ | prd(att_tree(attTree),att_tree(attTree)[])
+ | con(string,att_tree(attTree)[])                           -- term structure
+ | tpl(att_tree(attTree)[])
+ | grd(att_tree(attTree),att_tree(attTree)[])
+ | lzy(att_tree(attTree),att_tree(attTree)[])
+ | iff(att_tree(attTree),att_tree(attTree),att_tree(attTree))
+ | clss((string,type_tree)[],type_tree,att_tree(attTree),att_tree(attTree)[])
+ | crle((string,type_tree)[],att_tree(attTree),att_tree(attTree))
+ | onew(att_tree(attTree))
+ | vlof((string,type_tree)[],att_tree(attTree)[]) -- valof
+ | vlis(att_tree(attTree))                        -- valis
+ | tdf(att_tree(attTree),type_tree)
+ | tpe(string,visibility,type_tree)
+ | nt(att_tree(attTree),att_tree(attTree)[])
+ | itr((string,type_tree)[],att_tree(attTree),att_tree(attTree),att_tree(attTree)) -- iteration
+ | seq(att_tree(attTree)[])
+ | cnj(att_tree(attTree)[])
+ | frll((string,type_tree)[],att_tree(attTree)[],att_tree(attTree)[])
+ | dsj(att_tree(attTree),att_tree(attTree))
+ | neg(att_tree(attTree)[])
+ | one(att_tree(attTree)[])
+ | act(att_tree(attTree),att_tree(attTree)[])
+ | tmout((string,type_tree)[],att_tree(attTree),att_tree(attTree)[])
+ | err(att_tree(attTree),att_tree(attTree)[])
+ | sync(att_tree(attTree),att_tree(attTree)[],att_tree(attTree))
+ | imp(att_tree(attTree)[])
+ | pkrf(string,string)
+ | exc(att_tree(attTree))
+ | mdl(string[],(string[],(string,typeBinding,type_tree)[],string)[],att_tree(attTree)[]) -- module or top-level program
+ | vde        				                  -- nothing 
+ ;
+
+

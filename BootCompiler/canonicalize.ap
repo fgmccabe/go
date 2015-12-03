@@ -1,0 +1,255 @@
+/*
+ * Transform a type correct Go! program into canonical form, which can be handled directly by the compiler
+ * I.e., an expression foo(E) is transformed into XX ... foo(E,XX)
+ * Eg., the equations for append:
+ * app([],X) => X
+ * app([E,..X],Y) => [E,..app(X,Y)]
+ * becomes:
+ * app(([],X),X) :- !
+ * app(([E,..X],Y),[E,..XX]) :- !,app((X,Y),XX)
+ * Which is almost the same as the regular clausal form for append.
+ *
+ * Programs are always in a particular context, the outermost package and/or a class body
+ * Program names are munged into the form <package>#<class>@<program>
+ * More specifically,
+ * A program such as
+ * package people{
+ *   person[] ::= {name:(()=>string)}.
+ *   man(Name):person[]..{
+ *     name()=>Name.
+ *   }
+ * }
+ * becomes 
+ *   people#man@name(man(Name),this,Name).
+ * together with auxiliary clauses
+ *   people#man(name(Y),Cur,this) :- people#man@name(Cur,this,Y).
+ *   people(man(Name),Goal,this) :- people#man(Goal,man(Name),this,Y)
+ *   #
+ * and a goal of the form
+ *   Lbl.Goal
+ * where Lbl is an expression or a variable
+ * becomes 
+ *   #(Lbl,Goal,Lbl)
+ * the first Lbl is the 'class' variable, the second is the 'this' variable. The former reflects the current
+ * label, the second the original label
+ */
+
+#include "go.ah";
+
+module
+  import
+{
+  interface "misc.af" and
+  interface "errors.af" and
+  interface "findvars.af" and
+  interface "canon.af" and
+  interface "canonclass.af" and
+  interface "canonlabel.af" and
+  interface "display.af" and
+  interface "types.af" and
+  interface "ground.af" and
+  interface "debug.af" and
+  interface "st-types.af" and
+  interface <stdio.af>
+} in
+{
+  trProgram(Nd,Opts) => valof{
+    case Nd in {
+      node(mdl(Name,Imp,Prog),_,Lc) ->{
+        Version = {if version(Ver) in Opts then Ver else ""};
+        valis trModule(trPackageName(Name),Version,Imp,Prog,Lc,Opts)
+      }
+    | _ -> exception error("package expected: "<>show(Nd),'error)
+    }
+  };
+
+  trModule(mName,Version,Imps,Prog,Lc,Opts) => valof{
+    Map = packageMap(mName,Lc,Imps,Prog//((.(_,_,P).)=>P));
+
+    if dbgCanon in Opts then
+      showMap(Map)>>stdout;
+
+    entryClses : [];
+    types : [];
+    varInits : [];                                -- Which variables to initialize
+
+    for (xName,Mode,eNd::node(El,Tp,eLc).=eNd) in Prog do{
+      case El in {
+        rel(Name,Viz,Arity,Clses) ->{
+	  lName = { 
+	    case lookupRelName(Map,Name,Opts) in {
+	      localRel(vName,_,_) => vName
+	    | moduleRel(_,vName) => vName
+	    | M => exception error("invalid map entry for predicate ["<>Name<>"]: "<>M^0,'internal)
+	    }
+	  };
+
+	  prog = trPredicate(eNd,Opts,Map);
+
+	  if predType(Tps).=stripForAlls(deRef(Tp)) then
+	    genLazyVersion(Tps,[],Opts,Map,lName,prog,eLc)
+	  else
+	    exception error("bad type: "<>showType(Tp)<>" in predicate "<>xName,'error);
+
+          if Viz==public then{
+            entryClses := [generateModuleEntry(trCons(Name,Arity),lName,Arity,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | srel(Name,Viz,Arity,Clses) ->{
+	  lName = { 
+	    case lookupRelName(Map,Name,Opts) in {
+	      localRel(vName,_,_) => vName
+	    | moduleRel(_,vName) => vName
+	    | M => exception error("invalid map entry for predicate ["<>Name<>"]: "<>M^0,'internal)
+	    }
+	  };
+
+	  prog = trStrongPredicate(eNd,Opts,Map);
+
+	  if predType(Tps).=stripForAlls(deRef(Tp)) then
+	    genLazyVersion(Tps,[],Opts,Map,lName,prog,eLc)
+	  else
+	    exception error("bad type: "<>showType(Tp)<>" in predicate "<>xName,'error);
+
+          if Viz==public then{
+            entryClses := [generateModuleEntry(trCons(Name,Arity),lName,Arity,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | fun(Name,Vis,Arity,Clses) ->{
+	  lName = { case lookupFunName(Map,Name,Opts) in {
+	      localFun(vName,_,_) => vName
+	    | moduleFun(_,vName) => vName
+	    | M => exception error("invalid map entry for function ["<>Name<>"]: "<>M^0,'internal)
+	    }
+	  };
+
+	  prog = trFunction(eNd,Opts,Map);
+
+	  if funType(Tps,_).=stripForAlls(deRef(Tp)) then{
+	    RstVr = idnt(genNew("$"));
+	    genLazyVersion(Tps,[RstVr],Opts,Map,lName,prog,eLc);
+	  }
+	  else
+	    exception error("bad type: "<>showType(Tp)<>" in predicate "<>xName,'error);
+
+          if Vis==public then{
+            entryClses := [generateModuleEntry(trCons(Name,Arity+1),lName,Arity+1,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | grm(Name,Viz,Arity,Clses) ->{
+          lName = unpackName(lookupGrmName(Map,Name,Opts));
+
+	  prog = trGrammar(eNd,Opts,Map);
+
+	  if grType(Tps,_).=stripForAlls(deRef(Tp)) then{
+	    StrVr = idnt(genNew("S"));
+	    RstVr = idnt(genNew("R"));
+	    genLazyVersion(Tps,[StrVr,RstVr],Opts,Map,lName,prog,eLc);
+	  }
+	  else
+	    exception error("bad type: "<>showType(Tp)<>" in predicate "<>xName,'error);
+
+          if Viz==public then{
+            entryClses := [generateModuleEntry(trCons(Name,Arity+2),lName,Arity,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | prc(Name,Viz,Arity,Clses) ->{
+          lName = unpackName(lookupPrcName(Map,Name,Opts));
+
+	  prog = trProcedure(eNd,Opts,Map);
+
+	  if actType(Tps).=stripForAlls(deRef(Tp)) then{
+	    genLazyVersion(Tps,[],Opts,Map,lName,prog,eLc);
+	  }
+	  else
+	    exception error("bad type: "<>showType(Tp)<>" in predicate "<>xName,'error);
+
+          if Viz==public then{
+            entryClses := [generateModuleEntry(trCons(Name,Arity),lName,Arity,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | vlof(Q,Init) -> {
+          lName = prg(mungePrefix(Map)<>"$__init",listlen(extraVars(Map)));
+
+          (_,GG,_,Q1)  = trValof(eNd,Q//((.(Nm,_).)=>idnt(Nm)),Opts,Map);
+	  (QQ,preL) = accessLabel(Map,Q1);
+
+          defineProg(Map,lName,seqn([clse(QQ,extraVars(Map),preL<>GG,eLc)]));
+
+          varInits := [("$",lName),..varInits]
+        }
+      | class(Name,Viz,Arity,Entries) -> {
+          lName = unpackName(lookupClassName(Map,Name));
+
+          if dbgCanon in Opts then{
+            "Class label: "<>Name<>":"<>showType(Tp)<>"\n">>stdout;
+          };
+
+	  _ = trClass(eNd,Opts,Map);
+
+          if Viz==public then{
+            types := [(Name,varBind,Tp),..types];
+          }
+        }
+      | tpe(Name,Viz,Tp) -> {
+          if Viz==public then
+            types := [(Name,typeBind,Tp),..types];
+        }
+      | def(Name,Viz,Val) ->{
+	  (initPrg,vName) = trConstant(eNd,Opts,Map);
+
+	  if Viz==public then{
+	    vQ = idnt(genNew("$"));
+            entryClses := [generateModuleEntry(trCons(Name,1),vName,1,eLc),..entryClses];
+            types := [(Name,varBind,Tp),..types]; -- we export definition vars, but not assignable
+	    };
+	    
+	  varInits := [(Name,initPrg),..varInits];
+        }
+      | asg(Name,_,Val) ->{
+	  (initPrg,vName) = trVariable(eNd,Opts,Map);
+
+	  varInits := [(Name,initPrg),..varInits];
+        }
+      | _ ->
+          exception error("cannot handle package element: "<>show(eNd),'internal)
+      }
+    };
+
+    defineProg(Map,prg(mName<>"@$init",0),
+               seqn([clse([],[],collect{
+                            for (vN:: !(vN=="$"),lVn) in rev(varInits) do
+                              elemis call(lVn,[],noLoc);
+                            for ("$",lVn) in rev(varInits) do
+                                elemis call(lVn,[],noLoc);
+                          },noLoc)]));
+
+    -- These enable package references to work
+    defineProg(Map,prg(mName,1),seqn(entryClses));
+    
+    ImportPackages = collect{
+      for (Pname,Imported,V) in Imps do
+	elemis (trPackageName(Pname),Imported,V);
+    };
+
+    valis mdle(mName,Version,ImportPackages,types,defined(Map))
+  };
+
+  generateModuleEntry(Name,lName,Arity,Lc) => valof{
+    thisVar = idnt(genNew("$this"));
+    clsVar = idnt(genNew("$lbl"));
+
+    Q = collect{
+      for i in 1 .. Arity do
+	elemis idnt(genNew("$"));
+    };
+
+    valis clse(Q,[cons(Name,Q)],[neck(Lc),call(lName,Q,Lc)],Lc)
+  };
+
+} export (trProgram)

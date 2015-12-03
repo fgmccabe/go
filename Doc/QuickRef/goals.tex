@@ -1,0 +1,304 @@
+\chapter{Predicates and queries}
+\label{goals}
+
+\index{goals}
+A relational program is defined in terms of clauses. Predicate query conditions may occur in the bodies of clauses, guard conditions of rules and in the tests of conditionals.
+
+\section{Predicates}
+\label{theta:predicate}
+
+\index{predicate definition}
+A \emph{predicate} definition within a package or class body takes the form a sequence of clauses, grouped together by predicate symbol. 
+
+By default, the \emph{modes} of a predicate are \emph{bidirectional}. This implies that terms in the head of a clause are unified with the arguments to a predication query and that the types must similarly unify.
+
+\paragraph{Regular clause}
+\index{clause!regular}
+A regular clause may be an assertion of the form: 
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn}).
+\end{alltt}
+or a rule-clause of the form:
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn}):-\emph{Goal}.
+\end{alltt}
+
+Note that the first form is equivalent to:
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots\emph{A\subn}):-true.
+\end{alltt}
+
+\paragraph{Strong clauses}
+\label{clause:strong}
+\index{predicate!strong clause}
+\index{strong clause}
+The \firstterm{strong clause}{A form of clause that has an if-and-only-if semantics. All clauses in a predicate must be either regular or strong. In the latter case, the predicate is assumed to be formed of mutually exclusive cases -- each determined by a single strong clause.} is a variation on the clause form. Syntactically, strong clauses differ from regular clauses simply by using a `long arrow' instead of a normal clause arrow:
+\begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots,\emph{A\subn}) :-- \emph{B}
+\end{alltt}
+or, if a guard is necessary,
+ \begin{alltt}
+\emph{Name}(\emph{A\sub1},\ldots,\emph{A\subn})::\emph{G} :-- \emph{B}
+\end{alltt}
+A strong clause has an if and only if interpretation: if the head of a strong clause unifies with the call arguments -- and all embedded guards within the head are satisfied -- then no other clauses in the same program will be considered.
+
+Operationaly, strong clauses are similar to equations in function definitions: they offer shallow backtracking selection of the clauses do not permit deep backtracking once a clause has been committed to.
+
+It is not permitted to mix strong clauses and regular clauses in the same program.
+
+There is no assertional form for strong clauses. 
+
+\section{Basic queries}
+\label{goal:basic}
+
+\subsection{True/false goal}
+\index{true/false goal}
+\index{goals!\q{true}}
+\index{goals!\q{false}}
+The query:
+\begin{alltt}
+true
+\end{alltt}
+is always satisfied, whereas the query:
+\begin{alltt}
+false
+\end{alltt}
+is never satisfied.
+
+\subsection{Predication}
+\label{goal:predication}
+
+\index{predication}
+\index{goals!predication}
+A \firstterm{predication}{A syntax form that expresses a condition that must be satisfied.} is written:
+\begin{alltt}
+P(A\sub1,\ldots,A\subn)
+\end{alltt}
+This is satisfied if there is a clause that matches the query and whose body is also satisfied.
+
+Where an argument of a predicate type is marked as \emph{input}, then the corresponding actual argument may be a subtype of the expected type. Input arguments to predications, like arguments to a function call, are matched rather than unified against.
+
+\subsection{Class relative query}
+\label{goal:dot}
+\index{goals!class relative query}
+A class-relative query is written:
+\begin{alltt}
+\emph{O}.P(A\sub1,\ldots,A\subn)
+\end{alltt}
+This is satisfied if
+\begin{alltt}
+P(A\sub1,\ldots,A\subn)
+\end{alltt}
+can be satisfied relative to the class identified by \q{\emph{O}}.
+
+\subsection{Equality}
+\label{goal:equality}
+
+\index{equality}
+\index{goals!equality}
+A \q{=} is written:
+\begin{alltt}
+\emph{A} = \emph{B}
+\end{alltt}
+This is satisfied if it possible to unify \qe{A} and \q{\emph{B}}
+
+\subsection{Inequality}
+\label{goal:notequality}
+
+\index{inequality}
+\index{goals!inequality}
+The form of an inequality query is:
+\begin{alltt}
+\emph{A} != \emph{B}
+\end{alltt}
+Note that even though this query is satisfied only if \q{\emph{A}} is not unifiable with \q{\emph{B}}, they both must have the same type.
+
+\subsection{Match test}
+\label{goal:match}
+
+\index{match test}
+\index{goals!match test}
+A match test is written:
+\begin{alltt}
+\emph{P} .= \emph{T}
+\end{alltt}
+A match test will \emph{succeed} if it is possible to make \q{\emph{P}} and \q{\emph{T}} equal by binding variables in \q{\emph{P}} only.
+
+The match test  mirrors the kind of \emph{matching} that characterises the left hand sides of equations and other rules.
+ 
+\subsection{Identicality test}
+\label{goal:identical}
+
+\index{identicality test}
+\index{goals!identicality test}
+The form of a identicality test is:
+\begin{alltt}
+\emph{A} == \emph{B}
+\end{alltt}
+The \q{==} test is satisfied if the two terms are `already' equal -- without requiring any substitution of terms for variables. 
+
+\subsection{Membership test}
+\label{goal:element}
+
+\index{element of test}
+\index{goals!element of test}
+\index{goals!in@\q{in} test}
+The list membership test is:
+\begin{alltt}
+\emph{P} in \emph{L}
+\end{alltt}
+The \q{in} query is satisfied if \q{\emph{P}} is unifiable with an element of the list \q{\emph{L}}.
+
+\subsection{Sub-class of query}
+\label{goal:subclass}
+\index{goal!sub class}
+\index{inherits goal}
+The sub-class query is written:
+\begin{alltt}
+\emph{Ex} <= \emph{Lb}
+\end{alltt}
+This query is satisfied if \emph{Ex} is an object which is either already unifiable with \emph{Lb}, or is defined by a class that inherits from a class \emph{Sp} that satisfies the predicate
+\begin{alltt}
+\emph{Sp} <= \emph{Lb}
+\end{alltt}
+
+\subsection{Conjunction}
+\label{goal:conjunction}
+\index{goals!conjunction}
+\index{conjunction goal}
+
+A \emph{conjunction} is written:
+\begin{alltt}
+G\sub1,\ldots,G\subn
+\end{alltt}
+A conjunction is satisfied if all of \qe{G\subi} are satisfied \emph{in their original order}.
+
+\subsection{Disjunction}
+\label{goal:disjunction}
+
+\index{goals!disjunction}
+\index{disjunction goal}
+A \emph{disjunction} is written:
+\begin{alltt}
+(\emph{G\sub1} | \ldots | \emph{G\subn})
+\end{alltt}
+A disjunction is satisfied when one of \qe{G\subi} is satisfied; backtracking may cause more than one of \qe{G\subi} to be attempted.
+
+\subsection{Conditional}
+\label{goal:conditional}
+
+\index{goals!conditional}
+\index{conditional goal}
+\index{goals!if-then-else goal}
+\index{if-then-else goal}
+A \emph{conditional} is a triple:
+\begin{alltt}
+(\emph{T}?\emph{G\sub1}|\emph{G\sub2})
+\end{alltt}
+if \emph{T} is satisfied, then the query is satisfied when \emph{G\sub1} is, otherwise it is satisfied when \emph{G\sub2} is.
+
+Only one solution of \emph{T} is attempted; i.e., it is as though \emph{T} were implicitly a one-of query.
+
+\subsection{Negation}
+\label{goal:negation}
+
+\index{goals!negated}
+\index{negated goal}
+\index{negation as failure}
+A \firstterm{negation}{A predication which is satisfied iff its embedded predication is \emph{not} satisfied. \go uses negation-as-failure semantics negation.} query is written:
+\begin{alltt}
+\nasf{} \emph{G}
+\end{alltt}
+\go implements negation-as-failure \cite{klc:78}.
+
+\subsection{One-of}
+\label{goal:oneof}
+
+\index{goals!one-of}
+\index{one-of goal}
+\index{single solution goal}
+A \firstterm{one-of}{A predicate condition that may only be satisfied once -- the evaluation will not seek alternate solutions to a one-of condition once a successful solution has been found.} query is written:
+\begin{alltt}
+\emph{G}!
+\end{alltt}
+Only the first solution for \q{\emph{G}} is sought.
+
+\subsection{Forall}
+\label{goal:forall}
+
+\index{goals!forall}
+\index{forall query}
+\index{universally true condition}
+A \firstterm{forall}{A condition that is satisfied if a dependent goal is satisfied whenever the governing goal is satisfied. For example, all the children of someone are male, is a typical forall condition.} query takes the form:
+\begin{alltt}
+(\emph{G\sub1} *> \emph{G\sub2})
+\end{alltt}
+Such a query is satisfied if every solution of \emph{G\sub1} implies that \emph{G\sub2} is satisfied also. For example, the condition:
+\begin{alltt}
+(X in L1 *> X in L2)
+\end{alltt}
+tests that the list \q{L1} is a subset of the list \q{L2}
+
+\section{Special goals}
+\label{goals:special}
+
+The special queries allow queries that involve actions and other syntactic features.
+
+\subsection{Action query}
+\label{goal:special:action}
+
+\index{action query}
+\index{goals!action}
+The form of an \q{action} query is:
+\begin{alltt}
+action\{ \emph{A\sub1};\ldots;\emph{A\sub{i-1}};istrue \emph{G};\emph{A\sub{i+1}};\ldots;\emph{A\subn}\}
+\end{alltt}
+where \qe{A\subi} are all actions. The result of the action is returned via the \q{istrue} pseudo-action. If \qe{G} is satisfied, then the \q{action} is also satisfied.
+
+If there is no \q{istrue} action within the sequence, then the \q{action} query \emph{succeeds}.
+
+
+\subsection{Exception handler}
+\label{goal:errorhandler}
+
+\index{query!error protected}
+\index{exception handler!query}
+\index{handling exceptions in queries}
+An \q{onerror} query takes the form:
+\begin{alltt}
+\emph{Goal} onerror
+ (\emph{P\sub1} :- \emph{G\sub1}
+ | \ldots{}
+ | \emph{P\subn} :- \emph{G\subn})
+\end{alltt} 
+Semantically, an \q{onerror} goal has the same meaning as \emph{Goal}; unless a run-time problem causes the evaluation of \emph{Goal} to be terminated. In this case, the  success or failure of the protected goal depends on the success or failure of the goal in the first matching error recovery clause.
+
+\subsection{Raise exception}
+\label{goal:special:exception}
+
+\index{raise exception}
+\index{query!raise exception}
+\index{raising an exception}
+The \q{raise} psuedo-query takes the form:
+\begin{alltt}
+raise \emph{Er}
+\end{alltt}
+The \q{raise} query neither succeeds nor fails. The effect of a \q{raise} goal is to terminate the current computation and to send the \emph{Er} exception to the nearest enclosing exception handler.
+
+\subsection{Grammar query}
+\label{goal:grammar}
+
+\index{grammar condition query}
+\index{query!grammar goal}
+\index{parsing query}
+A grammar query is written:
+\begin{alltt}
+(\emph{Grammar} --> \emph{Stream})
+\end{alltt}
+This query succeeds if \emph{Grammar} parses the \emph{Stream}. 
+
+The second form of grammar goal allows for a partial parse of the stream:
+\begin{alltt}
+(\emph{Grammar} --> \emph{Stream} \tilda \emph{Remainder})
+\end{alltt}
+This form of succeeds if \emph{Grammar} parses the \emph{Stream} up to -- but not including -- the \emph{Remainder} stream. \emph{Remainder} must be a proper tail segment of the \emph{Stream}. 

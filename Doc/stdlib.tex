@@ -1,0 +1,227 @@
+\chapter{Standard Library}
+\label{stdlib}
+The standard libraries contain suites of programs that are useful in many different situations. 
+
+For many of the functions in this library, it is not necessary to explicitly \q{import} the corresponding packages. In fact, these programs are defined in the standard library \q{go.stdlib} -- which is always automatically loaded for all programs.
+
+However, some functions are in separate packages and will need to be explicitly \q{import}ed. All the packages in the standard library are part of the \q{go} package domain, and thus require an \q{import} statement of the form:
+\begin{alltt}
+\emph{packageName}\{
+  import go.\emph{library}.
+  \ldots
+\}
+\end{alltt}
+Where a function requires a specific package to be \q{import}ed, the description of the function explains which package to load.
+
+\section{List manipulation}
+\go has a simple set of functions that can be used to manipulate lists. These are essentially culled from experience of what list functions are most used; of these list append (\q{<>}) is probably the most heavily used list function.
+
+\subsection{\function{<>} -- List append}
+\label{stdlib:append}
+\synopsis{<>}{[list[t],list[t]]\funarrow{}list[t]}
+\index{<>@\q{<>} function}
+\index{Appending lists!with \q{<>} function}
+
+The \q{<>} polymorphic function appends its two arguments together: both arguments being lists of the same type. The definition of list append is quite short:
+\begin{alltt}
+[] <> X => X.
+[E,..X] <> Y => [E,..X<>Y].
+\end{alltt}
+As with many of the programs in the standard library, the \emph{name} of the function is also an operator; allowing the use of infix notation in list append expressions.
+
+\subsection{\q{append} -- List append predicate}
+\label{stdlib:app}
+\synopsis{append}{[list[t],list[t],list[t]]\{\}}
+\index{append@\q{append} predicate}
+\index{Appending lists!with \q{append} predicate}
+
+The \q{<>} list append function is convenient to use for the large majority of cases where it is used to concatenate two lists together. However, the traditional \prolog \q{append} predicate can be used for many additional things -- such as splitting lists, searching lists and so on. It is defined as:
+\begin{alltt}
+append([],X,X).
+append([E,..X],Y,[E,..Z]):-append(X,Y,Z).
+\end{alltt}
+
+\subsection{\function{listlen} -- Length of a list}
+\label{stdlib:listlen}
+\index{length of a list}
+\index{{\tt listlen} function}
+\synopsis{listlen}{[list[t]]\funarrow{}integer)}
+
+The \q{listlen} function counts the length of the list \param{L}. \q{listlen} is defined as though by:
+\begin{alltt}
+listlen(L) => len(L,0).
+
+private len:[list[t],integer]=>integer.
+len([],C) => C.
+len([\_,..L],C) => len(L,C+1).
+\end{alltt}
+
+\subsection{\function{in} -- List membership}
+\label{stdlib:in}
+\synopsis{in}{[T,list[T]]\{\}}
+\index{in@\q{in} predicate}
+\index{Test for list membership}
+
+The \q{in} standard predicate is true if the left hand argument term is on the list in the right hand argument.
+
+The definition of \q{in} is:
+\begin{alltt}
+X in [X,..\_].
+X in [\_,..Y] :- X in Y.
+\end{alltt}
+Note that unification is used to determine element equality, and that an element may be on a list more than once: the \q{in} predicate will find subsequent entries on backtracking.
+\begin{aside}
+If you look for the definition of \q{in} in the \q{go.stdlib} package source you will not find it. This is because \q{in} has such a deep relationship to many of \go's features that the compiler generates specific versions of \q{in} whenever it is used.
+\end{aside}
+
+\subsection{\function{reverse} -- List reverse}
+\label{stdlib:rev}
+\synopsis{reverse}{[list[t]]\funarrow{}list[t]}
+\index{reverse@\q{reverse} a list function}
+\index{Function to reverse lists}
+
+The \q{reverse} polymorphic function reverses its argument. This is \emph{not} `naive reverse'; \q{rev} is a linear complexity function. The definition of \q{rev} uses an auxilliary function to accomplish list reversal:
+\begin{alltt}
+reverse(L) => rv(L,[]).
+
+private rv:[list[t],list[t]]=>list[t].
+rv([],R) => R.
+rv([E,..M],R) => rv(M,[E,..R]).
+\end{alltt}
+
+\subsection{\function{nth} -- Nth element of a list}
+\label{misc:nth}
+\index{Nth element of a list}
+\index{nth@\q{nth} function}
+
+\synopsis{nth}{[list[T],integer]\funarrow{}t}
+
+The \q{nth} function returns the n$^{th}$ element of a list. The definition of \q{nth} is:
+\begin{alltt}
+nth(L,\_)::var(L)=>exception error("nth",'eINVAL').
+nth([E,..\_],1) => E.
+nth([\_,..L],N) => nth(L,N-1).
+nth([],\_) => raise error("nth",'eNOTFND').
+\end{alltt}
+
+\subsection{\q{front} -- the front portion of a list}
+\label{stdlib:front}
+\index{front@\q{front} of list function}
+\index{Get front portion of list}
+\synopsis{front}{[list[t],integer]\funarrow{}list[t]}
+
+The \q{front} function returns the front portion of a list. It is defined as though by:
+\begin{alltt}
+front([],\_)=>[].
+front([E,..L],C)::C>0 => [E,..front(L,C-1)].
+front(\_,\_) => [].
+\end{alltt}
+
+\subsection{\q{tail} -- the tail portion of a list}
+\label{stdlib:tail}
+\index{tail@\q{tail} of list function}
+\index{Get back portion of list}
+\synopsis{tail}{[list[t],integer]\funarrow{}list[t]}
+
+The \q{tail} function returns the tail portion of a list, i.e., the last N elements of the list. It is defined as though by:
+\begin{alltt}
+tail(L,C)::append(_,Tl,L), listlen(Tl,C) => Tl.
+\end{alltt}
+Note that its actual definition is significantly more efficient than this specification!
+
+\subsection{\q{drop} -- drop n elements from a list}
+\label{stdlib:drop}
+\index{drop@\q{drop} from list function}
+\synopsis{drop}{[list[t],integer]\funarrow{}list[t]}
+
+The \q{drop} function drops the first N elements from a list. It is defined as:
+\begin{alltt}
+drop:[list[t],integer]=>list[t].
+
+drop([],_)=>[].
+drop(L,0) => L.
+drop([_,..L],N) => drop(L,N-1).
+\end{alltt}
+
+
+\subsection{\function{iota} -- List construction}
+\label{stdlib:iota}
+\index{{\tt iota} function}
+\index{construct a list of integers}
+
+\synopsis{iota}{[integer,integer]\funarrow{}list[integer]}
+
+The \q{iota} function constructs a list of integers from \param{X} to \param{Y} inclusive. The definition of \q{iota} is:
+\begin{alltt}
+iota(N,M)::N>M=>[].
+iota(N,M)=>[N,..iota(N+1,M)].
+\end{alltt}
+
+\section{Set manipulation}
+These programs support sets, represented as lists. Sets are not a fully first-class structure in \go: there is no built in set data type. However, it is perhaps more useful to provide a suite of functions that implement set-like semantics over lists. In addition to these functions, \go also has two specific operators for constructing set-like lists: the bag-of expression (see section~\vref{expression:bagof}) and the bounded set expression (see section~\vref{expression:bounded}).
+
+These set functions are accessed via the \q{setlib} library:
+
+\libsynopsis{go.setlib}
+
+\subsection{\texorpdfstring{\function{\union} -- }{}Set union}
+\label{stdlib:union}
+\synopsis{\union}{[list[t],list[t]]\funarrow{}list[t]}
+
+The \q{\union} (pronounced `union') function unions two sets -- represented as lists -- together. Note that the \union function assumes that both arguments are already sets -- i.e., do not contain duplicate elements.
+
+The definition of \q{\union} is:
+\begin{alltt}
+[]\union{}X=>X.
+[E,..X]\union{}Y :: E in Y => X\union{}Y.
+[E,..X]\union{}Y => [E,..X\union{}Y].
+\end{alltt}
+
+\subsection{\texorpdfstring{\function{\intersection} -- }{}Set intersection}
+\label{stdlib:intersection}
+\synopsis{\intersection}{[list[t],list[t]]\funarrow{}list[t]}
+
+The \q{\intersection} (pronounced `intersection') function intersects two sets -- represented as lists -- together. Note that the \intersection function assumes that both arguments are already sets -- i.e., do not contain duplicate elements.
+
+The definition of \q{\intersection} is:
+\begin{alltt}
+[]\intersection{}\_=>[].
+[E,..X]\intersection{}Y :: E in Y=> [E,..X\intersection{}Y].
+[E,..X]\intersection{}Y => X\intersection{}Y.
+\end{alltt}
+
+\subsection{\texorpdfstring{\function{\difference} -- }{}Set difference}
+\label{stdlib:difference}
+\synopsis{\difference}{[list[t],list[t]]\funarrow{}list[t]}
+
+The \q{\difference} (pronounced `difference') function forms the set difference of two sets -- represented as lists -- together. Note that the \difference function assumes that both arguments are already sets -- i.e., do not contain duplicate elements.
+
+The definition of \q{\difference} is:
+\begin{alltt}
+[]\difference{}\_=>[].
+[E,..X]\difference{}Y :: \nasf{}E in Y => [E,..X\difference{}Y].
+[E,..X]\difference{}Y => X\difference{}Y.
+\end{alltt}
+
+\subsection{\texorpdfstring{\function{subset} -- }{}Subset predicate}
+\label{setlib:subset}
+\synopsis{subset}{[list[t],list[t]]\{\}}
+
+The \q{subset} predicate is true if every element of the first list is also an element of the second.
+
+For example:
+\begin{alltt}
+subset([1,34],[1,2,34,10,34,21,-3])
+\end{alltt}
+is satisfied, whereas
+\begin{alltt}
+subset([1,3,35],[1,2,34,10,34,21,-3])
+\end{alltt}
+is not, as \q{35} is not an element of the second argument.
+
+The definition of \q{subset} is:
+\begin{alltt}
+subset(X,Y) :-
+  E in X *> E in Y
+\end{alltt}
+

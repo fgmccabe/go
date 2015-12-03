@@ -1,0 +1,224 @@
+\documentclass[fleqn,11pt,openright,draft]{book}
+\usepackage{alltt,varioref,xspace,amsmath,longtable,latexsym,makeidx}
+\usepackage[final]{graphicx}
+\usepackage[intoc]{nomencl}
+\usepackage{manfnt}
+\usepackage{prog}
+\usepackage{multicol}
+\usepackage{index}
+%% \usepackage{cropmark}
+\usepackage{nap}
+\usepackage{bussproofs}
+\usepackage[pdftex=true,letterpaper=true,backref=page,hyperindex=true,pagebackref=true,linktocpage=true]{hyperref}
+\usepackage[nottoc]{tocbibind}
+\usepackage[titles]{tocloft}
+\usepackage{floatflt}
+\usepackage{float}
+\usepackage{shadow,boxedminipage}
+\usepackage[perpage,flushmargin]{footmisc}
+\usepackage{manfnt}
+\usepackage{lettrine}
+\usepackage{fancyhdr}
+
+\newcommand{\go}{{Go!}\xspace}
+\newcommand{\icm}{{\tt ICM\xspace}}
+\newcommand{\april}{{\tt April\xspace}}
+\newcommand{\prolog}{\mbox{\tt Prolog}\xspace}
+\newcommand{\lo}{\mbox{\tt L\&O}\xspace}
+\newcommand{\gcl}{\go Content Language\xspace}
+\newcommand{\golex}{{\tt Golex}\xspace}
+\newcommand{\new}{{\tt \char'044}\xspace}
+\newcommand{\reduce}{{\tt \bsl\bsl}\xspace}
+\newcommand{\map}{{\tt //}\xspace}
+\newcommand{\union}{{\tt \bsl/}\xspace}
+\newcommand{\select}{{\tt \bsl\uphat}\xspace}
+\newcommand{\intersection}{{\tt /\bsl}\xspace}
+\newcommand{\difference}{{\tt \bsl}\xspace}
+\newcommand{\funarrow}{{\mbox{\tt =>}}\xspace}
+\newcommand{\grarrow}{{\mbox{\tt -->}}\xspace}
+\newcommand{\classarrow}{{\mbox{\tt <=}\xspace}}
+\newcommand{\classtype}{{\mbox{\tt <=}\xspace}}
+\newcommand{\conarrow}{{\mbox{\tt @=}\xspace}}
+\newcommand{\sconarrow}{{\mbox{\tt @>}\xspace}}
+% \newcommand{\tinfers}{\mbox{$\vdash_{t}$}}
+% \newcommand{\impl}{{\mbox{\tt <\tilda}\xspace}}
+\newcommand{\nobject}{{\mbox{\tt \$}\xspace}}
+\newcommand{\classsynopsis}[3]{\synopsis{#1}{#2@=#3}}
+\newcommand{\synopsis}[2]{\par\noindent\begin{boxed}\begin{alltt}#1:\type{#2}\end{alltt}\end{boxed}\vskip1ex\noindent}
+%\newcommand{\psynopsis}[1]{{\tt #1:\type{#2}}\par\vskip1ex\noindent}
+\newcommand{\libsynopsis}[1]{\par\vspace{1ex}\par\noindent\begin{boxed}\begin{alltt}
+import #1.
+\end{alltt}\end{boxed}
+\vskip1ex\noindent}
+%\newcommand{\hint}[2]{\par\emph{Hint:}\index{#1}\begin{quote}#2\end{quote}\par}
+\newcommand{\subtype}[2]{\ensuremath{\emph{#1\/}\preceq\emph{#2}}}
+\newcommand{\typesafe}[2]{\ensuremath{\emph{#1\/}\vdash_{\mbox{\scriptsize\emph{ok}}}#2}}
+\newcommand{\safegoal}[2]{\ensuremath{\emph{#1\/}\vdash_{\mbox{\scriptsize\emph{safe}}}#2}}
+\newcommand{\safeact}[2]{\ensuremath{\emph{#1\/}\vdash_{\mbox{\scriptsize\emph{safe$_A$}}}#2}}
+\newcommand{\grammprd}[3]{\ensuremath{\emph{#1}~\vdash_{safe_G}#2\leadsto#3}}
+\newcommand{\safegrammar}[3]{\ensuremath{\emph{#1}~\tinfers{}\mbox{\emph{safe$_G$($#2$,$#3$)}}}}
+\newcommand{\implements}[3]{\ensuremath{\emph{#1}~\tinfers{}#2\impl\q{\{}#3\q{\}}}}
+\newcommand{\extends}[4]{\ensuremath{\emph{#1}~\tinfers{}\/\mbox{\emph{extends\sub{\theta}}(#2)=[#3,..#4]}}}
+
+\title{\Huge Go! reference manual\\
+\large
+\input version.tex
+}
+\author{Francis G. M$^c$Cabe}
+%\proofmodetrue
+\makeindex
+\makenomenclature
+
+\begin{document}
+
+\floatstyle{ruled}
+\floatname{program}{Program}
+\newfloat{program}{hbt}{lop}[chapter]
+
+\frontmatter
+\thispagestyle{empty}
+\newcommand{\HRule}{\rule{\linewidth}{1mm}}
+\vspace*{\stretch{1}}
+\begin{flushright}
+\HRule
+\\
+\Huge Go! reference manual\\
+\large
+\input version.tex
+\\[1ex]
+\huge Francis G. M$^c$Cabe
+\HRule
+\end{flushright}
+\vspace*{\stretch{2}}
+\begin{center}
+\Large\textsc{Network Agent Press\\
+\today}
+\end{center}
+\newpage{}
+\thispagestyle{empty}
+{
+\parindent=0in
+\parskip=1ex
+{\bf\large \go Reference Manual}
+
+Copyright \copyright 2006 Francis G. M$^c$Cabe\\
+ISBN 0-9754449-3-X\\
+
+\vspace*{\stretch{1}}
+Many of the designations used by manufacturers and sellers to distinguish their products are claimed as trademarks. Where Network Agent Press is aware of such trademark claims, and where referenced in this text, the designations have been printed in caps, or initial caps.
+
+While every precaution has been taken in the preparation of this book, the publisher assumes no responsibility for errors or omissions, or for damages resulting from the use of information contained therein.
+
+\vspace*{4ex}
+Network Agent Press\\
+Contact frankmccabe@mac.com\\
+}
+
+\newpage{}
+\thispagestyle{empty}
+\vspace*{\stretch{1}}
+\begin{center}
+\emph{For Miko and Stephen, without whom, none of this makes sense}
+\end{center}
+\vspace*{\stretch{2}}
+\cleardoublepage
+
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter\ #1}{}} \renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+\fancyhf{} % delete current setting for header and footer
+\fancyhead[LE,RO]{\bfseries\thepage}
+\fancyhead[LO]{\bfseries\rightmark}
+\fancyhead[RE]{\bfseries\leftmark}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0pt}
+\addtolength{\headheight}{0.5pt} % make space for the rule
+
+\fancypagestyle{plain}{
+% 
+\fancyhead{} % get rid of headers on plain pages 
+\renewcommand{\headrulewidth}{0pt} % and the line
+} 
+%\pagestyle{headings}
+
+\include{preface}
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter. #1}{}} 
+
+\makeatletter
+\renewcommand{\@pnumwidth}{2.5em}
+\renewcommand{\@tocrmarg}{2.7em}
+\makeatother
+
+\markboth{Contents}{Contents}
+
+\tableofcontents
+\cleardoublepage
+
+\markboth{List of Programs}{List of Programs}
+\addcontentsline{toc}{chapter}{List of Programs}
+\listof{program}{List of Programs}
+\markboth{}{}
+\cleardoublepage
+\markboth{List of Figures}{List of Figures}
+\addcontentsline{toc}{chapter}{List of Figures}
+\listof{figure}{List of Figures}
+\markboth{}{}
+\cleardoublepage
+\markboth{List of Examples}{List of Examples}
+\addcontentsline{toc}{chapter}{List of Examples}
+\listof{example}{List of Examples}
+\markboth{}{}
+\cleardoublepage
+\listoftables
+\markboth{}{}
+
+\mainmatter
+
+\part{Syntax and semantics of \go\ programs}
+\include{grammar}
+\include{types}
+\include{expressions}
+\include{goals}
+\include{actions}
+\include{grammarrule}
+\include{lo}
+\include{programs}
+%\include{canonical}
+\part{Standard library}
+The Standard library consists of the functions, predicates and actions that are part of the standard definition of \go. Note, however, that in order to access certain of these built-in functions it may be necessary to use explicit \function{import} directives.
+\include{arith}
+\include{stdlib}
+\include{chars}
+\include{string}
+\include{dynamic}
+\include{io}
+\include{message}
+\include{time}
+\include{misc}
+\include{xml}
+\include{lexer}
+%\include{http}
+%\include{gcl}
+\part{Using \go}
+\include{compile}
+\include{errorcodes}
+\appendix
+\include{install}
+\include{emacs}
+\include{debugging}
+\include{gpl}
+\bibliographystyle{plain}
+\bibliography{LogicBib}
+\cleardoublepage
+
+% To generate the glossary do:
+% latex go-ref
+% makeindex go-ref.glo -s nomencl.ist -o go-ref.gls 
+% latex go-ref (a few more times)
+
+\renewcommand{\nomname}{Glossary}
+%\renewcommand{\nompreamble}{\addcontentsline{toc}{chapter}{Glossary}\label{glossary}}
+\markboth{\MakeUppercase\nomname}{\MakeUppercase\nomname}
+\printnomenclature[1in]
+\cleardoublepage
+\printindex
+\end{document}

@@ -1,0 +1,12 @@
+-- Number grammar
+
+Number -> Integer / Real.
+
+Integer -> Digit / Integer Digit.
+
+Real -> Integer Fraction Scale.
+Fraction -> "." Integer.
+Scale -> "e" Sign Integer / ().
+
+Digit -> [0-9].
+Sign -> [-+].

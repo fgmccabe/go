@@ -1,0 +1,58 @@
+/*
+ * Module to handle reporting syntax errors
+ */
+
+#include "go_tok.ah";
+
+module
+  import {
+    interface <stdio.af> and
+    interface "misc.af"
+  }in
+{
+  insideEmacs() => valof {
+    emacsVar = (try getenv("EMACS") onerror _ => "");
+    valis emacsVar != "";
+  };
+
+  report(stream, Ln, colourStart, colourStop, msg) {
+    fflush(stdout);
+    if insideEmacs() then{
+      if loc(fl,ln,_,_).=Ln then
+        relativizePath(fl)++":"++ln^0++":" >> stream
+      else
+        "unknown:0">>stream
+    }
+    else{
+      if loc(Fl,ln,_,_).=Ln then{
+        colourStart++"Line "++ln^0++colourStop++"\n" >> stream;
+      }
+      else
+        "unknown location\n">>stream;
+    };
+    msg >> stream;
+    fflush(stream);
+  };
+
+  relativizePath(P) => relativizePath1(fpwd(), P);
+  relativizePath1 = {
+    (cwd, cwd++rest) => rest
+  | (cwd, path) => path
+  };
+
+  errCnt : 0;
+  reportError(er,Loc){
+    report(stderr, Loc, "\e[31m", ":\e[0m", "Syntax error: "++er++"\n");
+    errCnt +:=1;
+  };
+  errCount() => errCnt;
+
+  warnCnt : 0;
+  reportWarn(er,Loc){
+    report(stderr, Loc, "\e[34m", "\e[0m", "Warning: "++er++"\n");
+    warnCnt +:=1;
+  };
+  warnCount() => warnCnt;
+
+
+} export (reportError,errCount,reportWarn,warnCount);

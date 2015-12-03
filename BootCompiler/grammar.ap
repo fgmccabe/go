@@ -1,0 +1,504 @@
+/*
+ * Operator precedence grammar parser
+ * The basis of the Go! syntax
+ */
+
+#include "go.ah";
+#include "ops.ah";
+
+module
+  import { interface <stdio.af> and
+           interface "ops.af" and
+           interface "url.af" and
+           interface "abstract.af" and
+           interface "errors.af"}
+in
+{
+
+  showTok((T.=yyTok,L.=yyLine,P.=yyPos,E.=yyLPos)) => {
+    case T in {
+      TERM => "TERM"
+    | COMMA => "COMMA"
+    | CONS => "CONS"
+    | LPAR => "("
+    | RPAR => ")"
+    | LBRA => "["
+    | RBRA => "]"
+    | LBRCE => "{"
+    | RBRCE => "}"
+    | QBRA => "%["
+    | QKET => "]%"
+    | QUOTE(N) => "\'"++string%%N++"\'"
+    | ID(N) => N
+    | IN(N) =>string%%N 
+    | FT(N) =>string%%N 
+    | STR(N) => N
+    | CH(C) => "`"++[C]
+    | EOF => "<<end-of-file>>"
+    }
+  };
+    
+  synError(locn,er,s) => valof {
+    reportError(er,locn);
+    valis s
+  };
+
+  parse(userBase,uri,Opts) => let {
+    location(Ln,Pi,Po) => loc(uri,Ln,Pi,Po);
+
+    term00([(tok.=yyTok,ln.=yyLine,sPs.=yyPos,ePs.=yyLPos),..stream])=> {
+      case tok in {
+	ID(n) => { 
+	  if isOperator(n) && !lookAhead(stream,RPAR) then 
+	    synError(location(ln,sPs,ePs),"unexpected operator: "++n^0,(stream,VOID))
+	  else
+	    (stream,IDEN(location(ln,sPs,ePs),n))
+	}
+  
+      | LPAR => valof {
+	  if [(RPAR.=yyTok,ln1.=yyLine,_,xPs.=yyLPos),..rs].=stream then
+	    valis (rs,IDEN(location(ln,sPs,xPs),"()"))
+	  else{
+	    ([(tok.=yyTok,el.=yyLine,Pi.=yyPos,Px.=yyLPos),..rest],_,V)=term(stream,2000,true);
+	    if tok==RPAR then
+	      valis (rest,V)
+	    else
+	      valis synError(location(el,Pi,Px),"close parenthesis expected at "++showTok((yyTok=tok,yyLine=el,yyPos=Pi,yyLPos=Px))++", left paren at line: "++ln^0,(stream,VOID))
+	  }
+	}
+	
+      | LBRA => valof {
+          (rstream,L) = parseList(ln,sPs,stream);
+          if [(RBRA.=yyTok,el.=yyLine,Pi.=yyPos,Px.=yyLPos),..rs].=rstream then
+	    valis (rs,L)
+          else
+            valis synError(location(ln,sPs,ePs),"close bracket expected, left bracket at line: "++ln^0,(stream,VOID))
+	}
+
+      | LBRCE => valof {
+	  if [(RBRCE.=yyTok,lx.=yyLine,Pi.=yyPos,Px.=yyLPos),..rs].=stream then
+	    valis (rs,IDEN(location(ln,sPs,Px),"{}"))
+	  else{
+	    ([(tok.=yyTok,el.=yyLine,Pi.=yyPos,Px.=yyLPos),..rest],_,V)=term(stream,2000,true);
+	    if tok==RBRCE then
+	      valis (rest,APPLY(location(ln,sPs,Px),IDEN(location(ln,sPs,Px),"{}"),[V]))
+	    else
+	      valis synError(location(ln,sPs,Px),"close brace expected, left brace at line: "++ln^0,(stream,VOID))
+	  }
+	}
+
+      | QBRA => valof { -- beginning of a quine quote
+	  ([(tok.=yyTok,el.=yyLine,Pi.=yyPos,Px.=yyLPos),..rest],_,V)=term(stream,2000,true);
+	  if tok==QKET then
+	    valis (rest,APPLY(location(ln,sPs,Px),IDEN(location(ln,sPs,Px),"$meta"),[V]))
+	  else
+	    valis synError(location(el,Pi,Px),"close meta quote  expected at "++showTok((yyTok=tok,yyLine=el,yyPos=Pi,yyLPos=Px))++", left meta quote at line: "++ln^0,(stream,VOID))
+	  }
+	
+      | RPAR => 
+	  synError(location(ln,sPs,ePs),"unexpected close parenthesis",(stream,VOID))
+      | RBRA => 
+	  synError(location(ln,sPs,ePs),"unexpected close bracket",(stream,VOID))
+      | RBRCE => 
+	  synError(location(ln,sPs,ePs),"unexpected close brace",(stream,VOID))
+
+      | QKET => 
+	  synError(location(ln,sPs,ePs),"unexpected close meta quote",(stream,VOID))
+      | CONS => 
+	  synError(location(ln,sPs,ePs),"unexpected ,..",(stream,VOID))
+      | COMMA => 
+	  synError(location(ln,sPs,ePs),"unexpected comma",(stream,VOID))
+      | TERM => 
+	  synError(location(ln,sPs,ePs),"unexpected terminator",(stream,VOID))
+      | EOF => 
+	  ([],END)
+      }
+    };
+
+    term0(stream::[(tok.=yyTok,ln.=yyLine,sPs.=yyPos,ePs.=yyLPos),..strm].=stream)=> {
+      case tok in {
+	CH(c) => (strm,CHR(location(ln,sPs,ePs),c))          -- The first cases may not be parenthesised
+      | STR(s) => valof {
+          Px : ePs;
+	  S : s;
+	  rstream : strm;
+	  while [(STR(T).=yyTok,_,_,px.=yyLPos),..rs].=rstream do{
+	    S := S<>T;
+	    rstream := rs;
+            Px := px;
+	  };
+	  valis (rstream,ST(location(ln,sPs,Px),S))
+	}
+      | IN(n) => (strm,INT(location(ln,sPs,ePs),n))
+      | FT(n) => (strm,FLT(location(ln,sPs,ePs),n))
+      | QUOTE(n) => (strm,SYM(location(ln,sPs,ePs),n))
+      | _ => valof{
+          (rstrm,F) = term00(stream);
+        
+          valis termArgs(rstrm,F);
+        }
+      }
+    };
+
+    termArgs(stream,soFar) => valof{
+      strm : stream;
+      F : soFar;
+      
+      if F==END || strm==[] then
+	valis (strm,F)
+      else{
+        while [(hed.=yyTok,Ln.=yyLine,sPs.=yyPos,ePs.=yyLPos),..rs].=strm do{
+          case hed in {
+            LPAR -> {
+              if [(RPAR.=yyTok,_,_,Px.=yyLPos),..rs0].=rs then{
+		loc(_,fLn,fPi,_).=Context(F);
+                F := APPLY(location(fLn,fPi,Px),F,[]);
+                strm := rs0;
+              }
+              else{
+                (rs0,els) = tupleTerm([(yyTok=COMMA,yyLine=Ln,yyPos=sPs,yyLPos=ePs),..rs],[],true);
+                Px : ePs;
+                
+                if [(RPAR.=yyTok,_,_,px.=yyLPos),..rs1].=rs0 then{
+		  loc(_,fLn,fPi,_).=Context(F);
+                  F := APPLY(location(fLn,fPi,px),F,els);
+                  strm := rs1;
+                  Px := px;
+                }
+                else
+                  valis synError(location(Ln,sPs,Px),"close parenthesis expected, near "++showTok(head(rs0)),(rs0,F))
+              }
+            }
+          | LBRA -> {
+              if [(RBRA.=yyTok,_,_,px.=yyLPos),..rs0].=rs then{
+		loc(_,fLn,fPi,_).=Context(F);
+                F := SQUARE(location(fLn,fPi,px),F,[]);
+                strm := rs0;
+              }
+              else{
+                (rs0,els) = tupleTerm([(yyTok=COMMA,yyLine=Ln,yyPos=sPs,yyLPos=ePs),..rs],[],true);
+                Px : ePs;
+                
+                if [(RBRA.=yyTok,_,_,px.=yyLPos),..rs1].=rs0 then{
+		  loc(_,fLn,fPi,_).=Context(F);
+                  F := SQUARE(location(fLn,fPi,px),F,els);
+                  strm := rs1;
+                  Px := px;
+                }
+                else
+                  valis synError(location(Ln,sPs,Px),"close square expected, near "++showTok(head(rs0)),(rs0,F))
+              }
+            }
+
+          | LBRCE -> {
+              if [(RBRCE.=yyTok,_,_,px.=yyLPos),..rs0].=rs then{
+		loc(_,fLn,fPi,_).=Context(F);
+                F := BRACE(location(fLn,fPi,px),F,[]);
+                strm := rs0;
+              }
+              else{
+                Px : ePs;
+                (rs0,_,A) = term(rs,2000,true);
+                
+                if [(RBRCE.=yyTok,_,_,px.=yyLPos),..rs1].=rs0 then{
+		  loc(_,fLn,fPi,_).=Context(F);
+		  F := BRACE(location(fLn,fPi,px),F,[A]);
+                  strm := rs1;
+                  Px := px;
+                }
+                else{
+                  if [(_,_,_,px.=yyLPos),.._].=rs0 then
+                    Px := px;
+                  valis synError(location(Ln,sPs,Px),"close brace expected, near "++showTok(head(rs0))++
+                                 " left brace at line "++Ln^0,(rs0,F))
+                }
+              }
+            }
+          | ID(".") -> {                        -- handle the field selector at low level
+              if [(ID(Field).=yyTok,lx.=yyLine,sPs.=yyPos,ePs.=yyLPos),..rs0].=rs then {
+		Lc = location(Ln,sPs,ePs);
+		loc(_,fLn,Pi,_).=Context(F);
+                F := APPLY(location(fLn,Pi,ePs),IDEN(Lc,"."),[F,IDEN(Lc,Field)]);
+                strm := rs0;
+              }
+              else
+                valis synError(location(Ln,sPs,ePs),"identifier expected after '.'",(rs,VOID));
+            }
+          | _ ->
+            valis (strm,F)
+          }
+        }
+      }
+    };
+
+    tupleTerm(stream,soFar,inside) => valof{
+      S : stream;
+      tpl : soFar;
+       
+      while [(COMMA.=yyTok,_,_,_),..rstream].=S do{
+  	(rs,rp,right) = term(rstream,999,inside);
+  	
+  	tpl := tpl<>[right];
+  	S := rs;
+      };
+      
+      valis (S,tpl)
+    };
+    
+    termLeft(stream,prior,inside) => valof {
+      [(tok.=yyTok,ln.=yyLine,sPs.=yyPos,ePs.=yyLPos),..rstream] : stream;
+      case tok in {
+	CH(_) -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+	
+      | STR(_) -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | IN(_) -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | FT(_) -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | QUOTE(_) -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+	
+      | ID(n) -> {
+	  (O,R) = prefixPr(n);
+	  if O<=prior then {
+	    if [(RPAR.=yyTok,_,_,Px.=yyLPos),..rs].=rstream then 
+	      valis (rstream,0,IDEN(location(ln,sPs,Px),n))
+	    else{
+	      (rs,_,left) = term(rstream,R,inside);
+	      Lc = location(ln,sPs,ePs);
+	      loc(_,_,Pi,_).=Context(left);
+	      
+	      valis (rs,O,APPLY(location(ln,Pi,ePs),IDEN(Lc,n),[left]))
+	    }
+	  }
+	  else if O!=10000 then
+	    valis synError(location(ln,sPs,ePs),"priority of "++n++" is greater than "++prior^0,
+			   (stream,prior,VOID))
+	  else{
+	    (rs,left) = term0(stream);
+	    valis (rs,0,left)
+	  }
+	}
+	
+      | LPAR  -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | LBRA  -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | LBRCE -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+      | QBRA  -> {
+	  (rs,left) = term0(stream);
+	  valis (rs,0,left)
+	}
+
+      | EOF ->
+	  valis ([],0,END)
+      | _ -> 
+	  valis synError(location(ln,sPs,ePs),showTok(head(stream))++" not permitted here",(rstream,0,VOID))
+      }
+      onerror{
+	error(_,'matcherr)->
+	  valis ([],0,END)
+      }
+    };
+    
+    termRight(stream,prior,lprior,left,inside) => valof {{
+	loc(_,_,Pi,_).=Context(left);
+	[(tok.=yyTok,ln.=yyLine,sPs.=yyPos,ePs.=yyLPos),..rstream] : stream;
+	
+	case tok in {
+          ID(".") -> {                          -- Special rule for handling field access
+	    [(hed.=yyTok,_,_,Px.=yyLPos),..rrstream].=rstream;
+            Lc = location(ln,sPs,ePs);
+	    
+	    if ID(Field).=hed then{
+	      valis termRight(rstream,prior,lprior,APPLY(location(ln,Pi,Px),IDEN(Lc,"."),[left,IDEN(location(ln,sPs,Px),Field)]),inside)
+	    }
+	    else
+              valis synError(Lc,showTok(head(rstream))++" not allowed here; identifier expected",(rstream,prior,VOID))
+          }
+	    
+	| ID(n) -> {
+	    if (L,O) .= postfixPr(n) && O!=10000 then {
+	      if L>=lprior && O<=prior then {
+		if(XL,XO,XR) .= infixPr(n) && XO<=prior && XL>=lprior then {
+		  /* operator is both infix and postfix */
+		  [(hed.=yyTok,_,_,_),.._]=rstream;  -- look ahead one token
+		
+		  if QUOTE(_).=hed || STR(_) .=hed || IN(_).=hed || FT(_).=hed || 
+                  LPAR.=hed || LBRA.=hed || LBRCE.=hed || QBRA.=hed || 
+		  (ID(nn).=hed && (!isOperator(nn) ||
+				   (PP,_).=prefixPr(nn) && PP<=XL ||
+				   (PP,_,_).=infixPr(nn) && PP<=XL)) then {
+				 
+		    (rs,rp,right) = term(rstream,XR,inside);
+		    loc(_,_,_,Px).=Context(right);
+		    Lc = location(ln,Pi,Px);
+
+		    valis termRight(rs,prior,XO,APPLY(Lc,IDEN(location(ln,sPs,ePs),n),[left,right]),inside)
+		  }
+		  else{
+		    valis termRight(rstream,prior,O,
+				    APPLY(location(ln,Pi,ePs),
+					  IDEN(location(ln,sPs,ePs),n),
+					  [left]),inside)
+		  }
+		}
+		else{			-- postfix only
+		  valis termRight(rstream,prior,O,
+				  APPLY(location(ln,Pi,ePs),
+					IDEN(location(ln,sPs,ePs),n),
+					[left]),inside)
+		}
+	      }
+	      else{
+		if(XL,XO,XR) .= infixPr(n) && XO<=prior && XL>=lprior then { -- test for infix too
+		  /* operator is both infix and postfix */
+		  [(hed.=yyTok,lx.=yyLine,sO.=yyPos,xO.=yyLPos),.._]=rstream;  -- look ahead one token
+		
+		  if QUOTE(_).=hed || STR(_) .=hed || IN(_).=hed || FT(_).=hed || 
+                  LPAR.=hed || LBRA.=hed || LBRCE.=hed || QBRA.=hed ||
+		  (ID(nn).=hed && (!isOperator(nn) ||
+				   (PP,_).=prefixPr(nn) && PP<=XL ||
+				   (PP,_,_).=infixPr(nn) && PP<=XL)) then {
+				 
+		    (rs,rp,right) = term(rstream,XR,inside);
+		    loc(_,_,_,Px).=Context(right);
+		    
+		    valis termRight(rs,prior,XO,APPLY(location(ln,Pi,Px),IDEN(location(ln,sO,xO),n),[left,right]),inside)
+		  }
+		  else
+		    valis (stream,lprior,left) -- since it is a postfix operator, albeit out of scope we go up a level
+		}
+		else
+		  valis (stream,lprior,left) -- here too
+	      }
+	    }
+	    else if (L,O,R) .= infixPr(n) && L>=lprior && O<=prior then {
+              (rs,rp,right) = term(rstream,R,inside);
+	      loc(_,_,_,Px).=Context(right);
+              valis termRight(rs,prior,rp,APPLY(location(ln,Pi,Px),IDEN(location(ln,sPs,ePs),n),[left,right]),inside)
+	    }
+	    else
+	      valis (stream,lprior,left)
+	  }
+	| CH(_) -> valis (stream,lprior,left)
+	| STR(_) -> valis (stream,lprior,left)
+	| QUOTE(_) -> valis (stream,lprior,left)
+	| RPAR  -> valis (stream,lprior,left)
+	| RBRA  -> valis (stream,lprior,left)
+	| RBRCE  -> valis (stream,lprior,left)
+	| QKET -> valis (stream,lprior,left)
+	| CONS  -> valis (stream,lprior,left)
+	| COMMA -> {
+	    if prior >= 1000 && lprior<=999 then
+	      valis termRight([(yyTok=ID(","),yyLine=ln,yyPos=sPs,yyLPos=ePs),..rstream],
+			      prior,lprior,left,inside)
+	    else
+	      valis (stream,lprior,left)
+	  }
+	  	  
+	| TERM -> {
+	    if !inside then
+	      valis (stream,lprior,left)
+	    else
+	      valis termRight([(yyTok=ID(". "),yyLine=ln,yyPos=sPs,yyLPos=ePs),..rstream],prior,lprior,left,inside)
+	  }
+	| EOF -> valis (stream,lprior,left)
+	  
+	| _ -> valis synError(location(ln,sPs,ePs),
+			      showTok(head(stream))++" not allowed here",
+			      (rstream,prior,VOID))
+	}
+      }
+      onerror{
+	error(_,matcherr) -> valis (stream,lprior,left)
+      | failed -> valis (stream,lprior,left)
+      | E -> exception E
+      }
+    };
+    
+    term(stream,prior,inside) => valof {
+      (rstream,lprior,left) = termLeft(stream,prior,inside);
+      valis termRight(rstream,prior,lprior,left,inside);
+    };
+    
+    lookAhead([(tok.=yyTok,_,_,_),.._],tst)=>tok==tst;
+    
+    parseList(ln,sPs,stream) => valof {
+      if [(RBRA.=yyTok,_,_,Px.=yyLPos),.._].=stream then
+	valis (stream,IDEN(location(ln,sPs,Px),"[]"))
+      else{
+	(rstream,_,H)=term(stream,999,true);
+	
+	if [(tok.=yyTok,el.=yyLine,Pi.=yyPos,Px.=yyLPos),..rs].=rstream then {
+	  case tok in {
+	    RBRA -> 
+	      valis (rstream,APPLY(location(ln,sPs,Px),
+				   IDEN(location(el,Pi,Px),",.."),
+		                   [H,IDEN(location(el,Pi,Px),"[]")]))
+	  | COMMA -> {
+	      (rs2,T) = parseList(ln,sPs,rs);
+	      loc(_,_,_,Pt).=Context(T);
+	      valis (rs2,APPLY(location(el,sPs,Pt),IDEN(location(el,Pi,Px),",.."),[H,T]))
+	    }
+	  | CONS -> {
+	      (rs2,_,T) = term(rs,999,true);
+	      loc(_,_,_,Pt).=Context(T);
+	      valis (rs2,APPLY(location(ln,sPs,Pt),IDEN(location(el,Pi,Pt),",.."),[H,T]))
+	    }
+	  | _ ->
+	      valis synError(location(el,Pi,Px),"',' or ',..' missing, close bracket expected",(rstream,VOID))
+	  }
+	}
+	else
+	  valis synError(location(ln,sPs,sPs),"close bracket expected",(rstream,VOID))
+      }
+    };
+    
+  } in valof {
+    if dbgParse in Opts then
+      "Processing "++uri>>stdout;
+    S : streamer(uri);
+
+    if dbgToken in Opts then{
+      "\n"<>listlen(S)^0<>" tokens found:\n">>stdout;
+      for Tkn in S do
+	Tkn^0<>"\n">>stdout;
+    };
+      
+    valis collect{
+      while (NS,_,T) .= term(S,2000,false) && T!=END do{
+        if [(TERM.=yyTok,_,_,_),..rs].=NS then
+          S := rs
+        else
+          S := NS;
+        if dbgParse in Opts then
+          "\nParsed file: "++display(T)++"\n">>stdout;
+        elemis T;
+      }
+    };
+    if dbgParse in Opts then
+      " Ok\n">>stdout;
+  };
+} export (parse);
+
+

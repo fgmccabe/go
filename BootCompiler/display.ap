@@ -1,0 +1,578 @@
+/*
+ * A module to display an op_tree expression in a way that looks nice
+ */
+
+#include "go.ah";
+#include "ops.ah";
+#include "instr.ah";
+
+module
+import{
+  interface "ops.af" and
+  interface "types.af" and
+  interface "misc.af" and
+  interface "abstract.af" and
+  interface <stdio.af>
+}
+in
+{
+
+  NameToStr = {
+    [] => ""
+  | [C,..L] => strChr(C)++NameToStr(L)
+  };
+
+  strChr = {
+    ''\a => "\\a"
+  | ''\b => "\\b"
+  | ''\d => "\\d"
+  | ''\e => "\\e"
+  | ''\f => "\\f"
+  | ''\n => "\\n"
+  | ''\r => "\\r"
+  | ''\t => "\\t"
+  | ''\v => "\\v"
+  | ''\' => "\\'"
+  | ''\" => "\\\""
+  | ''\\ => "\\\\"
+  | X => string%%X
+  };
+
+  dispName(N) => {
+    if (_,P::P!=10000,_).=infixPr(N) ||
+    (P::P!=10000,_).=prefixPr(N) ||
+    (_,P::P!=10000).=postfixPr(N) then
+      "("++NameToStr(N)++")"
+    else
+      NameToStr(N)
+  };
+
+  showParen(XP,prior,P) => {
+    if XP>prior then
+      P
+    else
+      ""
+  };
+
+  showQuants(Q,alt) => valof{
+    if alt then{
+      str : "[";
+      sep : "";
+      for (V,T) in Q do{
+        str := str++sep++string%%V;
+        if alt then
+          str:=str++":"++showType(T);
+        sep := ",";
+      };
+      valis str++"]-"
+    }
+    else
+      valis ""
+  };
+  
+  showLineInfo(cLc,eLc,indent,alt) => {
+    if alt && (cLc!=eLc) then "\n"++showLocation(eLc)++":"++indent else ""
+  };
+
+  showExp(node(E,eTp,eLc),prior,indent,alt,cLc) => /*showLineInfo(cLc,eLc,indent,alt)++*/{
+    case E in {
+      iden(N) => dispName(N)
+    | enu(N)::alt => "*"++string%%N++"*"
+    | enu(N) => N
+    | int(N) => N^0
+    | flt(N) => N^0
+    | chr(C) => "\`"++strChr(C)
+    | str(S) => "\""++NameToStr(S)++"\""
+    | sym("[]") => "[]"
+    | sym(N) => "\'"++NameToStr(N)++"\'"
+    | con(node(enu(",.."),_,_),[H,T]) => {
+        "[" ++
+	showExp(H,999,indent,alt,eLc)++ valof{
+	  L : T;
+	  Str : "";
+	  while node(con(node(enu(",.."),_,_),[HH,TT]),_,lLc).=L do{
+	    Str := Str++", "++
+	    showExp(HH,999,indent,alt,lLc);
+	    L := TT;
+	  };
+	  if !node(enu("[]"),_,_).=L then {
+	    Str:=Str++",.."++
+	    showExp(L,999,indent,alt,eLc);
+	  };
+	  valis Str
+	}++"]"
+      }
+    | con(node(enu(","),_,_),[L,R]) => valof{
+        (XL,XP,XR) = infixPr(",");
+        valis showParen(XP,prior,"(")<>showExp(L,XL,indent,alt,eLc)<>
+	","<>showExp(R,XR,indent,alt,eLc)<>showParen(XP,prior,")")
+      }
+	
+    | dot(Vl,Fld) => valof{
+        (XL,XP,XR) = infixPr(".");
+        valis showExp(Vl,XL,indent,alt,eLc)++"."++Fld
+      }
+
+    | onew(O) => showExp(O,prior,indent,alt,eLc)
+
+    | pkrf(Pkg,Ex) => valof{
+        (XL,XP,XR) = infixPr("#");
+        valis showParen(XP,prior,"(")<>Pkg<>"#"<>showExp(Ex,XR,indent,alt,eLc)<>showParen(XP,prior,")")
+      }
+
+    | flow(T,Mode) => valof{
+        (XL,XP) = postfixPr("+");
+        mS = { case Mode in {
+	    inpMode => "+"
+	  | superMode => "++"
+	  | outMode => "-"
+	  | biMode => "-+"
+          }};
+        valis showParen(XP,prior,"(")<>showExp(T,XL,indent,alt,eLc)<>mS<>showParen(XP,prior,")")
+      }
+
+    | class(Id,Viz,Arity,Clses) => valof{
+        (XL,XP,XR) = infixPr("=>");
+        Out : indent++{case Viz in { private => "private " | anonymous => "anonymous " | _ => ""}}++"class "++Id++"/"++Arity^0++"{\n";
+        for node(El,_,_) in Clses do{
+          case El in {
+            clss(Q,C,H,Body) -> {
+              ind = indent++"    ";
+
+              Out := Out++ showQuants(Q,alt)++showExp(H,749,ind,alt,eLc)++":"++showType(C)++
+              showList(Body,"..{\n"++ind,".\n"++ind,"}\n",alt,eLc)
+            }
+          |  crle(Q,H,Spr) -> {
+              (XL,XP,XR) = infixPr("<=");
+              Out := Out++ showQuants(Q,alt)++showParen(XP,prior,"(")++
+              showExp(H,XL,indent,alt,eLc)++" <= "++ showExp(Spr,XR,indent,alt,eLc)++
+              showParen(XR,prior,")")++"\n"
+            }
+          }
+        };
+        valis Out++"}"
+      }
+
+    | clss(Q,C,H,Body) => valof{
+        ind = indent++"    ";
+
+        valis showQuants(Q,alt)++showExp(H,749,ind,alt,eLc)++":"++showType(C)++
+        showList(Body,"..{\n"++ind,".\n"++ind,"}",alt,eLc)
+      }
+    
+    | crle(Q,H,Spr) => valof {
+        (XL,XP,XR) = infixPr("<=");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++
+          showExp(H,XL,indent,alt,eLc)++" <= "++ showExp(Spr,XR,indent,alt,eLc)++
+        showParen(XR,prior,")")++showType(eTp)
+      }
+
+    | def(H,_,T) => valof {
+        (XL,XP,XR) = infixPr("=");
+        valis showParen(XP,prior,"(")++ H++ " = "++ showExp(T,XR,indent,alt,eLc)++ showParen(XP,prior,")");
+      }
+      
+    | asg(Vr,_,T) => valof {
+        (XL,XP,XR) = infixPr(":=");
+        valis showParen(XP,prior,"(")++ Vr++" := "++ showExp(T,XR,indent,alt,eLc)++ showParen(XP,prior,")");
+      }
+      
+    | mtc(H,T) => valof {
+        (XL,XP,XR) = infixPr(".=");
+        valis showParen(XP,prior,"(")++
+	showExp(H,XL,indent,alt,eLc)++
+	" .= "++
+	showExp(T,XR,indent,alt,eLc)++
+	showParen(XP,prior,")");
+      }
+
+    | fun(Id,Vis,Arity,Eqns) => valof{
+        (XL,XP,XR) = infixPr("=>");
+        Out : indent++{if Vis==private then "private " else ""}++"function "++Id++
+        "/"++Arity^0++"{\n";
+        for node(eqn(_,Q,H,T,B),_,_) in Eqns do{
+          Out := Out++indent++showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+          showList(H,"(",",",") =>",alt,eLc)++
+	  showExp(T,0,indent,alt,eLc)++{if B!=[] then showList(B,":-",",","",alt,eLc) else ""}++
+	  showParen(XP,prior,")")++"\n";
+        };
+        valis Out++"}:"++showType(eTp)
+      }
+
+    | eqn(Nm,Q,H,T,B) => valof {
+        (XL,XP,XR) = infixPr("=>");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++
+        Nm++showList(H,"(",",",") =>",alt,eLc)++
+        showExp(T,0,indent,alt,eLc)++{if B!=[] then showList(B,":-",",","",alt,eLc) else ""}++
+	  showParen(XP,prior,")");
+      }
+
+    | rel(Id,Viz,Arity,Clses) => valof{
+        (XL,XP,XR) = infixPr("=>");
+        Out : indent++{if Viz==private then "private " else ""}++"predicate "++Id++
+        "/"++Arity^0++"{\n";
+        for node(cls(_,Q,H,B),_,_) in Clses do{
+          Out := Out++indent++showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+          showList(H,"(",",",") ",alt,eLc)++
+	  {if B!=[] then showList(B,":-",",","",alt,eLc) else ""}++
+	  showParen(XP,prior,")")++"\n";
+        };
+        valis Out++"}:"++showType(eTp)
+      }
+
+    | cls(Id,Q,H,[]) => valof {
+        (XL,XP,XR) = infixPr(":-");
+        valis showQuants(Q,alt)++Id++showList(H,"(",",",")",alt,eLc)
+      }
+
+    | cls(Id,Q,H,T) => valof {
+        (XL,XP,XR) = infixPr(":-");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+        showList(H,"(",",","):-",alt,eLc)++
+        showList(T,"",",","",alt,eLc)++
+        showParen(XP,prior,")");
+      }
+
+    | srel(Id,Viz,Arity,Clses) => valof{
+        (XL,XP,XR) = infixPr("=>");
+        Out : indent++{if Viz==private then "private " else ""}++
+        "strong predicate "++Id++"/"++Arity^0++"{\n";
+        for node(scls(_,Q,H,G,B),_,_) in Clses do{
+          Out := Out++indent++showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+          showList(H,"(",",",") ",alt,eLc)++
+          {if G==[] then "" else " :: "++showList(G,"(",",",")",alt,eLc)}++
+	  {if B!=[] then showList(B,":--",",","",alt,eLc) else "{}"}++
+	  showParen(XP,prior,")")++"\n";
+        };
+        valis Out++"}:"++showType(eTp)
+      }
+
+    | scls(Id,Q,H,[],B) => valof {
+        (XL,XP,XR) = infixPr(":--");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+              showList(H,"(",",",") :-- ",alt,eLc)++
+	      showList(B,"",",","",alt,eLc)++
+	      showParen(XP,prior,")");
+      }
+
+    | scls(Id,Q,H,G,B) => valof {
+        (XL,XP,XR) = infixPr(":--");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+        showList(H,"(",",",") ",alt,eLc)++"::"++
+        showList(G,":: (",",",")",alt,eLc)++
+        showList(B,":--",",","",alt,eLc)++
+        showParen(XP,prior,")");
+      }
+
+    | sync(R,L,node(tmout(Q,T,A),_,_)) => valof{
+        (TL,TP,TR) = infixPr("timeout");
+        (XL,XP,XR) = infixPr("->");
+
+        valis "sync("++showExp(R,0,indent,alt,eLc)++")"++showList(L,"{",";","}",alt,eLc)++
+        "\n"++indent++"timeout"++
+        showQuants(Q,alt)++showParen(XP,prior,"(")++
+        showExp(T,XL,indent,alt,eLc)++
+        " -> "++showList(A,"(",";",")",alt,eLc)
+      }        
+
+    | sync(R,A,_) =>
+        "sync("++showExp(R,0,indent,alt,eLc)++")"++showList(A,"{",";","}",alt,eLc)
+
+    | grm(Id,Viz,Arity,Clses) => valof{
+        (XL,XP,XR) = infixPr("-->");
+        Out : indent++{if Viz==private then "private " else ""}++"grammar "++Id++
+        "/"++Arity^0++"{\n";
+        for node(grl(Q,H,PB,B),_,_) in Clses do{
+          Out := Out++indent++showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+          showList(H,"(",",",")",alt,eLc)++
+          ","++showExp(PB,0,indent,alt,eLc)++" --> "++showExp(B,XR,indent,alt,eLc)++
+	  showParen(XP,prior,")")++"\n";
+        };
+        valis Out++"}:"++showType(eTp)
+      }
+
+    | grl(Q,H,PB,B) => valof{
+        (XL,XP,XR) = infixPr("-->");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++
+                showList(H,"(",",",")",alt,eLc)++
+                ","++showExp(PB,0,indent,alt,eLc)++" --> "++showExp(B,XR,indent,alt,eLc)++
+    	      showParen(XP,prior,")");
+      }
+
+    | bnd(Q,T,VS) => valof {
+        (XL,XP,XR) = infixPr("-");
+	(bL,bP,bR) = infixPr("..");
+	(iL,iP,iR) = infixPr("in");
+        valis showParen(XP,prior,"(")++showQuants(Q,true)++"{"++
+	showExp(T,bL,indent,alt,eLc)++" .. "++valof{
+          sep : "";
+          out : "";
+          for (V,S) in VS do{
+            out := out++sep++showExp(V,iL,indent,alt,eLc)++
+            " in "++showExp(S,iR,indent,alt,eLc);
+            sep := ", "
+          };
+          valis out
+        }++"}"++
+	showParen(XP,prior,")");
+      }
+
+    | one(L) => showList(L,"(",",",")",alt,eLc)++"!"
+    
+    | seq(L) => showList(L,"","; ","",alt,eLc)
+
+    | nt(A,B) => showExp(A,0,indent,alt,eLc)++showList(B,"(",",",")",alt,eLc)
+
+    | itr(Q,T,node(vde,_,_),_) => valof {
+        (XL,XP) = postfixPr("*");
+        valis showParen(XP,prior,"(")++showQuants(Q,true)++
+	showExp(T,XL,indent,alt,eLc)++" * "++
+	showParen(XP,prior,")");
+      }
+
+    | itr(Q,T,V,S) => valof {
+        (XL,XP,XR) = infixPr("*");
+	(bL,bP,bR) = infixPr("^");
+        valis showParen(XP,prior,"(")++showQuants(Q,true)++
+	showExp(T,bL,indent,alt,eLc)++" * "++showExp(V,bL,indent,alt,eLc)++
+	" ^ "++showExp(S,bR,indent,alt,eLc)++"}"++
+	showParen(XP,prior,")");
+      }
+
+    | prc(Id,Viz,Arity,Clses) => valof{
+        (XL,XP,XR) = infixPr("->");
+        Out : indent++{if Viz==private then "private " else ""}++
+        "action procedure "++Id++"/"++Arity^0++"{\n";
+        for node(prl(Q,H,G,B),_,_) in Clses do{
+          Out := Out++indent++showQuants(Q,alt)++showParen(XP,prior,"(")++Id++
+          showList(H,"(",",",") ",alt,eLc)++
+          {if []==G then "" else showList(G,":: (",",",")",alt,eLc)}++{
+          if B==[] then " -> {}" else
+            showList(B," -> ",";","",alt,eLc)}++
+	  showParen(XP,prior,")")++"\n";
+        };
+        valis Out++"}:"++showType(eTp)
+      }
+
+    | prl(Q,H,G,B) => valof{
+        (XL,XP,XR) = infixPr("=>");
+        valis showQuants(Q,alt)++showParen(XP,prior,"(")++
+        showList(H,"(",",",") ",alt,eLc)++
+        {if []==G then "" else showList(G,":: (",",",")",alt,eLc)}++{
+          if B==[] then " -> {}" else
+            showList(B," -> ",";","",alt,eLc)}++
+        showParen(XP,prior,")")++"\n"
+      }
+
+    | cse(Exp,Rules) => valof{
+        (XP,XR) = prefixPr("case");
+        (EL,EP,ER) = infixPr("in");
+        valis showParen(XP,prior,"(")++
+        "case "++showExp(Exp,EL,indent,alt,eLc)++" in "++
+        showList(Rules,"(","|\n"++indent,")",alt,eLc)++
+        showParen(XP,prior,")")
+      }
+
+    | grd(T,G) => 
+	showExp(T,939,indent,alt,eLc)++showList(G,":: (",",",")",alt,eLc)
+
+    | lzy(T,G) => 
+	showExp(T,939,indent,alt,eLc)++showList(G,"@@ (",",",")",alt,eLc)
+
+    | con(node(iden(","),_,_),[L,R]) => valof{
+	(XL,XP,XR) = infixPr(",");
+        valis showParen(XP,prior,"(")++
+        showExp(L,XL,indent,alt,eLc)++" , "++
+        showExp(R,XR,indent,alt,eLc)++
+        showParen(XP,prior,")")
+      }
+
+    | con(N,AL) =>
+	showExp(N,0,indent,alt,eLc)++showList(AL,"(",",",")",alt,eLc)
+    | app(node(iden(N),_,_),[L,R]) :: (XL,XP,XR).=infixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        showExp(L,XL,indent,alt,eLc)++
+        " "++
+        string%%N++
+        " "++
+        showExp(R,XR,indent,alt,eLc)++
+        showParen(XP,prior,")")
+    | app(node(iden(N),_,_),[R]) :: (XP,XR).=prefixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        string%%N++
+        " "++
+        showExp(R,XR,indent,alt,eLc)++
+        showParen(XP,prior,")")
+    | app(node(iden(N),_,_),[L]) :: (XL,XP).=postfixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        showExp(L,XL,indent,alt,eLc)++
+        " "++
+        string%%N++
+        showParen(XP,prior,")")
+    | app(L::node(iden(N),_,_).=L,R) => 
+        showExp(L,0,indent,alt,eLc)++showList(R,"(",",",")",alt,eLc)
+    | app(L,R) => 
+        "("++showExp(L,0,indent,alt,eLc)++")"++showList(R,"(",",",")",alt,eLc)
+    | prd(node(iden(N),_,_),[L,R]) :: (XL,XP,XR).=infixPr(N) && XP!=10000 =>
+        showParen(XP,prior,"(")++
+        showExp(L,XL,indent,alt,eLc)++
+        " "++
+        string%%N++
+        " "++
+        showExp(R,XR,indent,alt,eLc)++
+        showParen(XP,prior,")")
+    | prd(node(iden("="),_,_),[L,R]) =>
+	"("++showExp(L,1000,indent,alt,eLc)++ " = "++showExp(R,1000,indent,alt,eLc)++")"
+    | prd(N,A) => 
+         showExp(N,0,indent,alt,eLc)++showList(A,"(",",",")",alt,eLc)
+    | tpe(Name,Viz,Tp) => {if Viz==private then "private " else ""}++showTypeDef(Name,Tp)
+    | cnj(L) => showList(L,"","&& ","",alt,eLc)
+    | dsj(L,R) :: (XL,XP,XR).=infixPr("|") && XP!=10000 =>
+        showParen(XP,prior,"(\n"++indent++"  ")++
+      showExp(L,XL,indent++"  ",alt,eLc)++
+      "\n"++indent++"| "++
+      showExp(R,XR,indent++"  ",alt,eLc)++
+      showParen(XP,prior,"\n"++indent++")")
+
+    | iff(T,L,R) :: (XL,XP,XR).=infixPr("|") && XP!=10000 =>
+        showParen(XP,prior,"(\n"++indent++"  ")++
+        showExp(T,XL,indent++"  ",alt,eLc)++"?"++
+        showExp(L,XL,indent++"  ",alt,eLc)++
+        "\n"++indent++"| "++
+        showExp(R,XR,indent++"  ",alt,eLc)++
+        showParen(XP,prior,"\n"++indent++")")
+
+    | neg(R) :: (XP,XR).=prefixPr("\\+") && XP!=10000 =>
+        showParen(XP,prior,"(")++"\\+"++showList(R,"",",","",alt,eLc)++showParen(XP,prior,")")
+
+    | frll(Q,L,R) :: (XL,XP,XR).=infixPr("forall") =>
+        showQuants(Q,alt)++showParen(XP,prior,"(\n"++indent++"  ")++
+        showList(L,"(",",",")",alt,eLc)++
+        "\n"++indent++" *> "++
+        showList(R,"(",",",")",alt,eLc)++
+        showParen(XP,prior,"\n"++indent++")")
+
+    | err(P,E) => valof{
+        (XL,XP,XR) = infixPr("onerror");
+        valis showParen(XP,prior,"(")++showExp(P,XL,indent,alt,eLc)++" onerror "++
+        showList(E,"{\n","\n","}",alt,eLc)++showParen(XP,prior,")");
+      }
+    | exc(E) => "raise "++showExp(E,0,indent,alt,eLc)
+    
+    | act(L,R) => 
+        showExp(L,0,indent,alt,eLc)++showList(R,"(",",",")",alt,eLc)
+        
+    | vlof(Q,G) => showQuants(Q,alt)++showList(G,"valof {",";","}",alt,eLc)
+    | vlis(E) =>
+        "valis "++showExp(E,0,indent,alt,eLc)
+    | bag(Q,E,G) => showQuants(Q,alt)++"{"++
+      showExp(E,0,indent,alt,eLc)++" || "++showExp(G,0,indent,alt,eLc)++"}"
+    
+    | frk(Q,A) => "spawn "++showQuants(Q,alt)++ showList(A,"(",";",")",alt,eLc)
+
+    | imp(Mod) => valof{
+        (XP,XR) = prefixPr("import");
+        valis showParen(XP,prior,"(")++" import "++
+	      showList(Mod,"",".","",alt,eLc)++showParen(XP,prior,")");
+      }
+
+    | mdl(Name,Imports,Defs) => valof{
+        ind = indent++"  ";
+        out:"module "++(Name\\((X,Y)=>X<>[''.,..Y]))++"{\n";
+
+        for (Pkg,Imps,Vers) in Imports do{
+          out := out++"import "++(Pkg\\((X,Y)=>X++"."++Y))++Vers^0++"{\n";
+          sep : "";
+          for (Fld,Mode,Tp) in Imps do{
+            out := out++sep++Fld++showMode(Mode)++showType(Tp);
+            sep := ", ";
+          };
+          out := out++"}\n";
+        };
+
+        sep : "";
+        for (Fld,Mode,Prg) in Defs do{
+          out := out++sep++Fld++showMode(Mode)++showExp(Prg,0,indent,alt,eLc);
+          sep := ".\n ";
+        };
+
+        valis out
+      }
+    | vde => "*null*"
+
+    | X => "??"++X^2++"??"
+    }
+  };
+
+  showList(L,pre,midl,pst,alt,Lc) => valof{
+    Str : pre;
+    sep : "";
+    for X in L do{
+      Str := Str++sep++showExp(X,999,"",alt,Lc);
+      sep := midl;
+    };
+    valis Str++pst
+  };
+
+  showMode(Mode) => case Mode in{
+    varBinding => ":"
+  | tvarBinding => "#"
+  | typeBinding => "::="
+  };
+
+  show(E) =>
+    showExp(E,2000,"",false,noLoc);
+  disp(E) =>
+    showExp(E,0,"",true,noLoc);
+
+  showTerm(E) => showExp(E,1000,"",false,noLoc)++":"++showType(ndType(E));
+
+  showIns(E) => { case E in {
+      lbl(S) => string%%S++":"
+    | cmt(C) => "--"++C
+    | X => X^0
+    }
+  };
+
+  showCodeSeq(IL) => IL//+(El=>showIns(El)++"\n");
+
+  showRange(L) => "["++showR(sort(L,((X,Y)=>X<Y)))++"]";
+
+  showR = {
+    [] => ""
+  | [R] => R^0
+  | [A,..B] => endRange(B,A,A)
+  };
+
+  endRange = {
+    ([],X,!X) => X^0
+  | ([],E,F) => F^0++".."++E^0
+  | ([X,..Y],E,F)::X==E+1=>endRange(Y,X,F)
+  | ([X,..Y],E,!E) => E^0++","++showR([X,..Y])
+  | ([X,..Y],E,F) => F^0++".."++E^0++","++showR([X,..Y])
+  };
+  
+  ndType(node(_,Tp,_)) => Tp;
+
+  __debug_display__(X) => {try{case X in {
+	any(P) => show(P)<>":"<>showType(ndType(P))
+      |	any(LN) => showList(LN,"[",",","]",false,noLoc)
+      | any(T) => display(T)
+      | any(string?S) => "\""++S++"\""
+      |	any(LN) => "["++(LN//+(X=>display(X)++","))++"]"
+      | any(T) => "\e[32m"++showType(T)++"\e[0m"
+      | any(T) => showType(T)
+      | any(LT) => LT//+(El=>showType(El))
+      | any(LT) => LT//+(El=>show(El))
+      | any(Env) => showEnvD(Env,40)
+      | any(IL) => IL//+(El=>showIns(El)++"\n")
+      | any(L) => showRange(L)
+      | any(Lc) => showLocation(Lc)
+      | any(Z) => Z^0
+      }} onerror{
+      error(_,_) => X^0
+    }
+  };
+
+} export (show,showTerm,disp,dispName,strChr,NameToStr,
+          showQuants,showRange/*,__debug_display__*/);

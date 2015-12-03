@@ -1,0 +1,215 @@
+/*
+ * handle the debug code transformation for the canonicalizer
+ */
+
+#include "go.ah";
+
+module
+  import
+{
+  interface "canon.af" and
+  interface "misc.af" and
+  interface "errors.af" and
+  interface "types.af" and
+  interface "st-types.af" and
+  interface "canonlabel.af" and
+  interface "canontype.af" and
+  interface <stdio.af>
+} in
+{
+
+  /* Debugging transformations, only applied if -g selected when compiling the program */
+
+  isDebugging(Name,Opts) => (dbg(Name) in Opts || (dbg("*") in Opts && Name!="show")) && ! noDbg(Name) in Opts;
+
+  inDebug(Opts) => dbg(_) in Opts && (inProg(pName) in Opts && pName!="show");
+
+  debugPreamble(Name,Opts,Lc,Vars) => valof{
+    loc(File,Line,_,_).=Lc;
+    pCode  = { if genProfile in Opts then 
+	[call(prg("go.profile@event",2),[strg(File),intgr(Line)],Lc)]
+      else []};
+
+    if isDebugging(Name,Opts) then {
+      dVar = genNew("$D");
+      fVar = genNew("$F");
+      vList : cons(strct("go.stdlib#[]",0),[]);
+      for idnt(Id) in Vars do{
+	if ![''_,.._].=Id then
+	  vList := cons(strct("go.stdlib#,..",2),[cons(strct("go.stdlib#,",2),[symb(Id),idnt(Id)]),vList])
+      };
+
+      valis ([dbgVar([dVar,fVar]),..Opts],
+	     pCode<>[call(prg("go.debug@current",1),[idnt(dVar)],Lc),
+	      defn(idnt(fVar),vList,Lc)],[idnt(dVar),idnt(fVar),..Vars])
+    }
+    else
+      valis (Opts^\dbgVar(_),pCode,Vars)
+  };
+
+  debugVars(Opts) => valof{
+    if dbgVar(Vrs) in Opts then
+      valis Vrs//(V=>idnt(V))
+    else
+      valis []
+  };
+
+  evalDebug(Nm,Args,Val,Call,Opts,Map,Lc) => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,F]) in Opts && !isEscape(Nm) &&
+    loc(Fl,Ln,Pi,Px).=Lc then{
+      Ky = symb(genNew("$wait$"));
+      Dbgr = idnt(V);
+      prName = symb(Nm);
+      valis [ocall(cons(trCons("line",4),[strg(Fl),intgr(Ln),intgr(Pi),intgr(Px)]),Dbgr,Dbgr,Lc),
+	     ocall(cons(trCons("evaluate",4),[prName,listToCanon(Args),Ky,idnt(F)]),Dbgr,Dbgr,Lc),
+	     Call,
+             ocall(cons(trCons("value",4),[prName,Val,Ky,idnt(F)]),Dbgr,Dbgr,Lc)]
+    }
+    else
+      valis [Call]
+  };
+
+  predDebug(Nm,Args,Call,Opts,Map,Lc) => valof {
+    if isDebugging(Nm,Opts) && dbgVar([V,F]) in Opts && 
+    !(Nm,_,_) in standardTypes  && loc(Fl,Ln,Pi,Px).=Lc then{
+      Ky = symb(genNew("$wait$"));
+      Dbg = idnt(V);
+      prName = symb(Nm);
+
+      valis [ocall(cons(trCons("line",4),[strg(Fl),intgr(Ln),intgr(Pi),intgr(Px)]),Dbg,Dbg,Lc),
+	     ocall(cons(trCons("prove",4),[prName,listToCanon(Args),Ky,idnt(F)]),Dbg,Dbg,Lc),
+	     Call,
+	     ocall(cons(trCons("succ",4),[prName,listToCanon(Args),Ky,idnt(F)]),Dbg,Dbg,Lc)]
+    }
+    else
+      valis [Call]
+  };
+
+  execDebug(Nm,Args,Call,Opts,Map,Lc) => valof {
+    if isDebugging(Nm,Opts) && dbgVar([V,F]) in Opts && 
+    !(Nm,_,_) in standardTypes  && loc(Fl,Ln,Pi,Px).=Lc then{
+      Ky = symb(genNew("$wait$"));
+      Dbg = idnt(V);
+      prName = symb(Nm);
+
+      valis [ocall(cons(trCons("line",4),[strg(Fl),intgr(Ln),intgr(Pi),intgr(Px)]),Dbg,Dbg,Lc),
+	     ocall(cons(trCons("call",4),[prName,listToCanon(Args),Ky,idnt(F)]),Dbg,Dbg,Lc),
+	     Call,
+	     ocall(cons(trCons("return",3),[prName,Ky,idnt(F)]),Dbg,Dbg,Lc)]
+    }
+    else
+      valis [Call]
+  };
+   
+  parseDebug(Nm,Args,S0,Strm,Call,Opts,Map,Lc) => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,F]) in Opts && !isEscape(Nm) &&
+    loc(Fl,Ln,Pi,Px).=Lc then{
+      Ky = symb(genNew("$wait$"));
+      Dbgr = idnt(V);
+      prName = symb(Nm);
+      valis [ocall(cons(trCons("line",4),[strg(Fl),intgr(Ln),intgr(Pi),intgr(Px)]),Dbgr,Dbgr,Lc),
+	     ocall(cons(trCons("parse",5),[prName,S0,listToCanon(Args),Ky,idnt(F)]),Dbgr,Dbgr,Lc),
+	     Call,
+             ocall(cons(trCons("parsed",4),[prName,Strm,Ky,idnt(F)]),Dbgr,Dbgr,Lc)]
+    }
+    else
+      valis [Call]
+  };
+
+  tokenDebug(Tk,S0,Strm,Call,Opts,Map,Lc) => valof{
+    if dbgVar([V,F]) in Opts && 
+    loc(Fl,Ln,Pi,Px).=Lc then{
+      Ky = symb(genNew("$wait$"));
+      Dbgr = idnt(V);
+      valis [ocall(cons(trCons("line",4),[strg(Fl),intgr(Ln),intgr(Pi),intgr(Px)]),Dbgr,Dbgr,Lc),
+	     ocall(cons(trCons("next",4),[Tk,S0,Ky,idnt(F)]),Dbgr,Dbgr,Lc),
+	     Call,
+             ocall(cons(trCons("token",4),[Tk,Strm,Ky,idnt(F)]),Dbgr,Dbgr,Lc)]
+    }
+    else
+      valis [Call]
+  };
+
+  triggerDebug(Nm,Arg,Opts,Map,Lc) => valof {
+    if isDebugging(Nm,Opts) && dbgVar([V,.._]) in Opts && !isEscape(Nm) then
+      valis [ocall(cons(trCons("trigger",2),[symb(Nm),Arg]),idnt(V),idnt(V),Lc)]
+    else
+      valis []
+  };
+    
+  breakDebug(Opts,Name,Lc) => valof{
+    if isDebugging(Name,Opts) && dbgVar([V,F]) in Opts then{
+      if bkPt(Name) in Opts then
+        valis [ocall(cons(trCons("break",1),[symb(Name)]),idnt(V),idnt(V),Lc)]
+      else
+        valis []
+    }
+    else
+      valis []
+  };
+  
+  frameDebug(Opts,Nm,No,Lc) => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,F]) in Opts && Lc!=noLoc then
+      valis [ocall(cons(trCons("rule",3),[symb(Nm),
+					 intgr(No),idnt(F)]),
+		   idnt(V),idnt(V),Lc)]
+    else
+      valis []
+  };
+  
+  deFrameDebug(Opts,Nm,No,Lc) => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,.._]) in Opts && Lc!=noLoc then{
+      valis [ocall(cons(trCons("xrule",2),[symb(Nm),
+					  intgr(No)]),idnt(V),idnt(V),Lc)]
+    }
+    else
+      valis []
+  };
+  
+  asgnDebug(Lc,Nm,Val,Opts) => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,.._]) in Opts && Lc!=noLoc then
+      valis [ocall(cons(trCons("asgn",2),[symb(Nm),Val]),idnt(V),idnt(V),Lc)]
+    else
+      valis []
+  };
+  
+  defnDebug(Lc,Nm,Val,Opts)  => valof{
+    if isDebugging(Nm,Opts) && dbgVar([V,.._]) in Opts && Lc!=noLoc then
+      valis [ocall(cons(trCons("asgn",2),[symb(Nm),Val]),idnt(V),idnt(V),Lc)]
+    else
+      valis []
+  };
+  
+  valisDebug(Lc,Exp,Opts) => valof{
+    if inDebug(Opts) && dbgVar([V,.._]) in Opts then
+      valis [ocall(cons(trCons("vlis",1),[Exp]),idnt(V),idnt(V),Lc)]
+    else
+      valis []
+  };
+
+  generateCall(Name,V,Templ,Lc,Opts,Map) => valof{
+    if isDebugging(Name,Opts) && Name!="show" then{
+      Vrs = varsInCanonCall(Templ,[]);
+      XP = prg(genNew(mungePrefix(Map)<>"$::"),listlen(Vrs));
+      
+      oError = cons(strct("go.stdlib#error",2),[strg("unbound object in call: "<>showLocation(Lc)),symb("eCODE")]);
+
+      cl = { if V!=vdel then [clse(Vrs,Vrs,[ecall("nonvar",[V],Lc),neck(Lc),Templ],Lc),
+			      clse(Vrs,Vrs,[rais(oError,Lc)],Lc)]
+	else
+	  [clse(Vrs,Vrs,[Templ],Lc)]
+      };
+      defineProg(Map,XP,seqn(cl));
+      valis call(XP,Vrs,Lc)
+    }
+    else
+      valis Templ
+  };
+
+  trCons(Name,Arity) => strct(Name<>"%"<>Arity^0,Arity);
+
+} export {debugPreamble,debugVars,
+  evalDebug,predDebug,execDebug,parseDebug,tokenDebug,
+  frameDebug, deFrameDebug, defnDebug,
+  asgnDebug, valisDebug, breakDebug, triggerDebug,generateCall,
+  inDebug, isDebugging};

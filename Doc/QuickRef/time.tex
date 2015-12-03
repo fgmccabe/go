@@ -1,0 +1,181 @@
+\chapter{Time and dates}
+\label{time}
+
+\go has a number of primitives for handling dates and times. There are two key structures; a time value -- represented as a \q{float} -- and a date value -- represented as a \q{date} type.
+
+\section{Time}
+\label{time:time}
+
+\subsection{\function{now} -- return current time}
+\label{time:now}
+
+\synopsis{now}{[]\funarrow{}float}
+
+The \q{now} function returns the current time -- expressed as a \q{float} -- which represents the number of seconds since Jan 1, 1970 GMT. To convert this value into a \q{date} value, use the \q{time2date} function (see Section~\vref{time2date}).  The number returned is potentially fractional; the resolution of the clock is implementation dependent but is at least in milliseconds.
+
+
+\subsection{\function{today} -- return time at 12:00am}
+\label{time:today}
+
+\synopsis{today}{[]\funarrow{}integer}
+
+The \q{today} function returns the time at midnight this morning -- expressed as the number of seconds since 12:00am, Jan 1$^{st}$ 1970. The effect is to return a number that represents today's date.
+
+\subsection{\function{ticks} -- return CPU time used}
+\label{time:ticks}
+
+\synopsis{ticks}{[]\funarrow{}float}
+
+The \q{ticks} function returns the number of seconds of CPU time -- expressed as the number of seconds -- consumed by the \go invocation since it started. The number returned is potentially fractional; the resolution of the clock is implementation dependent but is at least in milliseconds.
+
+The \q{ticks} function is best used differentially -- take the \q{ticks()} measure before some important timing and again after the timed event. The difference will tell you how long the event took.
+
+\subsection{\function{delay} -- delay for a period of time}
+\label{time:delay}
+
+\synopsis{delay}{[number]*}
+
+The \q{delay} \emph{action} causes the currently executing thread to delay for a given number of seconds. Other threads may continue executing while this thread suspends. \q{delay} can accept either an \q{integer} number of seconds or a fractional number of seconds -- expressed as a \q{float}.
+
+\subsection{\function{sleep} -- sleep until a given time}
+\label{time:sleep}
+
+\synopsis{sleep}{[number]*}
+
+The \q{sleep} \emph{action} causes the currently executing thread to suspend until a given time. Other threads may continue executing while this thread suspends. An action call of the form:
+\begin{alltt}
+sleep(now()+10)
+\end{alltt}
+is equivalent to:
+\begin{alltt}
+delay(10)
+\end{alltt}
+
+\section{Dates}
+\label{time:date}
+
+The \q{go.datelib} package provides a number of higher-level functions that support manipulating dates. These functions center on the \q{date} type -- a type interface for representing dates and times related to the \emph{wall clock}.
+
+To use these functions, you will need to import the \q{datelib} package:
+\libsynopsis{go.datelib}
+
+\subsection{The \q{date} type}
+\label{date:date}
+The \q{date} type interface represents a date and time value, it is summarized in:
+\begin{alltt}
+date \impl \{
+  time:[]\funarrow{}float.                      -- raw time
+  clock:[]\funarrow{}(integer,integer,float). -- The time in ordinary time
+  date:[]\funarrow{}(integer,integer,integer,integer). -- Broken out date
+  tzone:[]\funarrow{}float.   -- Time zone
+  zone:[]\funarrow{}string.   -- Name of the time zone
+  dow:[]\funarrow{}dow.       -- Day of the week
+\}.
+\end{alltt}
+Where \q{dow} is an algebraic type capturing the days of the week:
+\begin{alltt}
+  dow ::= monday | 
+  tuesday | 
+  wednesday | 
+  thursday |
+  friday |
+  saturday |
+  sunday.
+\end{alltt}
+
+\begin{description}
+\item[clock]
+The \q{clock} function returns the time associated with the \q{date} value -- as a triple: 
+\begin{alltt}
+(\emph{Hours},\emph{Minutes},\emph{Secs})
+\end{alltt}
+where 
+\begin{description}
+\item[\q{\emph{Hours}}]
+is an integral \q{number} from 0 (midnight) to 23
+\item[\q{\emph{Minutes}}]
+is an integral \q{number} from 0 to 59
+\item[\q{\emph{Seconds}}]
+is a \q{float}ing point value in the range $[0,60)$
+\end{description}
+\item[date]
+The \q{date} function returns the date associated with the \q{date} value -- as a 4-tuple:
+\begin{alltt}
+(\emph{Dow},\emph{Day},\emph{Month},\emph{Year})
+\end{alltt}
+where
+\begin{description}
+\item[\q{\emph{Dow}}]
+is an \q{integer} indicating the day of the week: 0 = sunday, 6 = saturday.
+\item[\q{\emph{Day}}]
+is an \q{integer} in the range 1..31, indicating the day of the month
+\item[\q{\emph{Month}}]
+is an \q{integer} in the range 1..12, indicating the month, with 1=January
+\item[\q{\emph{Year}}]
+is an \q{integer} indicating the year. Dates with a \q{\emph{Year}} less than 1900 are not guaranteed to be valid.
+\end{description}
+\item[time]
+This function returns the \q{float}-style time value associated with the \q{date} -- i.e., a number representing the number of seconds since Jan 1, 1970.
+\item[tzone]
+The \q{tzone} function returns the \q{number} of \emph{hours} that this \q{date} value is offset from UTC.
+\item[zone]
+The \q{zone} function returns the \emph{name} of the time zone associated with this \q{date} value.
+\item[dow]
+The \q{dow} function returns a \q{dow} (day of the week) value. The \q{dow} type is an enumeration of the possible days of the week:
+\begin{alltt}
+dow ::= monday | tuesday | wednesday | thursday
+     | friday | saturday | sunday.
+\end{alltt}
+\item[less]
+The \q{less} predicate allows the comparison of two \q{date} values. A query of the form:
+\begin{alltt}
+Dte.less(Rte)
+\end{alltt}
+is true if the date and time associated with \q{Dte} is \emph{before} the date/time associated with \q{Rte}.
+\end{description}
+
+\subsection{\q{time2date} -- convert a time value to a \q{date}}
+\label{time2date}
+\index{Convert time to date value}
+
+\synopsis{time2date}{[float]\funarrow{}date}
+
+The \q{time2date} function converts a time value -- expressed as a number of seconds since Jan 1, 1970 -- into an instance of the \q{date} class. As a result, the date in calendrial terms is computed.
+
+The date is computed relative to the default location that the \go system is executing in; i.e., the time is returned in local terms.
+
+\subsection{\q{time2utc} -- convert a time value to a \q{date}}
+\label{time2utc}
+\index{Convert time to date value}
+
+\synopsis{time2utc}{[float]\funarrow{}date}
+
+The \q{time2utc} function converts a time value -- expressed as a number of seconds since Jan 1, 1970 -- into an instance of the \q{date} class. As a result, the date in calendrial terms is computed.
+
+The date is computed as a UTC time (i.e., as used to be known GMT). The merit of this is that the value returned by \q{time2utc} is globally consistent; the problem is, of course, that for those who do not live in the same time zone as Greenwich, the time will be somewhat different to the local time -- possibly including the date also.
+
+\subsection{\q{dateOf} -- return a \q{date}}
+\label{date:dateOf}
+\index{return specific date value}
+
+\synopsis{dateOf}{[integer,integer,integer,integer,integer,
+number,number]\funarrow{}date}
+
+The \q{dateOf} function returns a \q{date} value, computed from the arguments; which are the Day, Month, Year, Hours, Minutes and seconds and the hour offset from UTC.
+
+\begin{aside}
+We provide the \q{dateOf} function, rather than simply allowing a direct use of a \q{date}-valued constructor, because of the calculations needed to ensure a valid \q{date} structure.
+\end{aside}
+
+\subsection{\q{rfc822\_date} -- parse a date in RFC822 format}
+\label{date:rfc822}
+\index{Date in rfc822 format}
+\index{RFC822 format date}
+
+\synopsis{rfc822\_date}{[date-]\grarrow{}string}
+
+The \q{rfc822\_date} grammar parses a date in the format specified by RFC822. A typical RFC822 date looks like:
+\begin{alltt}
+Wed 23 Nov, 2005 10:14:34 UT
+\end{alltt}
+The returned value in a \q{rfc822\_date} is a \q{date} object.

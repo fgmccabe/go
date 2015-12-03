@@ -1,0 +1,113 @@
+#include "go.ah";
+
+module
+import
+  interface "esc.af"
+in{
+  stringType = uType("go.stdlib","list",[uType("go.stdlib","char",[])]);
+  metaType = uType("go.stdlib","meta",[]);
+  thingType = uType("go.stdlib","thing",[]);
+
+  listType(Tp) => uType("go.stdlib","list",[Tp]);
+
+/*  thingMtds = [("show",varBind,funType([],stringType)),
+	       ("_meta",varBind,funType([],metaType)),
+	       ("__meta",varBind,funType([(listType(thingType),inpMode)],metaType))];
+*/
+  thingMtds = [("show",varBind,funType([],stringType))];
+
+  standardTypes = [
+    ("thing",typeBind,typeDef(thingType, [faceType(thingMtds)])),
+
+/*    ("meta",typeBind,
+     typeDef(metaType,
+	     [thingType,
+	      faceType([("__reflect",varBind,
+			 allType("T",thingType,
+				 allType("V",thingType,
+					 funType([(listType(uType("go.stdlib",",",[metaType,bound("V")])),inpMode)],bound("T"))))),..
+			thingMtds])])),
+*/
+    ("opaque",typeBind,
+     typeDef(uType("go.stdlib","opaque",[]),
+	     [uType("go.stdlib","thing",[]),faceType(thingMtds)])),
+    ("exception",typeBind,
+     typeDef(uType("*","exception",[]),
+	     [thingType,
+	      faceType(
+		[("cause",varBind,funType([],stringType)),
+		 ("code",varBind,funType([],uType("go.stdlib","symbol",[]))),..
+		 thingMtds])])),
+    ("[]",varBind,
+     allType("t",thingType,enuType(uType("go.stdlib","list",[bound("t")])))),
+    (",..",varBind,
+     allType("t",thingType,
+             conType([bound("t"),uType("go.stdlib","list",[bound("t")])],
+		     uType("go.stdlib","list",[bound("t")])))),
+    (",",varBind,				  -- As a constructor
+     allType("t",thingType,
+             allType("u",thingType,
+                     conType([bound("t"),bound("u")],
+			     uType("go.stdlib",",",[bound("t"),bound("u")]))))),
+    (",",typeBind,				  -- As a type
+     allType("t",thingType,
+             allType("u",thingType,
+                     typeDef(uType("go.stdlib",",",[bound("t"),bound("u")]),
+                             [thingType, faceType(thingMtds)])))),
+    ("list",typeBind,
+     allType("X",thingType,
+             typeDef(uType("go.stdlib","list",[bound("X")]),
+                     [thingType,
+                      faceType([("head", varBind,funType([],bound("X"))),
+                                ("tail", varBind,
+                                 funType([],uType("go.stdlib","list",[bound("X")]))),
+                                ("eof",varBind, predType([])),
+                                ("cons",varBind,
+                                 funType([(bound("X"),inpMode)],
+                                         uType("go.stdlib","list",[bound("X")]))),
+                                ("tack",varBind,
+                                 funType([(bound("X"),inpMode)],
+                                         uType("go.stdlib","list",[bound("X")]))),
+                                ("hdtl",varBind,
+                                 predType([(bound("X"),biMode),(uType("go.stdlib","list",[bound("X")]),biMode)])),
+                                ("eq",varBind,
+                                 predType([(uType("go.stdlib","list",[bound("X")]),biMode)])),..thingMtds])]))),
+    ("in",varBind,allType("XX",topType,
+                          predType([(bound("XX"),biMode),(uType("go.stdlib","list",[bound("XX")]),biMode)]))),
+    ("true",varBind,enuType(uType("go.stdlib","logical",[]))),
+    ("false",varBind,enuType(uType("go.stdlib","logical",[]))),
+    ("integer",typeBind,
+     typeDef(uType("go.stdlib","integer",[]),
+             [thingType,uType("go.stdlib","number",[]),
+              faceType(
+                [("equal",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),
+		 ("less",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),..thingMtds])])),
+    ("float",typeBind,
+     typeDef(uType("go.stdlib","float",[]),
+             [thingType,uType("go.stdlib","number",[]),
+              faceType(
+                [("equal",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),
+		 ("less",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),..thingMtds])])),
+    ("number",typeBind,
+     typeDef(uType("go.stdlib","number",[]),
+             [uType("go.stdlib","thing",[]),
+              faceType([("equal",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),
+			("less",varBind,predType([(uType("go.stdlib","number",[]),inpMode)])),..thingMtds])])),
+    ("logical",typeBind,
+     typeDef(uType("go.stdlib","logical",[]),
+             [uType("go.stdlib","thing",[]),
+              faceType(thingMtds)])),
+    ("symbol",typeBind,
+     typeDef(uType("go.stdlib","symbol",[]),
+             [uType("go.stdlib","thing",[]),
+              faceType(thingMtds)])),
+    ("char",typeBind,typeDef(uType("go.stdlib","char",[]),
+                             [uType("go.stdlib","thing",[]),
+                              faceType(thingMtds)])),..escTypes];
+
+  isEscape(F) => (F,varBind,_) in standardTypes;
+
+} export (standardTypes,isEscape);
+
+
+

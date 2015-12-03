@@ -1,0 +1,42 @@
+dl{
+  -- An ontology language with similar expressive power to OWL-DL
+
+  -- It supports individuals, classes, property restrictions.
+
+  -- Class operators include definition, conjunction, disjunction
+
+  -- Roles may have universals, existentials (no cardinality) 
+
+  -- A concept definition:
+
+  class Pizza {
+  -- Definitions go in here
+
+  -- A universal restriction:
+    topping: $PizzaTopping.
+
+  -- An existential restriction:
+    base: #PizzaBase.
+
+  -- End of Pizza class
+  }.
+
+  -- A vegetarian pizza:
+  class Vegetarian is Pizza {
+  -- With addition restrictions
+    topping: \Meat.
+  }.
+
+ -- Toppings come in a limited range
+ class Topping one-of { pepporoni, olive, cheese }.
+
+ -- An individual 
+ pepporoni a Meat.
+
+ olive a Vegetable.
+
+ cheese a DairyProduct.
+
+ -- 
+
+}

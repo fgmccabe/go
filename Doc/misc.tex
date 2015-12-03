@@ -1,0 +1,282 @@
+\chapter{Miscelleneous}
+\label{misc}
+
+These miscellaneous library primitives access and manipulate the environment in which the \go program executes.
+
+\section{Equality, matching and identicality}
+\label{misc:equality}
+
+There are many notions of equality in \go: two terms may be unifyable, `matchable' and may be identical.
+
+\subsection{\function{=} -- unifiability test}
+\label{misc:unifiable}
+
+\synopsis{=}{[t,t]\{\}}
+
+The \q{=} predicate is true if its two arguments are unifiable -- i.e., can be made to be identical after potential substitution of values for unbound variables. \q{=} is a standard operator, and so \q{=} predicates are written in infix notation.
+
+The \q{=} predicate is so fundamental to \go that it should be considered part of the definition of the language.
+
+\subsection{\function{.=} -- match test}
+\label{misc:match}
+
+\synopsis{.=}{[t,t]\{\}}
+
+The \q{.=} predicate is satisfied if it is possible to make its arguments identical without substituting any variables in the second. I.e., \q{X .= Y} is satisfied if \param{X} and \param{Y} can be made to be identical without binding a variable in \param{Y}; otherwise the \q{.=} test will \emph{fail}.  It is permitted to bind unbound variables in \param{X}, however.
+
+The \q{.=} predicate implements the same matching semantics as for the heads of equations, action rules and message receive clauses.
+
+\subsection{\function{==} -- identicality test}
+\label{misc:identical}
+
+\synopsis{==}{[t,t]\{\}}
+
+The \q{==} predicate is satisfied if its arguments are identical without substituting any variables in either argument; otherwise the \q{==} test will \emph{fail}.
+
+\section{Variables, terms and frozen terms}
+\label{misc:varterms}
+
+\subsection{\function{var} -- test for variable}
+\label{misc:var}
+
+\synopsis{var}{[t]\{\}}
+
+The \q{var} predicate is satisfied if its argument is a variable, and fails otherwise. 
+
+\subsection{\function{nonvar} -- test for variable}
+\label{misc:nonvar}
+
+\synopsis{nonvar}{[t]\{\}}
+
+The \q{nonvar} predicate is satisfied if its argument is \emph{not} a variable, and fails otherwise. 
+
+
+\subsection{\function{ground} -- test for groundedness}
+\label{misc:ground}
+
+\synopsis{ground}{[t]\{\}}
+
+The \q{ground} predicate is satisfied if its argument is \emph{ground}, and fails otherwise. 
+
+A term is ground if it does not contain any variables. This test applies to all types of values -- including program values. A program is considered to be ground iff its \emph{free} variables are ground -- a program's bound variables are universally quantified and we consider a term of the form: $\forall X.X$ to be ground.
+
+
+%\subsection{\function{frozen} -- test for frozen variable}
+%\label{misc:frozen}
+
+%\synopsis{frozen}{[T]-(T)\{\}}
+
+%The \q{var} predicate is satisfied if its argument is a \emph{frozen} variable, and fails otherwise. A frozen variable is one that arises from a term that has been previously \emph{frozen} (see section~\vref{misc:freeze}).
+
+%\subsection{\function{freeze} -- freeze a term}
+%\label{misc:freeze}
+
+%\synopsis{freeze}{[T]-((T)\funarrow{}T)}
+
+%The \q{freeze} function copies a term and `freezes' it. This involves replacing all the unbound variables with new `frozen' variables. A frozen variable cannot be further instantiated -- indeed it will only unify with itself.
+
+%Frozen terms are automatically introduced within a \go program when an updatable variable is updated with a term that contains variables. In this situation, the actual value assigned to the variable is the frozen term rather than the original.
+
+%Frozen terms' property that they cannot be further instantiated makes them very useful in many situations; apart from supporting assignment and message communication. For example, freezing a term  permits processing the term by unifying against it without risking `side-affecting' the term in undesirable ways.
+
+%\subsection{\function{thaw} -- thaw a frozen term}
+%\label{misc:thaw}
+
+%\synopsis{thaw}{[T]-((T)\funarrow{}T)}
+
+%The \q{thaw} function copies a frozen term and `thaws' it. This involves replacing all the frozen variables with new regular variables. This would permit a thawed term to be further instantiated if required.
+
+\section{Internet hosts}
+These two functions allow programs to compute IP addresses and hostnames of computers on the Internet. Their use requires an on-line connection to the Internet.
+
+\subsection{\function{hosttoip} -- determine IP address}
+\label{misc:hosttoip}
+
+\synopsis{hosttotip}{[string]\funarrow{}list[string]}
+
+The \function{hosttoip} function returns the IP addresses associated with the \param{host} computer. The returned list is a list of strings, each of which is an IP address in normal `quartet' form. Note that it isn't possible for this to be a guaranteed complete list -- it depends on the local DNS server.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+A ground string is required.
+\end{description}
+
+
+\subsection{\function{iptohost} -- determine host name}
+\label{misc:iptohost}
+
+\synopsis{iptohost}{[string]\funarrow{}string}
+
+The \function{iptohost} function returns the host name associated with a given IP address. The returned list is a string giving the hostname.
+
+Note that the form of the hostname is not guaranteed to be `canonical' -- i.e., the full hostname including domain. The \go system attempts to determine the full hostname but improperly configured local systems will be able to mystify \go.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eSTRNEEDD'}]
+A ground string is required.
+\end{description}
+
+\section{Environment variables}
+\label{misc:environment}
+
+These access and manipulate the environment variables that are often available for program to customize their operation.
+
+\subsection{\q{getenv} -- access environment variable}
+\label{misc:getenv}
+
+\synopsis{getenv}{[symbol,string]\funarrow{}string}
+     
+The \function{getenv} function expects a ground \q{symbol} argument -- the environment variable name -- and a string (\q{char[]}) \emph{default} argument. If the environment variable is set in the program's current environment then the value of the environment variable is returned as a string. Otherwise, the \function{getenv} function returns the \emph{default} value.
+
+\subsection{\q{setenv} -- set environment variable}
+\label{misc:setenv}
+
+\synopsis{setenv}{[symbol,string]*}
+     
+The \function{setenv} action expects a \q{symbol} argument -- \emph{K} -- and a string  argument \emph{V}; both parameters must be ground. This action sets the value of the \emph{K} environment variable to be \emph{V}.
+
+\subsection{\q{envir} -- return all environment variables}
+\label{misc:envir}
+
+\synopsis{envir}{[]\funarrow{}list[(symbol,string)]}
+
+The \function{envir} function returns all the environment variables available to the program. Each environment variable is `presented' as a 2-tuple: the first element of the tuple is a symbol denoting the name of the environment variable and the second is a string denoting the variable's value.
+
+\subsection{\q{getlogin} -- access login name}
+\label{misc:getlogin}
+
+\synopsis{getlogin}{[]\funarrow{}string}
+     
+The \function{getlogin} function returns the user name (login ID) of the `owner' of the process executing this \go application.
+
+\section{Program and thread management}
+\label{misc:process}
+
+These allow threads to monitor the state of other threads and wait for the termination of a thread.
+
+\subsection{\q{\_\_command\_line} -- command line arguments}
+\label{misc:commandline}
+\index{command line arguments}
+
+\synopsis{\_\_command\_line}{[]\funarrow{}list[string]}
+
+The \q{\_\_command\_line} function returns a list of strings corresponding to the program name and command line arguments passed to the \go run-time engine.
+
+
+\subsection{\q{exit} -- terminate \go execution}
+\label{misc:exit}
+\index{terminate execution}
+\index{{\tt exit} \go execution}
+
+\synopsis{exit}{[integer]*}
+
+The \q{exit} action terminates the current execution of the \go system and returns its argument as the process's return code to the operating system.
+
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+This is a privileged action, and the calling thread has insufficient permissions to close down the \go engine.
+\item[\constant{'eINVAL'}]
+A non-integer was passed as the return code to return from the \go invocation.
+\end{description}
+
+\subsection{\q{kill} -- terminate a \go thread}
+\label{misc:kill}
+\index{terminate thread}
+\index{{\tt kill} \go execution}
+
+\synopsis{kill}{[thread]*}
+
+The \q{kill} action terminates a thread identified by its argument.  Only the creator thread of a thread may kill it.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eNOPERM'}]
+This is a privileged action, and the calling thread has insufficient permissions to kill threads.
+\item[\constant{'eINVAL'}]
+The to-be-killed thread is not a valid local thread.
+\end{description}
+
+\subsection{\q{process\_state} -- access process state}
+\label{misc:prstate}
+
+\synopsis{process\_state}{[thread]\funarrow{}process\_state}
+     
+The \function{process\_state} function expects a \q{handle} argument and returns a symbol that identifies the current state of that thread:
+
+\begin{description}
+\item[\q{quiescent}]
+The thread has not yet executed any instructions.
+
+\item[\q{runnable}]
+The thread is currently one of the actively executing threads.
+
+\item[\q{wait\_io}]
+The thread is currently suspended waiting for an I/O event.
+
+\item[\q{wait\_term}]
+The thread is waiting for another thread to terminate.
+
+\item[\q{wait\_timer}]
+The thread is waiting for an alarm clock.
+
+\item[\q{wait\_child}]
+The thread is waiting for a child process -- as opposed to a thread -- to terminate.
+
+\item[\q{dead}]
+The thread has died.
+\end{description}
+
+\q{process\_state} is a standard type, whose definition is:
+\begin{alltt}
+process\_state ::= 
+  quiescent | runnable | wait\_io | wait\_term |
+  wait\_timer | wait\_lock | wait\_child | dead.
+\end{alltt}
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The \param{H} argument should be a handle, not a variable.
+\item[\constant{'eINVAL'}]
+The \param{H} argument is not a valid local handle.
+\end{description}
+
+\subsection{\q{waitfor} -- wait for a thread to terminate}
+\label{misc:waitfor}
+
+\synopsis{waitfor}{[thread]*}
+
+The \q{waitfor} standard action suspends the current process until the \param{H} thread has terminated. If \param{H} has already terminated then the \q{waitfor} action simply continues; otherwise the calling thread is suspended until \param{H} terminates.
+
+\paragraph{Error exceptions}
+\begin{description}
+\item[\constant{'eINSUFARG'}]
+The \param{H} argument should be a handle, not a variable.
+\item[\constant{'eINVAL'}]
+The \param{H} argument is not a valid local handle.
+\end{description}
+
+\subsection{\q{\_\_shell} -- execute shell command}
+\label{misc:shell}
+
+\synopsis{\_\_shell}{[string,list[string],list[(symbol,string)],number]*}
+
+The \q{\_\_shell} action invokes a \param{Cmd} program or shell script with the arguments constructed from the argument list in the environment constructed from the environment argument.
+
+Each element of the environment is a symbol/string pair of the form:
+\begin{alltt}
+(\emph{envVar},\emph{value})
+\end{alltt}
+If environment is empty, then sub-process'es environment has the default minimum number of environment variables set.
+
+The return code resulting from the execution of the program is returned as the value of \param{Ret}.
+
+\emph{Note:}
+In a multi-threaded \go application, if one thread issues a \q{\_\_shell} command, other threads emph{do not} suspend waiting for the shell command to terminate. This allows an application to spawn off more than one shell command. However, the thread issuing the \q{\_\_shell} action is suspended until the spawned process terminates.
+
+
+

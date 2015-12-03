@@ -1,0 +1,202 @@
+\chapter{XML processing}
+\label{xml}
+
+\go provides a simple library for processing XML documents. This library provides programs for `grabbing' an XML document, parsing it into a DOM-like structure and displaying it. Processing XML documents is the foundation for many other forms of data processing.\footnote{This version of the XML parser is not a complete XML 1.0 compliant parser: it does not understand external DTDs, nor does it understand all of XML 1.0's features. This may be extended in a future release.}
+
+\go's XML processing is based on string processing. I.e., a typical mode of operation is to first of all `grab' an XML document in a string -- \q{list[char]} -- and then parse it using \q{xmlParse}. Conversely, to display an XML document, we first of all convert it to a string, and then write it out on the appropriate channel.
+
+To use \go's XML processing facilities, it is necessary to access the \q{go.xml} package:
+\libsynopsis{go.xml}
+
+\section{\go's XML document type}
+\index{XML document type structure}
+
+The \q{xmlDOM} type provides the foundation for \go's XML processing. It is defined as:
+\begin{alltt}
+xmlDOM \impl showable.
+xmlDOM \impl \{ 
+  pickElement:[symbol]\funarrow{}xmlDOM. 
+  elementPresent:[symbol]{}.
+  hasAtt:[symbol,string]\{\}.
+  pickAtt:[symbol]=>string.
+  pickText:[symbol,string]\funarrow{}string.
+  xml:[]\funarrow{}string.
+\}.
+\end{alltt}
+The \q{xmlAttr} type encapsulates attributes associated with the \q{xmlDOM} entity (especially the \q{xmlElement} constructor):
+\begin{alltt}
+  xmlAttr ::= xmlAtt(symbol,string).
+\end{alltt}
+
+An \q{xmlDOM} term corresponds to the XML infoset view of an XML document. A node has one of three forms: an \q{xmlElement}, an \q{xmlText} element or an \q{xmlPI} processing instruction. Of these, the most complex is the \q{xmlElement} structure.
+
+\begin{aside}
+Note that \q{xmlDOM} is a sub-type of the \q{showable} type, which itself is in the \q{go.showable} package. However, it is not required for any package that is simply \emph{using} the \q{xmlDOM} type to also import the \q{go.showable} package.
+\end{aside}
+
+\begin{description}
+\item[pickElement]
+The \q{pickElement} function returns the first child element whose name is that given.
+
+\q{pickElement} raises a \q{'eNOTFND'} exception if the element is not present.
+
+\item[elementPresent]
+The \q{elementPresent} predicate is satisfied if the named element is present as a child.
+
+\item[hasAtt]
+The \q{hasAtt} predicate is satisfied if the named attribute is present.
+
+\item[pickAtt]
+The \q{pickAtt} function returns the value of the named attribute if present. Note that the XML specification permits multiple values for an attribute of an element; however, the \q{pickAtt} function returns an arbitrary member if there is more than one.
+
+If the attribute is not present, then an \q{'eNOTFND'} exception will be raised.
+
+\item[xml]
+The \q{xml} function returns an XML string representation of the \q{xmlDOM}. 
+
+Note that while most of the methods are not meaningful for all \q{xmlDOM} constructores, the \q{xml} function is.
+\end{description}
+
+
+\subsection{xmlText}
+\label{xml:xmltext}
+\index{xmlText@\q{xmlTEXT} xmlDOM constructor}
+\classsynopsis{xmlText}{[string]}{xmlDOM}
+Text appearing in an XML document is collected in an \q{xmlText} term. Note that the parser removes empty text elements during the parse, and strips off leading and trailing white space from other text elements.
+
+The parser supports standard entities (see Section~\vref{xml:entities}); which are substituted for in the body of the \q{xmlText} term.
+
+Note that \q{xmlText} does \emph{not} support many of the methods in the \q{xmlDOM} type -- for example, invoking the \q{pickElement} function will result in an \q{'eINVAL'} exception being raised. The \q{xmlText} constructor is a state-free constructor, and the expectation is that normally it will be matched against rather than used.
+
+\subsection{xmlPI}
+\label{xml:xmlPI}
+\index{xmlPI@\q{xmlPI} xmlDOM constructor}
+\classsynopsis{xmlPI}{[string]}{xmlDOM}
+Processing instructions appearing in the XML document are returned in an \q{xmlPI} term.
+
+\subsection{xmlElement}
+\label{xml:xmlElement}
+\index{xmlElement@\q{xmlElement} xmlDOM constructor}
+\classsynopsis{xmlElement}{[symbol,list[xmlAttr],list[xmlDOM]]}{xmlDOM}
+A tagged element is represented as an \q{xmlElement} term. This has three arguments, corresponding to the tag, the list of attributes and the list of child elements.
+
+The parser automatically converts local tag names into their fully expanded form when there is a name-space declaration; including the default namespace declaration.
+
+For example, the XML fragment:
+\begin{alltt}
+<foo xmlns="http:myNameSpace#" id="bar">
+  <subfoo/>
+</foo>
+\end{alltt}
+is represented, using \q{xmlDOM} terms, as:
+\begin{alltt}
+xmlElement('http:myNameSpace#foo',
+  [xmlAtt('http:myNameSpace#id',"bar")],
+  [xmlElement('http:myNameSpace#subfoo',[],[])])
+\end{alltt}
+
+\subsection{xmlAtt -- attributes}
+\label{xml:xmlAtt}
+\index{xmlAtt@\q{xmlAtt} xmlDOM attribute constructor}
+\classsynopsis{xmlAtt}{[symbol,string]}{xmlAttr}
+Atributes in an \q{xmlElement} are represented using the \q{xmlAtt} term. Each attribute \q{xmlAtt} term has two arguments: the attribute name and the value of the attribute -- as a string.
+
+The \go xml parser expands standard entities in attribute values.
+
+\subsection{Standard entities}
+\label{xml:entities}
+The \go parse (and display) functions are aware of a restricted set of standard entities. It is not possible to declare new entity definitions. The standard entities that the parser is aware of are shown in Table~\ref{xml:standardentities}:
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|c|}
+\hline
+Entity&Definition\\
+\hline
+\tt \&amp;&\tt\&\\
+\tt \&lt;&\tt<\\
+\tt \&gt;&\tt>\\
+\tt \&apos;&\tt'\\
+\tt \&excl;&\tt!\\
+\tt \&quot;&\tt"\\
+\hline
+\end{tabular}
+\end{center}
+\caption{\go standard entities}\label{xml:standardentities}
+\end{table}
+
+\section{Parsing XML documents}
+\label{xml:parse}
+
+There are two programs in the standard xml library for parsing documents: \q{grabURL} which is a convenience function for accessing the contents of a URI and \q{xmlParse} which is a grammar program for parsing strings.
+
+\subsection{grabXML}
+\synopsis{grabXML}{[string,string]\funarrow{}(string,xmlDOM)}
+
+The \q{grabXML} function takes two \q{string} arguments: a `base' url (\param{B}), a `request' url (\param{U}) and returns a pair -- the fully resolved url and the contents of the document found at that url, parsed as an \q{xmlDOM} document. The request url may be relative, in which case it is interpreted relative to the base url \param{B}.
+
+\paragraph{Error exceptions}\footnote{See Chapter~\vref{errorcodes} for the definition of the standard error codes}
+\begin{description}
+\item[\constant{'eNOTFND'}]
+It was not possible to access the document at the resolved location.
+\end{description}
+
+\subsection{xmlParse}
+
+\synopsis{xmlParse}{[xmlDOM-]\grarrow{}string}
+
+The \q{xmlParse} grammar parses a string which contains an XML document and returns the \q{xmlDOM} structure corresponding to the parse.
+
+The \q{xmlParse} parser does not validate XML documents, nor does it process DTDs. However, it is `namespace' aware: documents can be processed with namespace declarations and recognized properly.
+
+The parser is not currently a full XML parser; Table~\vref{xml:xml} is an enumeration of the features of XML and the extent to which they are supported.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|c|}
+\hline
+XML 1.0 Feature&Supported\\
+\hline
+Attributes&yes\\
+Character references&yes\\
+Comments&yes\\
+Conditional sections&no\\
+DTD&no\\
+Document declaration&no\\
+Empty Tags&yes\\
+Entities&predefined only\\
+Namespaces&yes\\
+PCDATA&yes\\
+Processing Instructions&yes\\
+Tags&yes\\
+Validation&no\\
+Well-formedness&partial\\
+\hline
+\end{tabular}
+\end{center}
+\caption{XML 1.0 features}\label{xml:xml}
+\end{table}
+Although the parser records processing instructions, there are no PIs that it recognizes directly.
+
+\section{Displaying XML documents}
+
+\subsection{xmlDisplay - show XML structure}
+\label{xml:display}
+\synopsis{xmlDisplay}{[xmlDOM]\funarrow{}string}
+
+The \q{xmlDisplay} function returns a string XML representation of an \q{xmlDOM} term. It uses the local tag and attribute names in constructing the displayed string.
+
+\q{xmlDisplay} is `entity' aware: characters in the values of attributes and in \q{xmlText} elements that require representing as elements in order to conform to XML are handled correctly.
+
+\q{xmlDisplay} is an extremely simple generator, optimized for performance rather than elegance of output. In particular, it does not `pretty print' the XML structure into an easily readable form.
+
+\section{Miscelleneous functions}
+
+\subsection{\q{hasNameSpace} -- Look for a name space}
+\synopsis{hasNameSpace}{[xmlDOM,string]\{\}}
+
+The \q{hasNameSpace} predicate is true of an \q{xmlElement} if has an \q{xmlns} attribute -- i.e., if its default namespace is known. The second argument is the name space.
+
+This predicate is equivalent to:
+\begin{alltt}
+hasNameSpace(X,N) :- X.hasAtt('xmlns',N).
+\end{alltt}
+
